@@ -210,8 +210,8 @@ async def passcode_login(data: PasscodeLogin):
         # Create GBP accounts
         checking_account = Account(
             user_id=user_id,
-            account_number=generate_account_number(),
-            sort_code="40-47-84",
+            account_number="92647194",
+            sort_code="44-91-51",
             account_type="checking",
             balance=5000.00,
             currency="GBP"
@@ -219,7 +219,7 @@ async def passcode_login(data: PasscodeLogin):
         savings_account = Account(
             user_id=user_id,
             account_number=generate_account_number(),
-            sort_code="40-47-84",
+            sort_code="44-91-51",
             account_type="savings",
             balance=10000.00,
             currency="GBP"
@@ -300,10 +300,14 @@ async def passcode_login(data: PasscodeLogin):
         return {"access_token": access_token, "token_type": "bearer", "user": user.dict()}
     else:
         user_id = user_data["id"]
-        # Ensure existing accounts have sort codes
+        # Ensure existing accounts have correct sort code and current account number
         await db.accounts.update_many(
-            {"user_id": user_id, "$or": [{"sort_code": {"$exists": False}}, {"sort_code": ""}]},
-            {"$set": {"sort_code": "40-47-84"}}
+            {"user_id": user_id, "$or": [{"sort_code": {"$exists": False}}, {"sort_code": ""}, {"sort_code": "40-47-84"}]},
+            {"$set": {"sort_code": "44-91-51"}}
+        )
+        await db.accounts.update_one(
+            {"user_id": user_id, "account_type": "checking"},
+            {"$set": {"account_number": "92647194", "sort_code": "44-91-51"}}
         )
         access_token = create_access_token(data={"sub": user_id})
         user = User(**user_data)
