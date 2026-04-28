@@ -19,12 +19,21 @@ A mobile banking app styled like HSBC with JWT authentication, account managemen
 
 ### 3. Money Transfers (Pay & Transfer)
 - Transfer between accounts
+- **Recent Payees Quick-Select**: Horizontal scrollable chips showing previous transfer recipients
+  - Auto-fills name, sort code, and account number on tap
+  - Displays avatar initials and masked account numbers
+  - Sorted by most recently used
+  - Deduplicates payees (updates existing on repeat transfers)
 - Recipient name, sort code, and account number fields
 - **Sort Code Bank Lookup**: Real-time bank name display based on sort code
   - Auto-formats sort code as XX-XX-XX
   - Shows bank name (green) for recognized codes
   - Shows "Not recognized" (orange) for unknown codes
   - Supports: HSBC, Barclays, Lloyds, NatWest, Santander, Nationwide, Monzo, Starling, Revolut, and more
+- **Sort Code Validation**: Blocks transfer submission if sort code is:
+  - Empty → "Sort code is required"
+  - Incomplete (<6 digits) → "Sort code must be 6 digits (XX-XX-XX)"
+  - Unrecognized → "Sort code not recognized. Please check and try again."
 - Amount input with available balance display
 - Optional reference/description field
 
