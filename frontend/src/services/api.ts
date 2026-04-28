@@ -166,3 +166,22 @@ export const chatApi = {
   send: (message: string, session_id?: string) => api.post<{ response: string; session_id: string }>('/chat', { message, session_id }),
   getHistory: (session_id?: string) => api.get<ChatMessage[]>(`/chat/history${session_id ? `?session_id=${session_id}` : ''}`),
 };
+
+// Notification types
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  notification_type: string;
+  is_read: boolean;
+  data?: any;
+  timestamp: string;
+}
+
+export const notificationsApi = {
+  getAll: (limit?: number) => api.get<AppNotification[]>(`/notifications${limit ? `?limit=${limit}` : ''}`),
+  getUnreadCount: () => api.get<{ count: number }>('/notifications/unread-count'),
+  markRead: (id: string) => api.post(`/notifications/${id}/read`),
+  markAllRead: () => api.post('/notifications/read-all'),
+};

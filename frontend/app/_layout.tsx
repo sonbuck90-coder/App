@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="payees" />
         <Stack.Screen name="analytics" />
         <Stack.Screen name="chat" />
+        <Stack.Screen name="notifications" />
       </Stack>
     </AuthProvider>
   );

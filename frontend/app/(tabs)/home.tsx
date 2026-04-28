@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { dashboardApi, accountsApi, Account, DashboardStats } from '../../src/services/api';
+import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../../src/services/api';
 
 // HSBC Colors
 const COLORS = {
@@ -28,19 +29,23 @@ const COLORS = {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchData = async () => {
     try {
-      const [statsRes, accountsRes] = await Promise.all([
+      const [statsRes, accountsRes, unreadRes] = await Promise.all([
         dashboardApi.getStats(),
         accountsApi.getAll(),
+        notificationsApi.getUnreadCount(),
       ]);
       setStats(statsRes.data);
       setAccounts(accountsRes.data);
+      setUnreadCount(unreadRes.data.count);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -115,8 +120,13 @@ export default function HomeScreen() {
             <TouchableOpacity style={styles.headerIcon}>
               <Ionicons name="search" size={22} color={COLORS.white} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIcon}>
+            <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')} testID="notification-bell">
               <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -315,6 +325,24 @@ const styles = StyleSheet.create({
   },
   headerIcon: {
     marginLeft: 20,
+    position: 'relative' as const,
+  },
+  notifBadge: {
+    position: 'absolute' as const,
+    top: -6,
+    right: -8,
+    backgroundColor: COLORS.white,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    paddingHorizontal: 4,
+  },
+  notifBadgeText: {
+    fontSize: 10,
+    fontWeight: '700' as const,
+    color: COLORS.primary,
   },
   greeting: {
     fontSize: 24,

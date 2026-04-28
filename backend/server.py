@@ -246,6 +246,9 @@ async def register(user_data: UserCreate):
     access_token = create_access_token(data={"sub": user_id})
     user = User(id=user_id, email=user_data.email, name=user_data.name)
     
+    # Welcome notification
+    await create_notification(user_id, "Welcome to HSBC!", f"Hello {user_data.name}, your accounts are ready. You have $5,000 in Checking and $10,000 in Savings.", "welcome")
+    
     return Token(access_token=access_token, token_type="bearer", user=user)
 
 @api_router.post("/auth/login", response_model=Token)
@@ -342,9 +345,11 @@ async def create_transfer(transfer: TransferRequest, current_user: User = Depend
             )
             await db.payees.insert_one(payee.dict())
     
+    # Transfer notification
+    recipient = transfer.recipient_name or "External Account"
+    await create_notification(current_user.id, "Transfer Sent", f"${transfer.amount:.2f} sent to {recipient}", "transfer", {"transaction_id": transaction.id, "amount": transfer.amount})
+    
     return transaction
-
-# ==================== PAYEE ENDPOINTS ====================
 
 @api_router.get("/payees")
 async def get_recent_payees(current_user: User = Depends(get_current_user)):
@@ -411,6 +416,9 @@ async def pay_bill(payment: BillPaymentRequest, current_user: User = Depends(get
     )
     await db.transactions.insert_one(transaction.dict())
     
+    # Bill payment notification
+    await create_notification(current_user.id, "Bill Payment", f"${payment.amount:.2f} paid to {biller.name}", "payment", {"transaction_id": transaction.id, "biller": biller.name})
+    
     return transaction
 
 # ==================== CARD ENDPOINTS ====================
@@ -435,6 +443,7 @@ async def freeze_card(card_id: str, current_user: User = Depends(get_current_use
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Card not found")
+    await create_notification(current_user.id, "Card Frozen", "Your card has been temporarily frozen for security", "card", {"card_id": card_id, "action": "frozen"})
     return {"message": "Card frozen successfully"}
 
 @api_router.post("/cards/{card_id}/unfreeze")
@@ -445,6 +454,7 @@ async def unfreeze_card(card_id: str, current_user: User = Depends(get_current_u
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Card not found")
+    await create_notification(current_user.id, "Card Activated", "Your card has been unfrozen and is now active", "card", {"card_id": card_id, "action": "unfrozen"})
     return {"message": "Card unfrozen successfully"}
 
 # ==================== DASHBOARD STATS ====================
@@ -723,6 +733,58 @@ async def get_chat_history(current_user: User = Depends(get_current_user), sessi
     
     messages = await db.chat_messages.find(query, {"_id": 0}).sort("timestamp", 1).to_list(50)
     return messages
+
+# ==================== NOTIFICATIONS ====================
+
+class Notification(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    title: str
+    body: str
+    notification_type: str  # transfer, payment, card, welcome, system
+    is_read: bool = False
+    data: Optional[dict] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+async def create_notification(user_id: str, title: str, body: str, notification_type: str, data: Optional[dict] = None):
+    notif = Notification(
+        user_id=user_id,
+        title=title,
+        body=body,
+        notification_type=notification_type,
+        data=data,
+    )
+    await db.notifications.insert_one(notif.dict())
+    return notif
+
+@api_router.get("/notifications")
+async def get_notifications(current_user: User = Depends(get_current_user), limit: int = 30):
+    notifications = await db.notifications.find(
+        {"user_id": current_user.id},
+        {"_id": 0}
+    ).sort("timestamp", -1).to_list(limit)
+    return notifications
+
+@api_router.get("/notifications/unread-count")
+async def get_unread_count(current_user: User = Depends(get_current_user)):
+    count = await db.notifications.count_documents({"user_id": current_user.id, "is_read": False})
+    return {"count": count}
+
+@api_router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str, current_user: User = Depends(get_current_user)):
+    await db.notifications.update_one(
+        {"id": notification_id, "user_id": current_user.id},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "Marked as read"}
+
+@api_router.post("/notifications/read-all")
+async def mark_all_read(current_user: User = Depends(get_current_user)):
+    await db.notifications.update_many(
+        {"user_id": current_user.id, "is_read": False},
+        {"$set": {"is_read": True}}
+    )
+    return {"message": "All marked as read"}
 
 # Include the router in the main app
 app.include_router(api_router)
