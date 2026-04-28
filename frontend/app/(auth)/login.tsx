@@ -1,321 +1,159 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  Image,
-} from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-// HSBC Colors
-const COLORS = {
-  primary: '#DB0011', // HSBC Red
-  secondary: '#333333',
-  white: '#FFFFFF',
-  lightGray: '#F5F5F5',
-  gray: '#767676',
-  darkGray: '#333333',
-  black: '#000000',
-};
+const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000' };
+const PASSCODE_LENGTH = 4;
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const { loginWithPasscode } = useAuth();
+  const [passcode, setPasscode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const hiddenInputRef = useRef<TextInput>(null);
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
+  const handleDigit = (digit: string) => {
+    if (passcode.length >= PASSCODE_LENGTH) return;
+    const newPasscode = passcode + digit;
+    setPasscode(newPasscode);
+    setError('');
+
+    if (newPasscode.length === PASSCODE_LENGTH) {
+      handleLogin(newPasscode);
     }
+  };
 
+  const handleDelete = () => {
+    setPasscode(prev => prev.slice(0, -1));
+    setError('');
+  };
+
+  const handleLogin = async (code: string) => {
     setIsLoading(true);
     try {
-      await login(email, password);
+      await loginWithPasscode(code);
       router.replace('/(tabs)/home');
-    } catch (error: any) {
-      Alert.alert('Login Failed', error.message);
+    } catch (err: any) {
+      setPasscode('');
+      setError('Invalid passcode. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
+
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* HSBC Logo Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <View style={styles.hexagonRow}>
-                <View style={[styles.hexagon, styles.hexagonRed]} />
-                <View style={[styles.hexagon, styles.hexagonWhite]} />
-              </View>
-              <View style={styles.hexagonRow}>
-                <View style={[styles.hexagon, styles.hexagonWhite]} />
-                <View style={[styles.hexagon, styles.hexagonRed]} />
-              </View>
+      <View style={styles.content}>
+        {/* Logo */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <View style={styles.hexagonRow}>
+              <View style={[styles.hexagon, styles.hexagonRed]} />
+              <View style={[styles.hexagon, styles.hexagonWhite]} />
             </View>
-            <Text style={styles.brandName}>HSBC</Text>
-            <Text style={styles.tagline}>Mobile Banking</Text>
+            <View style={styles.hexagonRow}>
+              <View style={[styles.hexagon, styles.hexagonWhite]} />
+              <View style={[styles.hexagon, styles.hexagonRed]} />
+            </View>
           </View>
+          <Text style={styles.brandName}>HSBC</Text>
+        </View>
 
-          <View style={styles.form}>
-            <Text style={styles.welcomeText}>Log on to Mobile Banking</Text>
-            
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Username / Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter your username"
-                placeholderTextColor={COLORS.gray}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                testID="email-input"
-              />
-            </View>
+        {/* Title */}
+        <Text style={styles.title}>Enter your passcode</Text>
+        <Text style={styles.subtitle}>Enter your 4-digit security passcode</Text>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Password</Text>
-              <View style={styles.passwordContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  placeholder="Enter your password"
-                  placeholderTextColor={COLORS.gray}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                  testID="password-input"
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-                  <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
-                    size={22}
-                    color={COLORS.gray}
-                  />
+        {/* Dots */}
+        <View style={styles.dotsContainer}>
+          {[0, 1, 2, 3].map((i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                passcode.length > i && styles.dotFilled,
+                error ? styles.dotError : null,
+              ]}
+            />
+          ))}
+        </View>
+
+        {/* Error */}
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={16} color={COLORS.primary} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        ) : null}
+
+        {/* Loading */}
+        {isLoading ? (
+          <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
+        ) : null}
+
+        {/* Keypad */}
+        <View style={styles.keypad}>
+          {digits.map((digit, i) => {
+            if (digit === '') return <View key={i} style={styles.keyEmpty} />;
+            if (digit === 'del') {
+              return (
+                <TouchableOpacity key={i} style={styles.key} onPress={handleDelete} testID="passcode-delete">
+                  <Ionicons name="backspace-outline" size={26} color={COLORS.darkGray} />
                 </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.forgotPassword}>
-              <Text style={styles.forgotPasswordText}>Forgotten your password?</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-              testID="login-button"
-            >
-              {isLoading ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={styles.loginButtonText}>Log on</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.biometricButton}>
-              <Ionicons name="finger-print" size={24} color={COLORS.primary} />
-              <Text style={styles.biometricText}>Use Touch ID</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>New to HSBC Mobile Banking? </Text>
-            <Link href="/(auth)/register" asChild>
-              <TouchableOpacity>
-                <Text style={styles.footerLink}>Register now</Text>
+              );
+            }
+            return (
+              <TouchableOpacity
+                key={i}
+                style={styles.key}
+                onPress={() => handleDigit(digit)}
+                disabled={isLoading}
+                testID={`passcode-key-${digit}`}
+              >
+                <Text style={styles.keyText}>{digit}</Text>
               </TouchableOpacity>
-            </Link>
-          </View>
+            );
+          })}
+        </View>
 
-          <View style={styles.securityNote}>
-            <Ionicons name="shield-checkmark" size={16} color={COLORS.gray} />
-            <Text style={styles.securityText}>Your security is our priority</Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {/* Biometric hint */}
+        <TouchableOpacity style={styles.biometricHint}>
+          <Ionicons name="finger-print" size={20} color={COLORS.primary} />
+          <Text style={styles.biometricText}>Use Touch ID</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoContainer: {
-    marginBottom: 12,
-  },
-  hexagonRow: {
-    flexDirection: 'row',
-  },
-  hexagon: {
-    width: 28,
-    height: 28,
-    margin: 1,
-  },
-  hexagonRed: {
-    backgroundColor: COLORS.primary,
-  },
-  hexagonWhite: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  brandName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.primary,
-    letterSpacing: 4,
-  },
-  tagline: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginTop: 4,
-  },
-  form: {
-    marginBottom: 24,
-  },
-  welcomeText: {
-    fontSize: 22,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-    marginBottom: 24,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.darkGray,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 4,
-    paddingHorizontal: 16,
-    height: 52,
-    fontSize: 16,
-    color: COLORS.black,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  passwordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    height: 52,
-    fontSize: 16,
-    color: COLORS.black,
-  },
-  eyeButton: {
-    padding: 12,
-  },
-  forgotPassword: {
-    alignSelf: 'flex-start',
-    marginBottom: 24,
-  },
-  forgotPasswordText: {
-    color: COLORS.primary,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  loginButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginButtonDisabled: {
-    opacity: 0.7,
-  },
-  loginButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    paddingVertical: 12,
-  },
-  biometricText: {
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 'auto',
-    paddingVertical: 16,
-  },
-  footerText: {
-    color: COLORS.darkGray,
-    fontSize: 14,
-  },
-  footerLink: {
-    color: COLORS.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  securityNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 8,
-  },
-  securityText: {
-    color: COLORS.gray,
-    fontSize: 12,
-    marginLeft: 6,
-  },
+  container: { flex: 1, backgroundColor: COLORS.white },
+  content: { flex: 1, alignItems: 'center', paddingHorizontal: 32, paddingTop: 20 },
+  header: { alignItems: 'center', marginBottom: 32 },
+  logoContainer: { marginBottom: 8 },
+  hexagonRow: { flexDirection: 'row' },
+  hexagon: { width: 22, height: 22, margin: 1 },
+  hexagonRed: { backgroundColor: COLORS.primary },
+  hexagonWhite: { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.primary },
+  brandName: { fontSize: 28, fontWeight: '700', color: COLORS.primary, letterSpacing: 4 },
+  title: { fontSize: 22, fontWeight: '600', color: COLORS.darkGray, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: COLORS.gray, marginBottom: 32 },
+  dotsContainer: { flexDirection: 'row', marginBottom: 24 },
+  dot: { width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: '#D0D0D0', marginHorizontal: 10 },
+  dotFilled: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  dotError: { borderColor: COLORS.primary, backgroundColor: 'transparent' },
+  errorContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  errorText: { fontSize: 14, color: COLORS.primary, marginLeft: 6, fontWeight: '500' },
+  loader: { marginBottom: 16 },
+  keypad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', width: 280, marginTop: 8 },
+  key: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', margin: 8, backgroundColor: COLORS.lightGray },
+  keyEmpty: { width: 72, height: 72, margin: 8 },
+  keyText: { fontSize: 28, fontWeight: '500', color: COLORS.darkGray },
+  biometricHint: { flexDirection: 'row', alignItems: 'center', marginTop: 20 },
+  biometricText: { fontSize: 14, color: COLORS.primary, fontWeight: '500', marginLeft: 8 },
 });

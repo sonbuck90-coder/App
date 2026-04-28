@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -14,6 +15,9 @@ import jwt
 from passlib.context import CryptContext
 import random
 import string
+import io
+import csv
+import asyncio
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -41,6 +45,9 @@ app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
 # ==================== MODELS ====================
+
+class PasscodeLogin(BaseModel):
+    passcode: str
 
 class UserCreate(BaseModel):
     email: EmailStr
@@ -71,7 +78,7 @@ class Account(BaseModel):
     account_number: str
     account_type: str  # checking, savings
     balance: float = 0.0
-    currency: str = "USD"
+    currency: str = "GBP"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Transaction(BaseModel):
@@ -174,6 +181,125 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise HTTPException(status_code=401, detail="Invalid token")
 
 # ==================== AUTH ENDPOINTS ====================
+
+VALID_PASSCODE = "0503"
+DEFAULT_USER_NAME = "HSBC Customer"
+DEFAULT_USER_EMAIL = "customer@hsbc.co.uk"
+
+@api_router.post("/auth/passcode")
+async def passcode_login(data: PasscodeLogin):
+    if data.passcode != VALID_PASSCODE:
+        raise HTTPException(status_code=401, detail="Invalid passcode")
+    
+    # Find or create the default user
+    user_data = await db.users.find_one({"email": DEFAULT_USER_EMAIL})
+    
+    if not user_data:
+        # Create user on first passcode login
+        user_id = str(uuid.uuid4())
+        user_dict = {
+            "id": user_id,
+            "email": DEFAULT_USER_EMAIL,
+            "name": DEFAULT_USER_NAME,
+            "password_hash": hash_password(VALID_PASSCODE),
+            "created_at": datetime.utcnow()
+        }
+        await db.users.insert_one(user_dict)
+        
+        # Create GBP accounts
+        checking_account = Account(
+            user_id=user_id,
+            account_number=generate_account_number(),
+            account_type="checking",
+            balance=5000.00,
+            currency="GBP"
+        )
+        savings_account = Account(
+            user_id=user_id,
+            account_number=generate_account_number(),
+            account_type="savings",
+            balance=10000.00,
+            currency="GBP"
+        )
+        await db.accounts.insert_one(checking_account.dict())
+        await db.accounts.insert_one(savings_account.dict())
+        
+        # Create cards with specific card number
+        debit_card = Card(
+            user_id=user_id,
+            card_number="5273400012345678",
+            card_type="debit",
+            card_name="HSBC Visa Debit",
+            expiry_date="12/28",
+            cvv="***"
+        )
+        credit_card = Card(
+            user_id=user_id,
+            card_number="5273400098765432",
+            card_type="credit",
+            card_name="HSBC Mastercard Platinum",
+            expiry_date="06/29",
+            cvv="***",
+            credit_limit=15000.00,
+            available_credit=12500.00
+        )
+        await db.cards.insert_one(debit_card.dict())
+        await db.cards.insert_one(credit_card.dict())
+        
+        # Generate random transactions (£10-£140) with varied dates
+        transaction_templates = [
+            ("transfer", "Rent Payment", "Landlord Properties"),
+            ("transfer", "Salary Transfer", "ABC Company Ltd"),
+            ("payment", "Bill payment - Electric Company", "British Gas"),
+            ("payment", "Bill payment - Internet Provider", "BT Broadband"),
+            ("payment", "Bill payment - Mobile Carrier", "Vodafone UK"),
+            ("transfer", "Grocery Shopping", "Tesco Superstore"),
+            ("transfer", "Online Purchase", "Amazon UK"),
+            ("payment", "Bill payment - Water Services", "Thames Water"),
+            ("deposit", "Monthly Salary", "ABC Company Ltd"),
+            ("deposit", "Refund", "ASOS Returns"),
+            ("transfer", "Coffee Shop", "Costa Coffee"),
+            ("transfer", "Transport", "TfL Oyster"),
+            ("payment", "Bill payment - Insurance Co.", "Aviva Insurance"),
+            ("transfer", "Restaurant", "Pizza Express"),
+            ("deposit", "Birthday Gift", "Jane Smith"),
+            ("transfer", "Gym Membership", "PureGym"),
+            ("payment", "Bill payment - Gas Company", "British Gas"),
+            ("transfer", "Cinema Tickets", "Odeon Cinemas"),
+            ("deposit", "Freelance Work", "Design Co Ltd"),
+            ("transfer", "Subscription", "Netflix UK"),
+        ]
+        
+        for i, (txn_type, desc, recipient) in enumerate(transaction_templates):
+            days_ago = random.randint(0, 30)
+            hours_ago = random.randint(0, 23)
+            mins_ago = random.randint(0, 59)
+            txn_time = datetime.utcnow() - timedelta(days=days_ago, hours=hours_ago, minutes=mins_ago)
+            amount = round(random.uniform(10, 140), 2)
+            
+            txn = Transaction(
+                user_id=user_id,
+                from_account_id=checking_account.id if txn_type != "deposit" else None,
+                to_account_id=checking_account.id if txn_type == "deposit" else None,
+                amount=amount,
+                transaction_type=txn_type,
+                description=desc,
+                recipient_name=recipient,
+                timestamp=txn_time,
+            )
+            await db.transactions.insert_one(txn.dict())
+        
+        # Welcome notification
+        await create_notification(user_id, "Welcome to HSBC!", f"Hello, your accounts are ready with £5,000 in Current and £10,000 in Savings.", "welcome")
+        
+        access_token = create_access_token(data={"sub": user_id})
+        user = User(id=user_id, email=DEFAULT_USER_EMAIL, name=DEFAULT_USER_NAME)
+        return {"access_token": access_token, "token_type": "bearer", "user": user.dict()}
+    else:
+        user_id = user_data["id"]
+        access_token = create_access_token(data={"sub": user_id})
+        user = User(**user_data)
+        return {"access_token": access_token, "token_type": "bearer", "user": user.dict()}
 
 @api_router.post("/auth/register", response_model=Token)
 async def register(user_data: UserCreate):
@@ -283,9 +409,169 @@ async def get_account(account_id: str, current_user: User = Depends(get_current_
 # ==================== TRANSACTION ENDPOINTS ====================
 
 @api_router.get("/transactions", response_model=List[Transaction])
-async def get_transactions(current_user: User = Depends(get_current_user), limit: int = 50):
-    transactions = await db.transactions.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(limit)
+async def get_transactions(
+    current_user: User = Depends(get_current_user),
+    limit: int = 50,
+    filter_type: Optional[str] = None,  # all, sent, received
+):
+    query = {"user_id": current_user.id}
+    
+    if filter_type == "sent":
+        query["transaction_type"] = {"$in": ["transfer", "payment"]}
+    elif filter_type == "received":
+        query["transaction_type"] = "deposit"
+    
+    transactions = await db.transactions.find(query).sort("timestamp", -1).to_list(limit)
     return [Transaction(**txn) for txn in transactions]
+
+@api_router.get("/statements/csv")
+async def download_csv_statement(current_user: User = Depends(get_current_user), limit: int = 100):
+    transactions = await db.transactions.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(limit)
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Type", "Description", "Recipient", "Amount (USD)", "Status"])
+    
+    for txn in transactions:
+        ts = txn.get("timestamp", datetime.utcnow())
+        if isinstance(ts, datetime):
+            date_str = ts.strftime("%Y-%m-%d %H:%M")
+        else:
+            date_str = str(ts)
+        
+        txn_type = txn.get("transaction_type", "").title()
+        desc = txn.get("description", "")
+        recipient = txn.get("recipient_name", "")
+        amount = txn.get("amount", 0)
+        status = txn.get("status", "completed").title()
+        
+        prefix = "+" if txn.get("transaction_type") == "deposit" else "-"
+        writer.writerow([date_str, txn_type, desc, recipient, f"{prefix}${amount:.2f}", status])
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=HSBC_Statement_{datetime.utcnow().strftime('%Y%m%d')}.csv"}
+    )
+
+@api_router.get("/statements/pdf")
+async def download_pdf_statement(current_user: User = Depends(get_current_user), limit: int = 100):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    
+    transactions = await db.transactions.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(limit)
+    accounts = await db.accounts.find({"user_id": current_user.id}).to_list(100)
+    total_balance = sum(acc["balance"] for acc in accounts)
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20*mm, bottomMargin=20*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Header
+    title_style = ParagraphStyle('Title', parent=styles['Title'], textColor=colors.HexColor('#DB0011'), fontSize=24)
+    elements.append(Paragraph("HSBC", title_style))
+    elements.append(Paragraph(f"Account Statement", styles['Heading2']))
+    elements.append(Paragraph(f"Customer: {current_user.name}", styles['Normal']))
+    elements.append(Paragraph(f"Email: {current_user.email}", styles['Normal']))
+    elements.append(Paragraph(f"Date: {datetime.utcnow().strftime('%B %d, %Y')}", styles['Normal']))
+    elements.append(Paragraph(f"Total Balance: ${total_balance:,.2f}", styles['Normal']))
+    elements.append(Spacer(1, 10*mm))
+    
+    # Table
+    data = [["Date", "Type", "Description", "Amount", "Status"]]
+    for txn in transactions:
+        ts = txn.get("timestamp", datetime.utcnow())
+        date_str = ts.strftime("%b %d, %Y") if isinstance(ts, datetime) else str(ts)
+        txn_type = txn.get("transaction_type", "").title()
+        desc = txn.get("description", "")[:30]
+        amount = txn.get("amount", 0)
+        prefix = "+" if txn.get("transaction_type") == "deposit" else "-"
+        status = txn.get("status", "completed").title()
+        data.append([date_str, txn_type, desc, f"{prefix}${amount:.2f}", status])
+    
+    table = Table(data, colWidths=[80, 60, 180, 80, 60])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#DB0011')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('FONTSIZE', (0, 0), (-1, 0), 10),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F5F5F5')]),
+        ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
+    ]))
+    elements.append(table)
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=HSBC_Statement_{datetime.utcnow().strftime('%Y%m%d')}.pdf"}
+    )
+
+@api_router.get("/receipts/{transaction_id}")
+async def get_receipt(transaction_id: str, current_user: User = Depends(get_current_user)):
+    txn = await db.transactions.find_one({"id": transaction_id, "user_id": current_user.id})
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import mm
+    
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=20*mm, bottomMargin=20*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    title_style = ParagraphStyle('Title', parent=styles['Title'], textColor=colors.HexColor('#DB0011'), fontSize=24)
+    elements.append(Paragraph("HSBC", title_style))
+    elements.append(Paragraph("Transaction Receipt", styles['Heading2']))
+    elements.append(Spacer(1, 10*mm))
+    
+    ts = txn.get("timestamp", datetime.utcnow())
+    date_str = ts.strftime("%B %d, %Y at %I:%M %p") if isinstance(ts, datetime) else str(ts)
+    prefix = "+" if txn.get("transaction_type") == "deposit" else "-"
+    
+    data = [
+        ["Reference", txn.get("id", "")[:12]],
+        ["Date", date_str],
+        ["Type", txn.get("transaction_type", "").title()],
+        ["Description", txn.get("description", "")],
+        ["Recipient", txn.get("recipient_name", "N/A")],
+        ["Amount", f"{prefix}£{txn.get('amount', 0):.2f}"],
+        ["Status", txn.get("status", "completed").title()],
+    ]
+    
+    table = Table(data, colWidths=[120, 340])
+    table.setStyle(TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.HexColor('#F5F5F5'), colors.white]),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 10*mm))
+    elements.append(Paragraph("Thank you for banking with HSBC", styles['Normal']))
+    
+    doc.build(elements)
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=HSBC_Receipt_{transaction_id[:8]}.pdf"}
+    )
 
 @api_router.post("/transfers", response_model=Transaction)
 async def create_transfer(transfer: TransferRequest, current_user: User = Depends(get_current_user)):
@@ -656,11 +942,11 @@ async def chat_with_ai(chat_req: ChatRequest, current_user: User = Depends(get_c
         acc_num = acc.get("account_number", "")
         accounts_summary += f"- {acc_type} Account (****{acc_num[-4:]}): ${balance:.2f}\n"
     
-    system_msg = f"""You are HSBC's AI Banking Assistant. You are helpful, professional, and concise.
+    system_msg = f"""You are Ellie, HSBC's friendly AI Banking Assistant. You are helpful, warm, professional, and concise.
 You have access to the customer's financial information:
 
 **Customer:** {current_user.name}
-**Total Balance:** ${total_balance:.2f}
+**Total Balance:** £{total_balance:.2f}
 
 **Accounts:**
 {accounts_summary}
@@ -669,12 +955,14 @@ You have access to the customer's financial information:
 {txn_summary if txn_summary else "No recent transactions."}
 
 **Guidelines:**
+- Always use £ (GBP) for all amounts.
 - Answer questions about their accounts, transactions, and banking.
 - For "Last Transaction" queries, provide full details of their most recent transaction.
 - For "Transfer Delays" queries, explain that domestic transfers typically take 1-2 business days, international 3-5 business days, and same-day transfers are available for urgent payments before 2 PM.
 - For "Support Hours" queries, explain HSBC support is available 24/7 via phone (1-800-HSBC), Mon-Fri 8AM-8PM via live chat, and branches are open Mon-Fri 9AM-5PM, Sat 9AM-1PM.
 - Be specific with numbers and dates when discussing transactions.
 - Keep responses concise but comprehensive.
+- Sign off as "Ellie" when appropriate.
 - If asked about something you don't have data for, say so politely."""
 
     session_id = chat_req.session_id or f"chat-{current_user.id}-{uuid.uuid4()}"

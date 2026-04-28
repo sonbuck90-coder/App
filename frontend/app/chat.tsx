@@ -33,6 +33,9 @@ export default function ChatScreen() {
     setIsLoading(true);
     Keyboard.dismiss();
 
+    // 10-second response delay for realistic feel
+    await new Promise(resolve => setTimeout(resolve, 10000));
+
     try {
       const res = await chatApi.send(text.trim(), sessionId);
       setSessionId(res.data.session_id);
@@ -58,8 +61,8 @@ export default function ChatScreen() {
             <Ionicons name="chatbubbles" size={18} color={COLORS.white} />
           </View>
           <View>
-            <Text style={styles.headerTitle}>HSBC Assistant</Text>
-            <Text style={styles.headerSubtitle}>AI-powered banking help</Text>
+            <Text style={styles.headerTitle}>Ellie</Text>
+            <Text style={styles.headerSubtitle}>Your AI Banking Assistant</Text>
           </View>
         </View>
       </View>
@@ -78,8 +81,8 @@ export default function ChatScreen() {
               <View style={styles.welcomeAvatar}>
                 <Ionicons name="chatbubbles" size={32} color={COLORS.primary} />
               </View>
-              <Text style={styles.welcomeTitle}>Hello! I'm your HSBC Assistant</Text>
-              <Text style={styles.welcomeText}>I can help with account info, transactions, transfers, and more. Try a quick action below or type your question.</Text>
+              <Text style={styles.welcomeTitle}>Hello! I'm Ellie</Text>
+              <Text style={styles.welcomeText}>Your personal HSBC banking assistant. I can help with account info, transactions, transfers, and more. Try a quick action below or type your question.</Text>
 
               {/* Quick Actions */}
               <View style={styles.quickActionsContainer}>
@@ -119,7 +122,7 @@ export default function ChatScreen() {
               </View>
               <View style={[styles.messageContent, styles.aiContent, styles.typingContainer]}>
                 <ActivityIndicator size="small" color={COLORS.primary} />
-                <Text style={styles.typingText}>Thinking...</Text>
+                <Text style={styles.typingText}>Ellie is typing...</Text>
               </View>
             </View>
           )}

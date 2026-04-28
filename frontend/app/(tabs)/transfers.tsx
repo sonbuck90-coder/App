@@ -44,6 +44,8 @@ export default function TransfersScreen() {
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
   const [recentPayees, setRecentPayees] = useState<Payee[]>([]);
   const [sortCodeError, setSortCodeError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
 
   useEffect(() => {
     fetchAccounts();
@@ -76,7 +78,7 @@ export default function TransfersScreen() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'GBP',
     }).format(value);
   };
 
@@ -169,6 +171,18 @@ export default function TransfersScreen() {
     }
 
     setIsLoading(true);
+    setIsProcessing(true);
+    setProcessingProgress(0);
+    
+    // 5-second processing delay with progress
+    const progressInterval = setInterval(() => {
+      setProcessingProgress(prev => Math.min(prev + 20, 100));
+    }, 1000);
+    
+    await new Promise(resolve => setTimeout(resolve, 5000));
+    clearInterval(progressInterval);
+    setProcessingProgress(100);
+    
     try {
       await transfersApi.create({
         from_account_id: selectedAccount.id,
@@ -199,6 +213,8 @@ export default function TransfersScreen() {
       Alert.alert('Transfer Failed', error.response?.data?.detail || 'Unable to complete transfer');
     } finally {
       setIsLoading(false);
+      setIsProcessing(false);
+      setProcessingProgress(0);
     }
   };
 
@@ -414,7 +430,7 @@ export default function TransfersScreen() {
             <Text style={styles.sectionLabel}>Amount</Text>
             <View style={styles.amountCard}>
               <View style={styles.amountInputContainer}>
-                <Text style={styles.currencyCode}>USD</Text>
+                <Text style={styles.currencyCode}>GBP</Text>
                 <TextInput
                   style={styles.amountInput}
                   placeholder="0.00"
@@ -448,13 +464,16 @@ export default function TransfersScreen() {
 
           {/* Transfer Button */}
           <TouchableOpacity
-            style={[styles.transferButton, isLoading && styles.transferButtonDisabled]}
+            style={[styles.transferButton, (isLoading || isProcessing) && styles.transferButtonDisabled]}
             onPress={handleTransfer}
-            disabled={isLoading}
+            disabled={isLoading || isProcessing}
             testID="transfer-now-button"
           >
-            {isLoading ? (
-              <ActivityIndicator color={COLORS.white} />
+            {isProcessing ? (
+              <View style={styles.processingContainer}>
+                <ActivityIndicator color={COLORS.white} size="small" />
+                <Text style={styles.processingText}>Processing... {processingProgress}%</Text>
+              </View>
             ) : (
               <Text style={styles.transferButtonText}>Transfer Now</Text>
             )}
@@ -789,6 +808,16 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  processingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  processingText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 10,
   },
   bottomPadding: {
     height: 40,

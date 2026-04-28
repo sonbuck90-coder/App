@@ -71,7 +71,13 @@ export const accountsApi = {
 };
 
 export const transactionsApi = {
-  getAll: (limit?: number) => api.get<Transaction[]>(`/transactions${limit ? `?limit=${limit}` : ''}`),
+  getAll: (limit?: number, filter_type?: string) => {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', String(limit));
+    if (filter_type) params.append('filter_type', filter_type);
+    const qs = params.toString();
+    return api.get<Transaction[]>(`/transactions${qs ? `?${qs}` : ''}`);
+  },
 };
 
 export const transfersApi = {

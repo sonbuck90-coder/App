@@ -13,6 +13,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithPasscode: (passcode: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -61,6 +62,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithPasscode = async (passcode: string) => {
+    try {
+      const response = await api.post('/auth/passcode', { passcode });
+      const { access_token, user: userData } = response.data;
+      
+      await AsyncStorage.setItem('auth_token', access_token);
+      await AsyncStorage.setItem('auth_user', JSON.stringify(userData));
+      
+      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+      setToken(access_token);
+      setUser(userData);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Invalid passcode');
+    }
+  };
+
   const register = async (email: string, password: string, name: string) => {
     try {
       const response = await api.post('/auth/register', { email, password, name });
@@ -86,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, loginWithPasscode, register, logout }}>
       {children}
     </AuthContext.Provider>
   );
