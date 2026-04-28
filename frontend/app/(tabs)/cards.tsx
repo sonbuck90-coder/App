@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { cardsApi, Card } from '../../src/services/api';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import { useAuth } from '../../src/context/AuthContext';
@@ -13,6 +14,7 @@ const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '
 export default function CardsScreen() {
   const { colors: cc } = useCustomization();
   const { user } = useAuth();
+  const router = useRouter();
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingCardId, setProcessingCardId] = useState<string | null>(null);
@@ -141,7 +143,11 @@ export default function CardsScreen() {
         )}
 
         {/* Card Details Link */}
-        <TouchableOpacity style={styles.cardDetailsLink} testID="card-details-link">
+        <TouchableOpacity
+          style={styles.cardDetailsLink}
+          onPress={() => activeCard && router.push({ pathname: '/card-details', params: { cardId: activeCard.id } })}
+          testID="card-details-link"
+        >
           <Text style={styles.cardDetailsText}>Card details</Text>
           <Ionicons name="arrow-forward" size={20} color={C.darkGray} />
         </TouchableOpacity>

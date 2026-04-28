@@ -22,6 +22,7 @@ export default function RootLayout() {
         <Stack.Screen name="add-money" />
         <Stack.Screen name="move-money" />
         <Stack.Screen name="schedules" />
+        <Stack.Screen name="card-details" />
         </Stack>
       </CustomizationProvider>
     </AuthProvider>
