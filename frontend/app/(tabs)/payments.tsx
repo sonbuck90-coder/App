@@ -15,10 +15,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { accountsApi, billersApi, Account, Biller } from '../../src/services/api';
+import { useCustomization } from '../../src/context/CustomizationContext';
 
-// HSBC Colors
+// Static colors (non-primary)
 const COLORS = {
-  primary: '#DB0011',
   secondary: '#333333',
   white: '#FFFFFF',
   lightGray: '#F5F5F5',
@@ -30,6 +30,7 @@ const COLORS = {
 };
 
 export default function PaymentsScreen() {
+  const { colors: customColors } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [billers, setBillers] = useState<Biller[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -130,14 +131,14 @@ export default function PaymentsScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={customColors.primary} />
       </SafeAreaView>
     );
   }
 
   // Service categories
   const serviceCategories = [
-    { icon: 'receipt-outline', label: 'Pay Bills', color: COLORS.primary },
+    { icon: 'receipt-outline', label: 'Pay Bills', color: customColors.primary },
     { icon: 'phone-portrait-outline', label: 'Mobile Top-up', color: '#5856D6' },
     { icon: 'card-outline', label: 'Credit Card', color: '#FF9500' },
     { icon: 'cash-outline', label: 'Loan', color: '#00847F' },
@@ -150,7 +151,7 @@ export default function PaymentsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
         <Text style={styles.headerTitle}>Services</Text>
       </View>
 
@@ -188,7 +189,7 @@ export default function PaymentsScreen() {
               >
                 <View style={styles.billerLeft}>
                   <View style={styles.billerIcon}>
-                    <Ionicons name={getBillerIcon(biller.icon)} size={20} color={COLORS.primary} />
+                    <Ionicons name={getBillerIcon(biller.icon)} size={20} color={customColors.primary} />
                   </View>
                   <View>
                     <Text style={styles.billerName}>{biller.name}</Text>
@@ -206,7 +207,7 @@ export default function PaymentsScreen() {
           <Text style={styles.sectionTitle}>Quick Pay</Text>
           <View style={styles.quickPayCard}>
             <View style={styles.quickPayRow}>
-              <Ionicons name="flash" size={20} color={COLORS.primary} />
+              <Ionicons name="flash" size={20} color={customColors.primary} />
               <Text style={styles.quickPayText}>Set up recurring payments</Text>
             </View>
             <TouchableOpacity style={styles.quickPayButton}>
@@ -246,7 +247,7 @@ export default function PaymentsScreen() {
             {selectedBiller && (
               <View style={styles.selectedBillerInfo}>
                 <View style={styles.billerIconLarge}>
-                  <Ionicons name={getBillerIcon(selectedBiller.icon)} size={28} color={COLORS.primary} />
+                  <Ionicons name={getBillerIcon(selectedBiller.icon)} size={28} color={customColors.primary} />
                 </View>
                 <Text style={styles.selectedBillerName}>{selectedBiller.name}</Text>
                 <Text style={styles.selectedBillerAccount}>Account: {selectedBiller.account_number}</Text>
@@ -275,7 +276,7 @@ export default function PaymentsScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.payButton, isProcessing && styles.payButtonDisabled]}
+              style={[styles.payButton, isProcessing && styles.payButtonDisabled, { backgroundColor: customColors.primary }]}
               onPress={handlePayBill}
               disabled={isProcessing}
             >
@@ -304,7 +305,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
@@ -360,7 +361,7 @@ const styles = StyleSheet.create({
   },
   addNew: {
     fontSize: 14,
-    color: COLORS.primary,
+    color: '#DB0011',
     fontWeight: '500',
   },
   billersCard: {
@@ -419,7 +420,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   quickPayButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 4,
@@ -495,7 +496,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary,
+    borderBottomColor: '#DB0011',
     paddingBottom: 12,
   },
   currencyCode: {
@@ -516,7 +517,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   payButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     borderRadius: 4,
     height: 52,
     alignItems: 'center',

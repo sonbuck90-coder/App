@@ -15,10 +15,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
+import { useCustomization } from '../../src/context/CustomizationContext';
 
-// HSBC Colors
+// Static colors (non-primary)
 const COLORS = {
-  primary: '#DB0011',
   secondary: '#333333',
   white: '#FFFFFF',
   lightGray: '#F5F5F5',
@@ -31,6 +31,7 @@ const COLORS = {
 };
 
 export default function TransfersScreen() {
+  const { colors: customColors } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
@@ -225,7 +226,7 @@ export default function TransfersScreen() {
   if (isLoadingAccounts) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={customColors.primary} />
       </SafeAreaView>
     );
   }
@@ -233,7 +234,7 @@ export default function TransfersScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
         <Text style={styles.headerTitle}>Pay & Transfer</Text>
       </View>
 
@@ -249,7 +250,7 @@ export default function TransfersScreen() {
           {/* Transfer Type Options */}
           <View style={styles.transferTypeContainer}>
             <TouchableOpacity style={[styles.transferTypeBtn, styles.transferTypeBtnActive]}>
-              <Ionicons name="swap-horizontal" size={20} color={COLORS.primary} />
+              <Ionicons name="swap-horizontal" size={20} color={customColors.primary} />
               <Text style={[styles.transferTypeText, styles.transferTypeTextActive]}>Transfer</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.transferTypeBtn}>
@@ -302,7 +303,7 @@ export default function TransfersScreen() {
               {selectedAccount && (
                 <>
                   <View style={styles.accountInfo}>
-                    <View style={[styles.accountDot, { backgroundColor: selectedAccount.account_type === 'checking' ? COLORS.primary : COLORS.success }]} />
+                    <View style={[styles.accountDot, { backgroundColor: selectedAccount.account_type === 'checking' ? customColors.primary : COLORS.success }]} />
                     <View>
                       <Text style={styles.accountType}>
                         {selectedAccount.account_type === 'checking' ? 'Current Account' : 'Savings Account'}
@@ -337,13 +338,13 @@ export default function TransfersScreen() {
                     }}
                   >
                     <View style={styles.accountPickerLeft}>
-                      <View style={[styles.accountDot, { backgroundColor: account.account_type === 'checking' ? COLORS.primary : COLORS.success }]} />
+                      <View style={[styles.accountDot, { backgroundColor: account.account_type === 'checking' ? customColors.primary : COLORS.success }]} />
                       <Text style={styles.accountPickerText}>
                         {account.account_type === 'checking' ? 'Current' : 'Savings'} - {formatCurrency(account.balance)}
                       </Text>
                     </View>
                     {selectedAccount?.id === account.id && (
-                      <Ionicons name="checkmark" size={18} color={COLORS.primary} />
+                      <Ionicons name="checkmark" size={18} color={customColors.primary} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -384,7 +385,7 @@ export default function TransfersScreen() {
               {/* Sort code validation error */}
               {sortCodeError ? (
                 <View style={styles.sortCodeErrorContainer}>
-                  <Ionicons name="close-circle" size={16} color={COLORS.primary} />
+                  <Ionicons name="close-circle" size={16} color={customColors.primary} />
                   <Text style={styles.sortCodeErrorText}>{sortCodeError}</Text>
                 </View>
               ) : null}
@@ -464,7 +465,7 @@ export default function TransfersScreen() {
 
           {/* Transfer Button */}
           <TouchableOpacity
-            style={[styles.transferButton, (isLoading || isProcessing) && styles.transferButtonDisabled]}
+            style={[styles.transferButton, (isLoading || isProcessing) && styles.transferButtonDisabled, { backgroundColor: customColors.primary }]}
             onPress={handleTransfer}
             disabled={isLoading || isProcessing}
             testID="transfer-now-button"
@@ -498,7 +499,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
@@ -538,7 +539,7 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   transferTypeTextActive: {
-    color: COLORS.primary,
+    color: '#DB0011',
   },
   // Recent Payees
   recentPayeesSection: {
@@ -568,7 +569,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -691,7 +692,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   inputError: {
-    borderColor: COLORS.primary,
+    borderColor: '#DB0011',
     borderWidth: 1.5,
   },
   // Sort code validation error
@@ -703,11 +704,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     borderLeftWidth: 3,
-    borderLeftColor: COLORS.primary,
+    borderLeftColor: '#DB0011',
   },
   sortCodeErrorText: {
     fontSize: 13,
-    color: COLORS.primary,
+    color: '#DB0011',
     marginLeft: 8,
     fontWeight: '500',
     flex: 1,
@@ -772,7 +773,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 2,
-    borderBottomColor: COLORS.primary,
+    borderBottomColor: '#DB0011',
     paddingBottom: 12,
   },
   currencyCode: {
@@ -793,7 +794,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   transferButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     borderRadius: 4,
     height: 52,
     alignItems: 'center',

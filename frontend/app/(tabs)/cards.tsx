@@ -12,12 +12,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsApi, Card } from '../../src/services/api';
+import { useCustomization } from '../../src/context/CustomizationContext';
 
 const { width } = Dimensions.get('window');
 
-// HSBC Colors
+// Static colors (non-primary)
 const COLORS = {
-  primary: '#DB0011',
   secondary: '#333333',
   white: '#FFFFFF',
   lightGray: '#F5F5F5',
@@ -29,6 +29,7 @@ const COLORS = {
 };
 
 export default function CardsScreen() {
+  const { colors: customColors } = useCustomization();
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingCardId, setProcessingCardId] = useState<string | null>(null);
@@ -77,7 +78,7 @@ export default function CardsScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+        <ActivityIndicator size="large" color={customColors.primary} />
       </SafeAreaView>
     );
   }
@@ -85,7 +86,7 @@ export default function CardsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
         <Text style={styles.headerTitle}>Cards</Text>
       </View>
 
@@ -158,7 +159,7 @@ export default function CardsScreen() {
           {cards.map((_, index) => (
             <View
               key={index}
-              style={[styles.indicator, activeCardIndex === index && styles.indicatorActive]}
+              style={[styles.indicator, activeCardIndex === index && [styles.indicatorActive, { backgroundColor: customColors.primary }]]}
             />
           ))}
         </View>
@@ -209,12 +210,12 @@ export default function CardsScreen() {
             >
               <View style={[styles.actionIcon, cards[activeCardIndex]?.is_frozen && styles.actionIconActive]}>
                 {processingCardId === cards[activeCardIndex]?.id ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <ActivityIndicator size="small" color={customColors.primary} />
                 ) : (
                   <Ionicons
                     name={cards[activeCardIndex]?.is_frozen ? 'snow' : 'snow-outline'}
                     size={24}
-                    color={cards[activeCardIndex]?.is_frozen ? COLORS.primary : COLORS.darkGray}
+                    color={cards[activeCardIndex]?.is_frozen ? customColors.primary : COLORS.darkGray}
                   />
                 )}
               </View>
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   header: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   cardHexagonRed: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
   },
   cardBrandText: {
     color: COLORS.white,
@@ -421,7 +422,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 4,
   },
   indicatorActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     width: 24,
   },
   cardInfoSection: {
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
   },
   creditProgressFill: {
     height: '100%',
-    backgroundColor: COLORS.primary,
+    backgroundColor: '#DB0011',
     borderRadius: 4,
   },
   creditUsed: {
