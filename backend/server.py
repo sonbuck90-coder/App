@@ -92,6 +92,15 @@ class TransferRequest(BaseModel):
     amount: float
     description: str = ""
     recipient_name: str = ""
+    sort_code: str = ""
+
+class Payee(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    name: str
+    sort_code: str
+    account_number: str
+    last_used: datetime = Field(default_factory=datetime.utcnow)
 
 class Card(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -313,7 +322,44 @@ async def create_transfer(transfer: TransferRequest, current_user: User = Depend
     )
     await db.transactions.insert_one(transaction.dict())
     
+    # Save/update payee for recent payees feature
+    if transfer.recipient_name and transfer.to_account_number:
+        existing_payee = await db.payees.find_one({
+            "user_id": current_user.id,
+            "account_number": transfer.to_account_number,
+        })
+        if existing_payee:
+            await db.payees.update_one(
+                {"id": existing_payee["id"]},
+                {"$set": {"last_used": datetime.utcnow(), "name": transfer.recipient_name, "sort_code": transfer.sort_code}}
+            )
+        else:
+            payee = Payee(
+                user_id=current_user.id,
+                name=transfer.recipient_name,
+                sort_code=transfer.sort_code,
+                account_number=transfer.to_account_number,
+            )
+            await db.payees.insert_one(payee.dict())
+    
     return transaction
+
+# ==================== PAYEE ENDPOINTS ====================
+
+@api_router.get("/payees")
+async def get_recent_payees(current_user: User = Depends(get_current_user)):
+    payees = await db.payees.find(
+        {"user_id": current_user.id},
+        {"_id": 0}
+    ).sort("last_used", -1).to_list(10)
+    return payees
+
+@api_router.delete("/payees/{payee_id}")
+async def delete_payee(payee_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.payees.delete_one({"id": payee_id, "user_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Payee not found")
+    return {"message": "Payee deleted"}
 
 # ==================== BILL PAYMENT ENDPOINTS ====================
 

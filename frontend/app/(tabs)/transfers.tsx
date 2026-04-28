@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { accountsApi, transfersApi, Account } from '../../src/services/api';
+import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
 
 // HSBC Colors
@@ -27,6 +27,7 @@ const COLORS = {
   black: '#000000',
   success: '#00847F',
   background: '#F5F5F5',
+  warning: '#E67E22',
 };
 
 export default function TransfersScreen() {
@@ -41,9 +42,12 @@ export default function TransfersScreen() {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAccounts, setIsLoadingAccounts] = useState(true);
+  const [recentPayees, setRecentPayees] = useState<Payee[]>([]);
+  const [sortCodeError, setSortCodeError] = useState('');
 
   useEffect(() => {
     fetchAccounts();
+    fetchRecentPayees();
   }, []);
 
   const fetchAccounts = async () => {
@@ -60,6 +64,15 @@ export default function TransfersScreen() {
     }
   };
 
+  const fetchRecentPayees = async () => {
+    try {
+      const response = await payeesApi.getRecent();
+      setRecentPayees(response.data);
+    } catch (error) {
+      console.error('Error fetching payees:', error);
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -70,14 +83,13 @@ export default function TransfersScreen() {
   const handleSortCodeChange = useCallback((text: string) => {
     const formatted = formatSortCode(text);
     setSortCode(formatted);
-    
+    setSortCodeError('');
+
     const digits = text.replace(/\D/g, '');
     if (digits.length === 0) {
       setBankLookupResult(null);
     } else if (digits.length >= 2) {
-      const result = lookupBank(digits.length >= 6 ? digits.slice(0, 6) : digits + '0'.repeat(6 - digits.length));
       if (digits.length < 6) {
-        // Partial input - show preview if first 2 digits match
         const partialResult = lookupBank(digits.slice(0, 2) + '0000');
         if (partialResult.found) {
           setBankLookupResult({ ...partialResult, error: undefined });
@@ -85,6 +97,7 @@ export default function TransfersScreen() {
           setBankLookupResult(null);
         }
       } else {
+        const result = lookupBank(digits.slice(0, 6));
         setBankLookupResult(result);
       }
     } else {
@@ -92,9 +105,50 @@ export default function TransfersScreen() {
     }
   }, []);
 
+  const selectPayee = (payee: Payee) => {
+    setRecipientName(payee.name);
+    setRecipientAccount(payee.account_number);
+    if (payee.sort_code) {
+      handleSortCodeChange(payee.sort_code.replace(/-/g, ''));
+    }
+  };
+
+  const validateSortCode = (): boolean => {
+    const digits = sortCode.replace(/\D/g, '');
+
+    if (digits.length === 0) {
+      setSortCodeError('Sort code is required');
+      return false;
+    }
+
+    if (digits.length < 6) {
+      setSortCodeError('Sort code must be 6 digits (XX-XX-XX)');
+      return false;
+    }
+
+    const result = lookupBank(digits);
+    if (!result.found) {
+      setSortCodeError('Sort code not recognized. Please check and try again.');
+      return false;
+    }
+
+    setSortCodeError('');
+    return true;
+  };
+
   const handleTransfer = async () => {
     if (!selectedAccount) {
       Alert.alert('Error', 'Please select an account');
+      return;
+    }
+
+    if (!recipientName.trim()) {
+      Alert.alert('Error', 'Please enter recipient name');
+      return;
+    }
+
+    // Sort code validation
+    if (!validateSortCode()) {
       return;
     }
 
@@ -122,6 +176,7 @@ export default function TransfersScreen() {
         amount: transferAmount,
         description: description || `Transfer to ${recipientName || recipientAccount}`,
         recipient_name: recipientName,
+        sort_code: sortCode,
       });
 
       Alert.alert('Transfer Successful', `${formatCurrency(transferAmount)} has been transferred successfully`, [
@@ -132,9 +187,11 @@ export default function TransfersScreen() {
             setRecipientName('');
             setSortCode('');
             setBankLookupResult(null);
+            setSortCodeError('');
             setAmount('');
             setDescription('');
             fetchAccounts();
+            fetchRecentPayees();
           },
         },
       ]);
@@ -143,6 +200,10 @@ export default function TransfersScreen() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const getInitials = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   if (isLoadingAccounts) {
@@ -185,12 +246,42 @@ export default function TransfersScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Recent Payees */}
+          {recentPayees.length > 0 && (
+            <View style={styles.recentPayeesSection}>
+              <Text style={styles.recentPayeesTitle}>Recent Payees</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.payeesScrollContent}
+              >
+                {recentPayees.map((payee) => (
+                  <TouchableOpacity
+                    key={payee.id}
+                    style={styles.payeeChip}
+                    onPress={() => selectPayee(payee)}
+                    testID={`payee-chip-${payee.id}`}
+                  >
+                    <View style={styles.payeeAvatar}>
+                      <Text style={styles.payeeAvatarText}>{getInitials(payee.name)}</Text>
+                    </View>
+                    <View style={styles.payeeInfo}>
+                      <Text style={styles.payeeName} numberOfLines={1}>{payee.name}</Text>
+                      <Text style={styles.payeeAccount}>****{payee.account_number.slice(-4)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {/* From Account */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>From</Text>
             <TouchableOpacity
               style={styles.accountSelector}
               onPress={() => setShowAccountPicker(!showAccountPicker)}
+              testID="from-account-selector"
             >
               {selectedAccount && (
                 <>
@@ -264,7 +355,7 @@ export default function TransfersScreen() {
                 style={[
                   styles.input,
                   bankLookupResult?.found && styles.inputSuccess,
-                  bankLookupResult && !bankLookupResult.found && isValidSortCode(sortCode) && styles.inputWarning,
+                  sortCodeError ? styles.inputError : (bankLookupResult && !bankLookupResult.found && isValidSortCode(sortCode) && styles.inputWarning),
                 ]}
                 placeholder="XX-XX-XX"
                 placeholderTextColor={COLORS.gray}
@@ -274,8 +365,15 @@ export default function TransfersScreen() {
                 maxLength={8}
                 testID="sort-code-input"
               />
+              {/* Sort code validation error */}
+              {sortCodeError ? (
+                <View style={styles.sortCodeErrorContainer}>
+                  <Ionicons name="close-circle" size={16} color={COLORS.primary} />
+                  <Text style={styles.sortCodeErrorText}>{sortCodeError}</Text>
+                </View>
+              ) : null}
               {/* Bank Name Lookup Result */}
-              {bankLookupResult && (
+              {!sortCodeError && bankLookupResult && (
                 <View style={styles.bankLookupContainer}>
                   {bankLookupResult.found && bankLookupResult.bank ? (
                     <View style={styles.bankFound}>
@@ -290,7 +388,7 @@ export default function TransfersScreen() {
                     </View>
                   ) : bankLookupResult.error && isValidSortCode(sortCode) ? (
                     <View style={styles.bankNotFound}>
-                      <Ionicons name="alert-circle" size={18} color="#E67E22" />
+                      <Ionicons name="alert-circle" size={18} color={COLORS.warning} />
                       <Text style={styles.bankNotFoundText}>{bankLookupResult.error}</Text>
                     </View>
                   ) : null}
@@ -324,6 +422,7 @@ export default function TransfersScreen() {
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="decimal-pad"
+                  testID="amount-input"
                 />
               </View>
               {selectedAccount && (
@@ -343,6 +442,7 @@ export default function TransfersScreen() {
               placeholderTextColor={COLORS.gray}
               value={description}
               onChangeText={setDescription}
+              testID="description-input"
             />
           </View>
 
@@ -351,6 +451,7 @@ export default function TransfersScreen() {
             style={[styles.transferButton, isLoading && styles.transferButtonDisabled]}
             onPress={handleTransfer}
             disabled={isLoading}
+            testID="transfer-now-button"
           >
             {isLoading ? (
               <ActivityIndicator color={COLORS.white} />
@@ -420,6 +521,58 @@ const styles = StyleSheet.create({
   transferTypeTextActive: {
     color: COLORS.primary,
   },
+  // Recent Payees
+  recentPayeesSection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  recentPayeesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+    marginBottom: 12,
+  },
+  payeesScrollContent: {
+    paddingRight: 16,
+  },
+  payeeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginRight: 10,
+    minWidth: 150,
+  },
+  payeeAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  payeeAvatarText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  payeeInfo: {
+    flex: 1,
+  },
+  payeeName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+  },
+  payeeAccount: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginTop: 1,
+  },
+  // Sections
   section: {
     marginHorizontal: 16,
     marginBottom: 20,
@@ -515,9 +668,32 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   inputWarning: {
-    borderColor: '#E67E22',
+    borderColor: COLORS.warning,
     borderWidth: 1.5,
   },
+  inputError: {
+    borderColor: COLORS.primary,
+    borderWidth: 1.5,
+  },
+  // Sort code validation error
+  sortCodeErrorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    backgroundColor: '#FDEDEE',
+    borderRadius: 8,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
+  },
+  sortCodeErrorText: {
+    fontSize: 13,
+    color: COLORS.primary,
+    marginLeft: 8,
+    fontWeight: '500',
+    flex: 1,
+  },
+  // Bank lookup
   bankLookupContainer: {
     marginTop: 8,
   },
@@ -559,14 +735,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#E67E22',
+    borderLeftColor: COLORS.warning,
   },
   bankNotFoundText: {
     fontSize: 13,
-    color: '#E67E22',
+    color: COLORS.warning,
     marginLeft: 8,
     fontWeight: '500',
   },
+  // Amount
   amountCard: {
     backgroundColor: COLORS.white,
     borderRadius: 8,

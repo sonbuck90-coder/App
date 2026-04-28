@@ -81,6 +81,7 @@ export const transfersApi = {
     amount: number;
     description?: string;
     recipient_name?: string;
+    sort_code?: string;
   }) => api.post<Transaction>('/transfers', data),
 };
 
@@ -102,4 +103,19 @@ export const cardsApi = {
 
 export const dashboardApi = {
   getStats: () => api.get<DashboardStats>('/dashboard/stats'),
+};
+
+// Payee types
+export interface Payee {
+  id: string;
+  user_id: string;
+  name: string;
+  sort_code: string;
+  account_number: string;
+  last_used: string;
+}
+
+export const payeesApi = {
+  getRecent: () => api.get<Payee[]>('/payees'),
+  delete: (payeeId: string) => api.delete(`/payees/${payeeId}`),
 };
