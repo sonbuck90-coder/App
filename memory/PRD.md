@@ -81,3 +81,10 @@ A mobile banking app styled like HSBC with JWT authentication, account managemen
 - POST /api/cards/{id}/freeze
 - POST /api/cards/{id}/unfreeze
 - GET /api/dashboard/stats
+- GET /api/payees (list recent)
+- POST /api/payees (create)
+- PUT /api/payees/{id} (update)
+- DELETE /api/payees/{id} (delete)
+- GET /api/analytics/spending
+- POST /api/chat (AI chat)
+- GET /api/chat/history
