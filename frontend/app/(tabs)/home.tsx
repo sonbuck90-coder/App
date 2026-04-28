@@ -189,7 +189,20 @@ export default function HomeScreen() {
                 </View>
                 <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
               </View>
-              <Text style={styles.accountNumber}>****{account.account_number.slice(-4)}</Text>
+              {/* Sort Code & Account Number */}
+              <View style={styles.accountDetails}>
+                <View style={styles.accountDetailItem}>
+                  <Text style={styles.accountDetailLabel}>Sort Code</Text>
+                  <Text style={styles.accountDetailValue}>{account.sort_code || '40-47-84'}</Text>
+                </View>
+                <View style={styles.accountDetailDivider} />
+                <View style={styles.accountDetailItem}>
+                  <Text style={styles.accountDetailLabel}>Account No.</Text>
+                  <Text style={styles.accountDetailValue}>
+                    {account.account_number.replace(/(\d{4})(\d{4})(\d{2})?/, '$1 $2 $3').trim()}
+                  </Text>
+                </View>
+              </View>
               <View style={styles.accountBottom}>
                 <View>
                   <Text style={styles.balanceLabel}>Available Balance</Text>
@@ -453,6 +466,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: COLORS.gray,
     marginBottom: 12,
+  },
+  accountDetails: {
+    flexDirection: 'row',
+    backgroundColor: '#F8F8F8',
+    borderRadius: 6,
+    padding: 10,
+    marginBottom: 12,
+  },
+  accountDetailItem: {
+    flex: 1,
+  },
+  accountDetailLabel: {
+    fontSize: 11,
+    color: COLORS.gray,
+    marginBottom: 3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  accountDetailValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+    letterSpacing: 0.5,
+  },
+  accountDetailDivider: {
+    width: 1,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 12,
   },
   accountBottom: {
     flexDirection: 'row',
