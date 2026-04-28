@@ -13,6 +13,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { dashboardApi, accountsApi, Account, DashboardStats } from '../../src/services/api';
 
+// HSBC Colors
+const COLORS = {
+  primary: '#DB0011',
+  secondary: '#333333',
+  white: '#FFFFFF',
+  lightGray: '#F5F5F5',
+  gray: '#767676',
+  darkGray: '#333333',
+  black: '#000000',
+  success: '#00847F',
+  background: '#F5F5F5',
+};
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -57,15 +70,13 @@ export default function HomeScreen() {
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   };
 
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case 'transfer':
-        return 'swap-horizontal';
+        return 'arrow-forward';
       case 'payment':
         return 'receipt';
       case 'deposit':
@@ -80,73 +91,79 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0066FF" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <View style={styles.logoContainer}>
+            <View style={styles.hexagonRow}>
+              <View style={[styles.hexagon, styles.hexagonRed]} />
+              <View style={[styles.hexagon, styles.hexagonWhite]} />
+            </View>
+            <View style={styles.hexagonRow}>
+              <View style={[styles.hexagon, styles.hexagonWhite]} />
+              <View style={[styles.hexagon, styles.hexagonRed]} />
+            </View>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.headerIcon}>
+              <Ionicons name="search" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerIcon}>
+              <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
+        <Text style={styles.lastLogin}>Last logged in: Today at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Good {getGreeting()}</Text>
-            <Text style={styles.userName}>{user?.name || 'User'}</Text>
-          </View>
-          <TouchableOpacity style={styles.notificationBtn}>
-            <Ionicons name="notifications-outline" size={24} color="#1A1A2E" />
-          </TouchableOpacity>
-        </View>
-
         {/* Total Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>Total Balance</Text>
-          <Text style={styles.balanceAmount}>
+        <View style={styles.totalBalanceCard}>
+          <Text style={styles.totalBalanceLabel}>Total Relationship Balance</Text>
+          <Text style={styles.totalBalanceAmount}>
             {formatCurrency(stats?.total_balance || 0)}
           </Text>
-          <View style={styles.balanceStats}>
-            <View style={styles.statItem}>
-              <Ionicons name="trending-up" size={16} color="#00C853" />
-              <Text style={styles.statText}>This month</Text>
-            </View>
-            <Text style={styles.spendingAmount}>
-              -{formatCurrency(stats?.monthly_spending || 0)}
-            </Text>
-          </View>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="arrow-up" size={20} color="#0066FF" />
+        <View style={styles.quickActionsContainer}>
+          <TouchableOpacity style={styles.quickAction}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="swap-horizontal" size={22} color={COLORS.primary} />
             </View>
-            <Text style={styles.actionText}>Send</Text>
+            <Text style={styles.quickActionText}>Transfer</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="arrow-down" size={20} color="#0066FF" />
+          <TouchableOpacity style={styles.quickAction}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="receipt-outline" size={22} color={COLORS.primary} />
             </View>
-            <Text style={styles.actionText}>Receive</Text>
+            <Text style={styles.quickActionText}>Pay Bills</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="receipt" size={20} color="#0066FF" />
+          <TouchableOpacity style={styles.quickAction}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="qr-code-outline" size={22} color={COLORS.primary} />
             </View>
-            <Text style={styles.actionText}>Pay</Text>
+            <Text style={styles.quickActionText}>QR Pay</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
-            <View style={styles.actionIcon}>
-              <Ionicons name="qr-code" size={20} color="#0066FF" />
+          <TouchableOpacity style={styles.quickAction}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="card-outline" size={22} color={COLORS.primary} />
             </View>
-            <Text style={styles.actionText}>Scan</Text>
+            <Text style={styles.quickActionText}>Cards</Text>
           </TouchableOpacity>
         </View>
 
@@ -155,28 +172,27 @@ export default function HomeScreen() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>My Accounts</Text>
             <TouchableOpacity>
-              <Text style={styles.seeAll}>See All</Text>
+              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
             </TouchableOpacity>
           </View>
           {accounts.map((account) => (
             <TouchableOpacity key={account.id} style={styles.accountCard}>
-              <View style={styles.accountInfo}>
-                <View style={styles.accountIconContainer}>
-                  <Ionicons
-                    name={account.account_type === 'checking' ? 'wallet' : 'cash'}
-                    size={20}
-                    color="#0066FF"
-                  />
-                </View>
-                <View>
+              <View style={styles.accountTop}>
+                <View style={styles.accountTypeContainer}>
+                  <View style={[styles.accountDot, { backgroundColor: account.account_type === 'checking' ? COLORS.primary : COLORS.success }]} />
                   <Text style={styles.accountType}>
-                    {account.account_type.charAt(0).toUpperCase() +
-                      account.account_type.slice(1)}
+                    {account.account_type === 'checking' ? 'Current Account' : 'Savings Account'}
                   </Text>
-                  <Text style={styles.accountNumber}>****{account.account_number.slice(-4)}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+              </View>
+              <Text style={styles.accountNumber}>****{account.account_number.slice(-4)}</Text>
+              <View style={styles.accountBottom}>
+                <View>
+                  <Text style={styles.balanceLabel}>Available Balance</Text>
+                  <Text style={styles.accountBalance}>{formatCurrency(account.balance)}</Text>
                 </View>
               </View>
-              <Text style={styles.accountBalance}>{formatCurrency(account.balance)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -184,276 +200,328 @@ export default function HomeScreen() {
         {/* Recent Transactions */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Transactions</Text>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
             <TouchableOpacity>
-              <Text style={styles.seeAll}>See All</Text>
+              <Text style={styles.viewAll}>View All</Text>
             </TouchableOpacity>
           </View>
-          {stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
-            stats.recent_transactions.map((transaction) => (
-              <View key={transaction.id} style={styles.transactionItem}>
-                <View style={styles.transactionLeft}>
-                  <View style={styles.transactionIconContainer}>
-                    <Ionicons
-                      name={getTransactionIcon(transaction.transaction_type) as any}
-                      size={20}
-                      color="#1A1A2E"
-                    />
+          <View style={styles.transactionsCard}>
+            {stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
+              stats.recent_transactions.map((transaction, index) => (
+                <View key={transaction.id} style={[
+                  styles.transactionItem,
+                  index < stats.recent_transactions.length - 1 && styles.transactionBorder
+                ]}>
+                  <View style={styles.transactionLeft}>
+                    <View style={styles.transactionIconContainer}>
+                      <Ionicons
+                        name={getTransactionIcon(transaction.transaction_type) as any}
+                        size={18}
+                        color={COLORS.darkGray}
+                      />
+                    </View>
+                    <View style={styles.transactionInfo}>
+                      <Text style={styles.transactionTitle}>
+                        {transaction.recipient_name || transaction.description}
+                      </Text>
+                      <Text style={styles.transactionDate}>
+                        {formatDate(transaction.timestamp)}
+                      </Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text style={styles.transactionTitle}>
-                      {transaction.recipient_name || transaction.description}
-                    </Text>
-                    <Text style={styles.transactionDate}>
-                      {formatDate(transaction.timestamp)}
-                    </Text>
-                  </View>
+                  <Text
+                    style={[
+                      styles.transactionAmount,
+                      transaction.transaction_type === 'deposit'
+                        ? styles.positiveAmount
+                        : styles.negativeAmount,
+                    ]}
+                  >
+                    {transaction.transaction_type === 'deposit' ? '+' : '-'}
+                    {formatCurrency(transaction.amount)}
+                  </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.transactionAmount,
-                    transaction.transaction_type === 'deposit'
-                      ? styles.positiveAmount
-                      : styles.negativeAmount,
-                  ]}
-                >
-                  {transaction.transaction_type === 'deposit' ? '+' : '-'}
-                  {formatCurrency(transaction.amount)}
-                </Text>
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Ionicons name="receipt-outline" size={40} color={COLORS.gray} />
+                <Text style={styles.emptyStateText}>No recent transactions</Text>
               </View>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="receipt-outline" size={48} color="#CCCCCC" />
-              <Text style={styles.emptyStateText}>No transactions yet</Text>
-            </View>
-          )}
+            )}
+          </View>
         </View>
+
+        {/* Spending Summary */}
+        <View style={styles.section}>
+          <View style={styles.spendingCard}>
+            <View style={styles.spendingHeader}>
+              <Ionicons name="trending-down" size={20} color={COLORS.primary} />
+              <Text style={styles.spendingTitle}>This Month's Spending</Text>
+            </View>
+            <Text style={styles.spendingAmount}>{formatCurrency(stats?.monthly_spending || 0)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Morning';
-  if (hour < 18) return 'Afternoon';
-  return 'Evening';
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 20,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoContainer: {
+    flexDirection: 'column',
+  },
+  hexagonRow: {
+    flexDirection: 'row',
+  },
+  hexagon: {
+    width: 14,
+    height: 14,
+    margin: 0.5,
+  },
+  hexagonRed: {
+    backgroundColor: COLORS.white,
+  },
+  hexagonWhite: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: COLORS.white,
+  },
+  headerRight: {
+    flexDirection: 'row',
+  },
+  headerIcon: {
+    marginLeft: 20,
+  },
+  greeting: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: COLORS.white,
+    marginBottom: 4,
+  },
+  lastLogin: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
+  totalBalanceCard: {
+    backgroundColor: COLORS.white,
+    margin: 16,
+    padding: 20,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
-  greeting: {
+  totalBalanceLabel: {
     fontSize: 14,
-    color: '#666666',
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1A1A2E',
-  },
-  notificationBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  balanceCard: {
-    marginHorizontal: 24,
-    backgroundColor: '#0066FF',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 24,
-  },
-  balanceLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
+    color: COLORS.gray,
     marginBottom: 8,
   },
-  balanceAmount: {
-    fontSize: 36,
+  totalBalanceAmount: {
+    fontSize: 32,
     fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 16,
+    color: COLORS.darkGray,
   },
-  balanceStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginLeft: 6,
-  },
-  spendingAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  quickActions: {
+  quickActionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingVertical: 16,
+    borderRadius: 8,
   },
-  actionButton: {
+  quickAction: {
     alignItems: 'center',
   },
-  actionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#E8F0FE',
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#FFF0F0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
-  actionText: {
+  quickActionText: {
     fontSize: 12,
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
     fontWeight: '500',
   },
   section: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
+    marginHorizontal: 16,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
   },
-  seeAll: {
+  viewAll: {
     fontSize: 14,
-    color: '#0066FF',
+    color: COLORS.primary,
     fontWeight: '500',
   },
   accountCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+  },
+  accountTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 8,
   },
-  accountInfo: {
+  accountTypeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  accountIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E8F0FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  accountDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
   },
   accountType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
   },
   accountNumber: {
     fontSize: 14,
-    color: '#666666',
+    color: COLORS.gray,
+    marginBottom: 12,
+  },
+  accountBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  balanceLabel: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginBottom: 4,
   },
   accountBalance: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A2E',
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.darkGray,
+  },
+  transactionsCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 4,
   },
   transactionItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+  },
+  transactionBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   transactionLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   transactionIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F8F9FA',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.lightGray,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
+  transactionInfo: {
+    flex: 1,
+  },
   transactionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
   },
   transactionDate: {
-    fontSize: 14,
-    color: '#666666',
+    fontSize: 12,
+    color: COLORS.gray,
+    marginTop: 2,
   },
   transactionAmount: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   positiveAmount: {
-    color: '#00C853',
+    color: COLORS.success,
   },
   negativeAmount: {
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
   },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 32,
   },
   emptyStateText: {
-    fontSize: 16,
-    color: '#999999',
+    fontSize: 14,
+    color: COLORS.gray,
     marginTop: 12,
+  },
+  spendingCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 16,
+  },
+  spendingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  spendingTitle: {
+    fontSize: 14,
+    color: COLORS.gray,
+    marginLeft: 8,
+  },
+  spendingAmount: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  bottomPadding: {
+    height: 20,
   },
 });

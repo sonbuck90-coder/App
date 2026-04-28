@@ -12,15 +12,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 
+// HSBC Colors
+const COLORS = {
+  primary: '#DB0011',
+  secondary: '#333333',
+  white: '#FFFFFF',
+  lightGray: '#F5F5F5',
+  gray: '#767676',
+  darkGray: '#333333',
+  black: '#000000',
+  success: '#00847F',
+  background: '#F5F5F5',
+};
+
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Logout',
+        text: 'Log Out',
         style: 'destructive',
         onPress: async () => {
           await logout();
@@ -30,62 +43,85 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const menuItems = [
+  const menuSections = [
     {
-      title: 'Account',
+      title: 'Account & Settings',
       items: [
-        { icon: 'person-outline', label: 'Personal Information', onPress: () => {} },
-        { icon: 'shield-checkmark-outline', label: 'Security', onPress: () => {} },
-        { icon: 'notifications-outline', label: 'Notifications', onPress: () => {} },
+        { icon: 'person-outline', label: 'Personal Details', chevron: true },
+        { icon: 'lock-closed-outline', label: 'Security Settings', chevron: true },
+        { icon: 'notifications-outline', label: 'Notifications', chevron: true },
+        { icon: 'finger-print-outline', label: 'Biometric Login', toggle: true },
       ],
     },
     {
-      title: 'Preferences',
+      title: 'Help & Support',
       items: [
-        { icon: 'language-outline', label: 'Language', onPress: () => {} },
-        { icon: 'moon-outline', label: 'Appearance', onPress: () => {} },
-        { icon: 'finger-print-outline', label: 'Biometric Login', onPress: () => {} },
+        { icon: 'chatbubble-outline', label: 'Contact Us', chevron: true },
+        { icon: 'help-circle-outline', label: 'FAQs', chevron: true },
+        { icon: 'location-outline', label: 'Branch & ATM Locator', chevron: true },
+        { icon: 'call-outline', label: 'Call Us', subtitle: '1-800-HSBC' },
       ],
     },
     {
-      title: 'Support',
+      title: 'Legal',
       items: [
-        { icon: 'help-circle-outline', label: 'Help Center', onPress: () => {} },
-        { icon: 'chatbubble-outline', label: 'Contact Us', onPress: () => {} },
-        { icon: 'document-text-outline', label: 'Terms & Privacy', onPress: () => {} },
+        { icon: 'document-text-outline', label: 'Terms & Conditions', chevron: true },
+        { icon: 'shield-outline', label: 'Privacy Policy', chevron: true },
+        { icon: 'information-circle-outline', label: 'About HSBC', chevron: true },
       ],
     },
   ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>More</Text>
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Profile</Text>
+        {/* User Card */}
+        <View style={styles.userCard}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.avatarText}>
+              {user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase() || 'U'}
+            </Text>
+          </View>
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>{user?.name || 'User'}</Text>
+            <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
+          </View>
+          <TouchableOpacity style={styles.editButton}>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+          </TouchableOpacity>
         </View>
 
-        {/* User Info Card */}
-        <View style={styles.userCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase() || 'U'}
-              </Text>
+        {/* Quick Actions */}
+        <View style={styles.quickActionsCard}>
+          <TouchableOpacity style={styles.quickActionItem}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="qr-code-outline" size={22} color={COLORS.primary} />
             </View>
-            <TouchableOpacity style={styles.editAvatarButton}>
-              <Ionicons name="camera" size={14} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.userName}>{user?.name || 'User'}</Text>
-          <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
-          <TouchableOpacity style={styles.editProfileButton}>
-            <Text style={styles.editProfileText}>Edit Profile</Text>
+            <Text style={styles.quickActionText}>My QR Code</Text>
+          </TouchableOpacity>
+          <View style={styles.quickActionDivider} />
+          <TouchableOpacity style={styles.quickActionItem}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="document-outline" size={22} color={COLORS.primary} />
+            </View>
+            <Text style={styles.quickActionText}>Statements</Text>
+          </TouchableOpacity>
+          <View style={styles.quickActionDivider} />
+          <TouchableOpacity style={styles.quickActionItem}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="settings-outline" size={22} color={COLORS.primary} />
+            </View>
+            <Text style={styles.quickActionText}>Settings</Text>
           </TouchableOpacity>
         </View>
 
         {/* Menu Sections */}
-        {menuItems.map((section, sectionIndex) => (
+        {menuSections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.menuSection}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
             <View style={styles.menuCard}>
@@ -96,15 +132,24 @@ export default function ProfileScreen() {
                     styles.menuItem,
                     itemIndex < section.items.length - 1 && styles.menuItemBorder,
                   ]}
-                  onPress={item.onPress}
                 >
                   <View style={styles.menuItemLeft}>
-                    <View style={styles.menuIconContainer}>
-                      <Ionicons name={item.icon as any} size={20} color="#0066FF" />
+                    <Ionicons name={item.icon as any} size={22} color={COLORS.darkGray} />
+                    <View style={styles.menuItemTextContainer}>
+                      <Text style={styles.menuItemLabel}>{item.label}</Text>
+                      {item.subtitle && (
+                        <Text style={styles.menuItemSubtitle}>{item.subtitle}</Text>
+                      )}
                     </View>
-                    <Text style={styles.menuItemLabel}>{item.label}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
+                  {item.chevron && (
+                    <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+                  )}
+                  {item.toggle && (
+                    <View style={styles.toggle}>
+                      <View style={styles.toggleKnob} />
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -113,12 +158,14 @@ export default function ProfileScreen() {
 
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color="#FF3B30" />
+          <Ionicons name="log-out-outline" size={22} color={COLORS.primary} />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
 
         {/* App Version */}
-        <Text style={styles.versionText}>VaultBank v1.0.0</Text>
+        <Text style={styles.versionText}>HSBC Mobile Banking v1.0.0</Text>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -127,105 +174,104 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
+  },
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.white,
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-  },
   userCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    borderRadius: 20,
-    padding: 24,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: COLORS.white,
+    margin: 16,
+    padding: 16,
+    borderRadius: 8,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#0066FF',
+  userAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  editAvatarButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1A1A2E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  userName: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 4,
+    color: COLORS.white,
+  },
+  userInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.darkGray,
   },
   userEmail: {
     fontSize: 14,
-    color: '#666666',
+    color: COLORS.gray,
+    marginTop: 2,
+  },
+  editButton: {
+    padding: 8,
+  },
+  quickActionsCard: {
+    flexDirection: 'row',
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
     marginBottom: 16,
+    borderRadius: 8,
+    padding: 16,
   },
-  editProfileButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#E8F0FE',
+  quickActionItem: {
+    flex: 1,
+    alignItems: 'center',
   },
-  editProfileText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0066FF',
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FFF0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  quickActionText: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+    fontWeight: '500',
+  },
+  quickActionDivider: {
+    width: 1,
+    backgroundColor: '#E0E0E0',
+    marginVertical: 8,
   },
   menuSection: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#666666',
-    paddingHorizontal: 24,
-    marginBottom: 12,
+    color: COLORS.gray,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   menuCard: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    borderRadius: 8,
   },
   menuItem: {
     flexDirection: 'row',
@@ -240,45 +286,59 @@ const styles = StyleSheet.create({
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  menuIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E8F0FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  menuItemTextContainer: {
+    marginLeft: 16,
+    flex: 1,
   },
   menuItemLabel: {
-    fontSize: 16,
-    color: '#1A1A2E',
+    fontSize: 15,
+    color: COLORS.darkGray,
+  },
+  menuItemSubtitle: {
+    fontSize: 13,
+    color: COLORS.gray,
+    marginTop: 2,
+  },
+  toggle: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  toggleKnob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
   },
   logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    borderRadius: 16,
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 8,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
   },
   logoutText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: COLORS.primary,
     marginLeft: 8,
   },
   versionText: {
     fontSize: 12,
-    color: '#999999',
+    color: COLORS.gray,
     textAlign: 'center',
-    marginBottom: 24,
+    marginTop: 16,
+  },
+  bottomPadding: {
+    height: 40,
   },
 });

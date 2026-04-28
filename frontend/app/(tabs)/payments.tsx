@@ -16,6 +16,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { accountsApi, billersApi, Account, Biller } from '../../src/services/api';
 
+// HSBC Colors
+const COLORS = {
+  primary: '#DB0011',
+  secondary: '#333333',
+  white: '#FFFFFF',
+  lightGray: '#F5F5F5',
+  gray: '#767676',
+  darkGray: '#333333',
+  black: '#000000',
+  success: '#00847F',
+  background: '#F5F5F5',
+};
+
 export default function PaymentsScreen() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [billers, setBillers] = useState<Biller[]>([]);
@@ -69,18 +82,6 @@ export default function PaymentsScreen() {
     return iconMap[icon] || 'receipt';
   };
 
-  const getCategoryColor = (category: string) => {
-    const colors: { [key: string]: string } = {
-      utilities: '#FF9500',
-      internet: '#5856D6',
-      phone: '#00C7BE',
-      insurance: '#34C759',
-      entertainment: '#FF2D55',
-      finance: '#0066FF',
-    };
-    return colors[category] || '#666666';
-  };
-
   const handleSelectBiller = (biller: Biller) => {
     setSelectedBiller(biller);
     setShowPaymentModal(true);
@@ -96,7 +97,7 @@ export default function PaymentsScreen() {
     }
 
     if (paymentAmount > selectedAccount.balance) {
-      Alert.alert('Error', 'Insufficient funds');
+      Alert.alert('Insufficient Funds', 'You do not have enough balance');
       return;
     }
 
@@ -108,7 +109,7 @@ export default function PaymentsScreen() {
         amount: paymentAmount,
       });
 
-      Alert.alert('Success', `Payment of ${formatCurrency(paymentAmount)} to ${selectedBiller.name} successful!`, [
+      Alert.alert('Payment Successful', `${formatCurrency(paymentAmount)} paid to ${selectedBiller.name}`, [
         {
           text: 'OK',
           onPress: () => {
@@ -120,7 +121,7 @@ export default function PaymentsScreen() {
         },
       ]);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Payment failed');
+      Alert.alert('Payment Failed', error.response?.data?.detail || 'Unable to process payment');
     } finally {
       setIsProcessing(false);
     }
@@ -129,75 +130,92 @@ export default function PaymentsScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0066FF" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
-  const groupedBillers = billers.reduce((acc, biller) => {
-    if (!acc[biller.category]) {
-      acc[biller.category] = [];
-    }
-    acc[biller.category].push(biller);
-    return acc;
-  }, {} as { [key: string]: Biller[] });
+  // Service categories
+  const serviceCategories = [
+    { icon: 'receipt-outline', label: 'Pay Bills', color: COLORS.primary },
+    { icon: 'phone-portrait-outline', label: 'Mobile Top-up', color: '#5856D6' },
+    { icon: 'card-outline', label: 'Credit Card', color: '#FF9500' },
+    { icon: 'cash-outline', label: 'Loan', color: '#00847F' },
+    { icon: 'trending-up-outline', label: 'Investments', color: '#007AFF' },
+    { icon: 'shield-outline', label: 'Insurance', color: '#34C759' },
+    { icon: 'airplane-outline', label: 'Travel', color: '#AF52DE' },
+    { icon: 'ellipsis-horizontal', label: 'More', color: COLORS.gray },
+  ];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Services</Text>
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Pay Bills</Text>
-          <Text style={styles.headerSubtitle}>Select a biller to make payment</Text>
+        {/* Service Grid */}
+        <View style={styles.serviceGrid}>
+          {serviceCategories.map((service, index) => (
+            <TouchableOpacity key={index} style={styles.serviceItem}>
+              <View style={[styles.serviceIcon, { backgroundColor: `${service.color}15` }]}>
+                <Ionicons name={service.icon as any} size={24} color={service.color} />
+              </View>
+              <Text style={styles.serviceLabel}>{service.label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Account Balance */}
-        {selectedAccount && (
-          <View style={styles.balanceCard}>
-            <View style={styles.balanceInfo}>
-              <Text style={styles.balanceLabel}>Available Balance</Text>
-              <Text style={styles.balanceAmount}>{formatCurrency(selectedAccount.balance)}</Text>
-            </View>
-            <View style={styles.accountBadge}>
-              <Text style={styles.accountBadgeText}>
-                {selectedAccount.account_type.charAt(0).toUpperCase() +
-                  selectedAccount.account_type.slice(1)}
-              </Text>
-            </View>
+        {/* Registered Billers */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Registered Billers</Text>
+            <TouchableOpacity>
+              <Text style={styles.addNew}>+ Add New</Text>
+            </TouchableOpacity>
           </View>
-        )}
 
-        {/* Billers by Category */}
-        {Object.entries(groupedBillers).map(([category, categoryBillers]) => (
-          <View key={category} style={styles.categorySection}>
-            <Text style={styles.categoryTitle}>
-              {category.charAt(0).toUpperCase() + category.slice(1)}
-            </Text>
-            <View style={styles.billersGrid}>
-              {categoryBillers.map((biller) => (
-                <TouchableOpacity
-                  key={biller.id}
-                  style={styles.billerCard}
-                  onPress={() => handleSelectBiller(biller)}
-                >
-                  <View
-                    style={[
-                      styles.billerIcon,
-                      { backgroundColor: `${getCategoryColor(biller.category)}20` },
-                    ]}
-                  >
-                    <Ionicons
-                      name={getBillerIcon(biller.icon)}
-                      size={24}
-                      color={getCategoryColor(biller.category)}
-                    />
+          <View style={styles.billersCard}>
+            {billers.map((biller, index) => (
+              <TouchableOpacity
+                key={biller.id}
+                style={[
+                  styles.billerItem,
+                  index < billers.length - 1 && styles.billerBorder
+                ]}
+                onPress={() => handleSelectBiller(biller)}
+              >
+                <View style={styles.billerLeft}>
+                  <View style={styles.billerIcon}>
+                    <Ionicons name={getBillerIcon(biller.icon)} size={20} color={COLORS.primary} />
                   </View>
-                  <Text style={styles.billerName}>{biller.name}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  <View>
+                    <Text style={styles.billerName}>{biller.name}</Text>
+                    <Text style={styles.billerCategory}>{biller.category}</Text>
+                  </View>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+              </TouchableOpacity>
+            ))}
           </View>
-        ))}
+        </View>
+
+        {/* Quick Pay */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Pay</Text>
+          <View style={styles.quickPayCard}>
+            <View style={styles.quickPayRow}>
+              <Ionicons name="flash" size={20} color={COLORS.primary} />
+              <Text style={styles.quickPayText}>Set up recurring payments</Text>
+            </View>
+            <TouchableOpacity style={styles.quickPayButton}>
+              <Text style={styles.quickPayButtonText}>Set Up</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
 
       {/* Payment Modal */}
@@ -221,23 +239,14 @@ export default function PaymentsScreen() {
                   setAmount('');
                 }}
               >
-                <Ionicons name="close" size={24} color="#666666" />
+                <Ionicons name="close" size={24} color={COLORS.darkGray} />
               </TouchableOpacity>
             </View>
 
             {selectedBiller && (
               <View style={styles.selectedBillerInfo}>
-                <View
-                  style={[
-                    styles.billerIconLarge,
-                    { backgroundColor: `${getCategoryColor(selectedBiller.category)}20` },
-                  ]}
-                >
-                  <Ionicons
-                    name={getBillerIcon(selectedBiller.icon)}
-                    size={32}
-                    color={getCategoryColor(selectedBiller.category)}
-                  />
+                <View style={styles.billerIconLarge}>
+                  <Ionicons name={getBillerIcon(selectedBiller.icon)} size={28} color={COLORS.primary} />
                 </View>
                 <Text style={styles.selectedBillerName}>{selectedBiller.name}</Text>
                 <Text style={styles.selectedBillerAccount}>Account: {selectedBiller.account_number}</Text>
@@ -245,19 +254,24 @@ export default function PaymentsScreen() {
             )}
 
             <View style={styles.amountSection}>
-              <Text style={styles.amountLabel}>Enter Amount</Text>
+              <Text style={styles.amountLabel}>Payment Amount</Text>
               <View style={styles.amountInputContainer}>
-                <Text style={styles.currencySymbol}>$</Text>
+                <Text style={styles.currencyCode}>USD</Text>
                 <TextInput
                   style={styles.amountInput}
                   placeholder="0.00"
-                  placeholderTextColor="#CCCCCC"
+                  placeholderTextColor={COLORS.gray}
                   value={amount}
                   onChangeText={setAmount}
                   keyboardType="decimal-pad"
                   autoFocus
                 />
               </View>
+              {selectedAccount && (
+                <Text style={styles.availableBalance}>
+                  Available: {formatCurrency(selectedAccount.balance)}
+                </Text>
+              )}
             </View>
 
             <TouchableOpacity
@@ -266,12 +280,9 @@ export default function PaymentsScreen() {
               disabled={isProcessing}
             >
               {isProcessing ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={COLORS.white} />
               ) : (
-                <>
-                  <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
-                  <Text style={styles.payButtonText}>Confirm Payment</Text>
-                </>
+                <Text style={styles.payButtonText}>Pay Now</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -284,94 +295,41 @@ export default function PaymentsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.white,
   },
   scrollView: {
     flex: 1,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666666',
-  },
-  balanceCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#0066FF',
-    marginHorizontal: 24,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-  },
-  balanceInfo: {},
-  balanceLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
-  },
-  balanceAmount: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  accountBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  accountBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  categorySection: {
-    paddingHorizontal: 24,
-    marginBottom: 24,
-  },
-  categoryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1A1A2E',
-    marginBottom: 16,
-  },
-  billersGrid: {
+  serviceGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -6,
+    backgroundColor: COLORS.white,
+    margin: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
   },
-  billerCard: {
-    width: '31%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
+  serviceItem: {
+    width: '25%',
     alignItems: 'center',
-    marginHorizontal: '1%',
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    paddingVertical: 16,
   },
-  billerIcon: {
+  serviceIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
@@ -379,11 +337,100 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  billerName: {
-    fontSize: 12,
+  serviceLabel: {
+    fontSize: 11,
+    color: COLORS.darkGray,
     fontWeight: '500',
-    color: '#1A1A2E',
     textAlign: 'center',
+  },
+  section: {
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+  },
+  addNew: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  billersCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+  },
+  billerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+  },
+  billerBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  billerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  billerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF0F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  billerName: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.darkGray,
+  },
+  billerCategory: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginTop: 2,
+    textTransform: 'capitalize',
+  },
+  quickPayCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 16,
+  },
+  quickPayRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quickPayText: {
+    fontSize: 14,
+    color: COLORS.darkGray,
+    marginLeft: 12,
+  },
+  quickPayButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  quickPayButtonText: {
+    color: COLORS.white,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  bottomPadding: {
+    height: 20,
   },
   modalOverlay: {
     flex: 1,
@@ -391,9 +438,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingHorizontal: 24,
     paddingTop: 24,
     paddingBottom: 40,
@@ -407,7 +454,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
   },
   closeButton: {
     padding: 4,
@@ -417,9 +464,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   billerIconLarge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FFF0F0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -427,56 +475,59 @@ const styles = StyleSheet.create({
   selectedBillerName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
     marginBottom: 4,
   },
   selectedBillerAccount: {
     fontSize: 14,
-    color: '#666666',
+    color: COLORS.gray,
   },
   amountSection: {
     marginBottom: 24,
   },
   amountLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
+    fontWeight: '500',
+    color: COLORS.darkGray,
     marginBottom: 12,
   },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 20,
+    borderBottomWidth: 2,
+    borderBottomColor: COLORS.primary,
+    paddingBottom: 12,
   },
-  currencySymbol: {
-    fontSize: 28,
+  currencyCode: {
+    fontSize: 18,
     fontWeight: '600',
-    color: '#1A1A2E',
-    marginRight: 8,
+    color: COLORS.darkGray,
+    marginRight: 12,
   },
   amountInput: {
     flex: 1,
-    fontSize: 36,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
+  },
+  availableBalance: {
+    fontSize: 13,
+    color: COLORS.gray,
+    marginTop: 12,
   },
   payButton: {
-    flexDirection: 'row',
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
+    height: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#0066FF',
-    borderRadius: 12,
-    height: 56,
   },
   payButtonDisabled: {
     opacity: 0.7,
   },
   payButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
 });

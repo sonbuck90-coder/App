@@ -3,23 +3,31 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View, StyleSheet } from 'react-native';
 
+// HSBC Colors
+const COLORS = {
+  primary: '#DB0011',
+  gray: '#767676',
+  white: '#FFFFFF',
+  lightGray: '#F5F5F5',
+};
+
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#0066FF',
-        tabBarInactiveTintColor: '#999999',
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.gray,
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
+          backgroundColor: COLORS.white,
           borderTopWidth: 1,
-          borderTopColor: '#F0F0F0',
+          borderTopColor: '#E0E0E0',
           height: Platform.OS === 'ios' ? 88 : 64,
           paddingBottom: Platform.OS === 'ios' ? 28 : 8,
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: '500',
         },
       }}
@@ -27,16 +35,16 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Home',
+          title: 'Accounts',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <Ionicons name="wallet" size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="transfers"
         options={{
-          title: 'Transfer',
+          title: 'Pay & Transfer',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="swap-horizontal" size={size} color={color} />
           ),
@@ -45,9 +53,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="payments"
         options={{
-          title: 'Pay Bills',
+          title: 'Services',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="receipt" size={size} color={color} />
+            <Ionicons name="grid" size={size} color={color} />
           ),
         }}
       />
@@ -63,9 +71,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'More',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="menu" size={size} color={color} />
           ),
         }}
       />

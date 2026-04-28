@@ -7,15 +7,32 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsApi, Card } from '../../src/services/api';
 
+const { width } = Dimensions.get('window');
+
+// HSBC Colors
+const COLORS = {
+  primary: '#DB0011',
+  secondary: '#333333',
+  white: '#FFFFFF',
+  lightGray: '#F5F5F5',
+  gray: '#767676',
+  darkGray: '#333333',
+  black: '#000000',
+  success: '#00847F',
+  background: '#F5F5F5',
+};
+
 export default function CardsScreen() {
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingCardId, setProcessingCardId] = useState<string | null>(null);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
 
   useEffect(() => {
     fetchCards();
@@ -37,10 +54,10 @@ export default function CardsScreen() {
     try {
       if (card.is_frozen) {
         await cardsApi.unfreeze(card.id);
-        Alert.alert('Success', 'Card unfrozen successfully');
+        Alert.alert('Card Activated', 'Your card is now active');
       } else {
         await cardsApi.freeze(card.id);
-        Alert.alert('Success', 'Card frozen successfully');
+        Alert.alert('Card Frozen', 'Your card has been temporarily frozen');
       }
       fetchCards();
     } catch (error: any) {
@@ -57,149 +74,193 @@ export default function CardsScreen() {
     }).format(value);
   };
 
-  const getCardGradient = (cardType: string, index: number) => {
-    const gradients = [
-      { bg: '#1A1A2E', accent: '#4A4A6A' },
-      { bg: '#0066FF', accent: '#3D8BFF' },
-      { bg: '#5856D6', accent: '#7E7CE5' },
-      { bg: '#FF9500', accent: '#FFB340' },
-    ];
-    return gradients[index % gradients.length];
-  };
-
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0066FF" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>My Cards</Text>
-          <Text style={styles.headerSubtitle}>Manage your cards</Text>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Cards</Text>
+      </View>
 
-        {/* Cards List */}
-        {cards.map((card, index) => {
-          const gradient = getCardGradient(card.card_type, index);
-          return (
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Card Carousel */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / (width - 48));
+            setActiveCardIndex(index);
+          }}
+          scrollEventThrottle={16}
+          contentContainerStyle={styles.cardCarousel}
+        >
+          {cards.map((card, index) => (
             <View key={card.id} style={styles.cardWrapper}>
-              {/* Physical Card Design */}
-              <View style={[styles.physicalCard, { backgroundColor: gradient.bg }]}>
+              <View style={[styles.physicalCard, card.is_frozen && styles.frozenCard]}>
                 {card.is_frozen && (
-                  <View style={styles.frozenOverlay}>
-                    <Ionicons name="snow" size={48} color="rgba(255,255,255,0.5)" />
-                    <Text style={styles.frozenText}>FROZEN</Text>
+                  <View style={styles.frozenBadge}>
+                    <Ionicons name="snow" size={14} color={COLORS.white} />
+                    <Text style={styles.frozenBadgeText}>FROZEN</Text>
                   </View>
                 )}
-                <View style={styles.cardHeader}>
-                  <Text style={styles.cardName}>{card.card_name}</Text>
-                  <View style={styles.cardChip}>
-                    <View style={styles.chipLine} />
-                    <View style={styles.chipLine} />
-                    <View style={styles.chipLine} />
+                <View style={styles.cardTop}>
+                  <View style={styles.cardLogoContainer}>
+                    <View style={styles.cardHexagonRow}>
+                      <View style={[styles.cardHexagon, styles.cardHexagonWhite]} />
+                      <View style={[styles.cardHexagon, styles.cardHexagonRed]} />
+                    </View>
+                    <View style={styles.cardHexagonRow}>
+                      <View style={[styles.cardHexagon, styles.cardHexagonRed]} />
+                      <View style={[styles.cardHexagon, styles.cardHexagonWhite]} />
+                    </View>
                   </View>
+                  <Text style={styles.cardBrandText}>HSBC</Text>
                 </View>
-                <View style={styles.cardNumberContainer}>
-                  <Text style={styles.cardNumber}>{card.card_number_masked}</Text>
+                <View style={styles.cardChip}>
+                  <View style={styles.chipInner} />
                 </View>
-                <View style={styles.cardFooter}>
+                <Text style={styles.cardNumberText}>{card.card_number_masked}</Text>
+                <View style={styles.cardBottom}>
                   <View>
                     <Text style={styles.cardLabel}>VALID THRU</Text>
                     <Text style={styles.cardValue}>{card.expiry_date}</Text>
                   </View>
-                  <View style={styles.cardType}>
+                  <View>
+                    <Text style={styles.cardLabel}>CARD TYPE</Text>
+                    <Text style={styles.cardValue}>{card.card_type.toUpperCase()}</Text>
+                  </View>
+                  <View style={styles.cardNetwork}>
                     {card.card_type === 'debit' ? (
-                      <Text style={styles.cardTypeText}>VISA</Text>
+                      <Text style={styles.networkText}>VISA</Text>
                     ) : (
-                      <Text style={styles.cardTypeText}>MASTERCARD</Text>
+                      <View style={styles.mastercardLogo}>
+                        <View style={[styles.mcCircle, styles.mcCircleRed]} />
+                        <View style={[styles.mcCircle, styles.mcCircleOrange]} />
+                      </View>
                     )}
                   </View>
-                </View>
-              </View>
-
-              {/* Card Actions */}
-              <View style={styles.cardActions}>
-                {card.card_type === 'credit' && card.credit_limit && (
-                  <View style={styles.creditInfo}>
-                    <View style={styles.creditRow}>
-                      <Text style={styles.creditLabel}>Credit Limit</Text>
-                      <Text style={styles.creditValue}>{formatCurrency(card.credit_limit)}</Text>
-                    </View>
-                    <View style={styles.creditRow}>
-                      <Text style={styles.creditLabel}>Available</Text>
-                      <Text style={[styles.creditValue, styles.availableCredit]}>
-                        {formatCurrency(card.available_credit || 0)}
-                      </Text>
-                    </View>
-                    <View style={styles.creditBar}>
-                      <View
-                        style={[
-                          styles.creditUsed,
-                          {
-                            width: `${((card.credit_limit - (card.available_credit || 0)) / card.credit_limit) * 100}%`,
-                          },
-                        ]}
-                      />
-                    </View>
-                  </View>
-                )}
-
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity
-                    style={[
-                      styles.actionButton,
-                      card.is_frozen && styles.actionButtonActive,
-                    ]}
-                    onPress={() => toggleCardFreeze(card)}
-                    disabled={processingCardId === card.id}
-                  >
-                    {processingCardId === card.id ? (
-                      <ActivityIndicator size="small" color="#0066FF" />
-                    ) : (
-                      <>
-                        <Ionicons
-                          name={card.is_frozen ? 'snow' : 'snow-outline'}
-                          size={20}
-                          color={card.is_frozen ? '#0066FF' : '#666666'}
-                        />
-                        <Text
-                          style={[
-                            styles.actionButtonText,
-                            card.is_frozen && styles.actionButtonTextActive,
-                          ]}
-                        >
-                          {card.is_frozen ? 'Unfreeze' : 'Freeze'}
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name="settings-outline" size={20} color="#666666" />
-                    <Text style={styles.actionButtonText}>Settings</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.actionButton}>
-                    <Ionicons name="document-text-outline" size={20} color="#666666" />
-                    <Text style={styles.actionButtonText}>Details</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             </View>
-          );
-        })}
+          ))}
+        </ScrollView>
 
-        {/* Add New Card Button */}
-        <TouchableOpacity style={styles.addCardButton}>
-          <Ionicons name="add-circle-outline" size={24} color="#0066FF" />
-          <Text style={styles.addCardText}>Add New Card</Text>
-        </TouchableOpacity>
+        {/* Card Indicators */}
+        <View style={styles.cardIndicators}>
+          {cards.map((_, index) => (
+            <View
+              key={index}
+              style={[styles.indicator, activeCardIndex === index && styles.indicatorActive]}
+            />
+          ))}
+        </View>
+
+        {/* Card Info */}
+        {cards[activeCardIndex] && (
+          <View style={styles.cardInfoSection}>
+            <Text style={styles.cardInfoTitle}>{cards[activeCardIndex].card_name}</Text>
+            
+            {cards[activeCardIndex].card_type === 'credit' && cards[activeCardIndex].credit_limit && (
+              <View style={styles.creditInfoCard}>
+                <View style={styles.creditRow}>
+                  <Text style={styles.creditLabel}>Credit Limit</Text>
+                  <Text style={styles.creditValue}>{formatCurrency(cards[activeCardIndex].credit_limit || 0)}</Text>
+                </View>
+                <View style={styles.creditRow}>
+                  <Text style={styles.creditLabel}>Available Credit</Text>
+                  <Text style={[styles.creditValue, styles.availableCredit]}>
+                    {formatCurrency(cards[activeCardIndex].available_credit || 0)}
+                  </Text>
+                </View>
+                <View style={styles.creditProgressBar}>
+                  <View
+                    style={[
+                      styles.creditProgressFill,
+                      {
+                        width: `${((cards[activeCardIndex].credit_limit! - (cards[activeCardIndex].available_credit || 0)) / cards[activeCardIndex].credit_limit!) * 100}%`,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.creditUsed}>
+                  {formatCurrency(cards[activeCardIndex].credit_limit! - (cards[activeCardIndex].available_credit || 0))} used
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Card Actions */}
+        <View style={styles.actionsSection}>
+          <Text style={styles.actionsTitle}>Card Actions</Text>
+          <View style={styles.actionsGrid}>
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => cards[activeCardIndex] && toggleCardFreeze(cards[activeCardIndex])}
+              disabled={processingCardId === cards[activeCardIndex]?.id}
+            >
+              <View style={[styles.actionIcon, cards[activeCardIndex]?.is_frozen && styles.actionIconActive]}>
+                {processingCardId === cards[activeCardIndex]?.id ? (
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                ) : (
+                  <Ionicons
+                    name={cards[activeCardIndex]?.is_frozen ? 'snow' : 'snow-outline'}
+                    size={24}
+                    color={cards[activeCardIndex]?.is_frozen ? COLORS.primary : COLORS.darkGray}
+                  />
+                )}
+              </View>
+              <Text style={styles.actionLabel}>
+                {cards[activeCardIndex]?.is_frozen ? 'Unfreeze' : 'Freeze Card'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="eye-outline" size={24} color={COLORS.darkGray} />
+              </View>
+              <Text style={styles.actionLabel}>View PIN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="settings-outline" size={24} color={COLORS.darkGray} />
+              </View>
+              <Text style={styles.actionLabel}>Card Settings</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="location-outline" size={24} color={COLORS.darkGray} />
+              </View>
+              <Text style={styles.actionLabel}>ATM Locator</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="notifications-outline" size={24} color={COLORS.darkGray} />
+              </View>
+              <Text style={styles.actionLabel}>Alerts</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="help-circle-outline" size={24} color={COLORS.darkGray} />
+              </View>
+              <Text style={styles.actionLabel}>Report Lost</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -208,70 +269,87 @@ export default function CardsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: COLORS.white,
   },
   scrollView: {
     flex: 1,
   },
-  header: {
+  cardCarousel: {
     paddingHorizontal: 24,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666666',
+    paddingTop: 20,
   },
   cardWrapper: {
-    marginHorizontal: 24,
-    marginBottom: 24,
+    width: width - 48,
+    paddingRight: 16,
   },
   physicalCard: {
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: '#1A1A2E',
+    borderRadius: 16,
+    padding: 20,
     height: 200,
     justifyContent: 'space-between',
-    position: 'relative',
-    overflow: 'hidden',
   },
-  frozenOverlay: {
+  frozenCard: {
+    opacity: 0.7,
+  },
+  frozenBadge: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    top: 12,
+    right: 12,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  frozenText: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 8,
+  frozenBadgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: '600',
+    marginLeft: 4,
   },
-  cardHeader: {
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  cardName: {
+  cardLogoContainer: {},
+  cardHexagonRow: {
+    flexDirection: 'row',
+  },
+  cardHexagon: {
+    width: 10,
+    height: 10,
+    margin: 0.5,
+  },
+  cardHexagonWhite: {
+    backgroundColor: COLORS.white,
+  },
+  cardHexagonRed: {
+    backgroundColor: COLORS.primary,
+  },
+  cardBrandText: {
+    color: COLORS.white,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   cardChip: {
     width: 40,
@@ -279,61 +357,87 @@ const styles = StyleSheet.create({
     backgroundColor: '#C4A86C',
     borderRadius: 4,
     padding: 4,
-    justifyContent: 'space-around',
+    justifyContent: 'center',
   },
-  chipLine: {
-    height: 2,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 1,
+  chipInner: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.15)',
+    borderRadius: 2,
   },
-  cardNumberContainer: {
-    alignItems: 'center',
-  },
-  cardNumber: {
-    fontSize: 22,
+  cardNumberText: {
+    color: COLORS.white,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: 4,
+    letterSpacing: 3,
   },
-  cardFooter: {
+  cardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
   },
   cardLabel: {
-    fontSize: 10,
     color: 'rgba(255,255,255,0.6)',
+    fontSize: 9,
     marginBottom: 2,
   },
   cardValue: {
-    fontSize: 14,
+    color: COLORS.white,
+    fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
-  cardType: {},
-  cardTypeText: {
-    fontSize: 18,
+  cardNetwork: {},
+  networkText: {
+    color: COLORS.white,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
     fontStyle: 'italic',
   },
-  cardActions: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: -20,
-    marginHorizontal: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+  mastercardLogo: {
+    flexDirection: 'row',
   },
-  creditInfo: {
+  mcCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  mcCircleRed: {
+    backgroundColor: '#EB001B',
+  },
+  mcCircleOrange: {
+    backgroundColor: '#F79E1B',
+    marginLeft: -10,
+    opacity: 0.8,
+  },
+  cardIndicators: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  indicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D0D0D0',
+    marginHorizontal: 4,
+  },
+  indicatorActive: {
+    backgroundColor: COLORS.primary,
+    width: 24,
+  },
+  cardInfoSection: {
+    marginHorizontal: 24,
+    marginTop: 24,
+  },
+  cardInfoTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.darkGray,
     marginBottom: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+  },
+  creditInfoCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 16,
   },
   creditRow: {
     flexDirection: 'row',
@@ -342,67 +446,74 @@ const styles = StyleSheet.create({
   },
   creditLabel: {
     fontSize: 14,
-    color: '#666666',
+    color: COLORS.gray,
   },
   creditValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1A1A2E',
+    color: COLORS.darkGray,
   },
   availableCredit: {
-    color: '#00C853',
+    color: COLORS.success,
   },
-  creditBar: {
-    height: 6,
-    backgroundColor: '#E8F0FE',
-    borderRadius: 3,
+  creditProgressBar: {
+    height: 8,
+    backgroundColor: '#E8E8E8',
+    borderRadius: 4,
     overflow: 'hidden',
-    marginTop: 4,
+    marginTop: 8,
+  },
+  creditProgressFill: {
+    height: '100%',
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
   },
   creditUsed: {
-    height: '100%',
-    backgroundColor: '#0066FF',
-    borderRadius: 3,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  actionButton: {
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    minWidth: 80,
-  },
-  actionButtonActive: {
-    backgroundColor: '#E8F0FE',
-  },
-  actionButtonText: {
     fontSize: 12,
-    color: '#666666',
-    marginTop: 4,
-    fontWeight: '500',
+    color: COLORS.gray,
+    marginTop: 8,
   },
-  actionButtonTextActive: {
-    color: '#0066FF',
+  actionsSection: {
+    marginHorizontal: 24,
+    marginTop: 24,
   },
-  addCardButton: {
+  actionsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+    marginBottom: 16,
+  },
+  actionsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    backgroundColor: COLORS.white,
+    borderRadius: 8,
+    padding: 8,
+  },
+  actionItem: {
+    width: '33.33%',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.lightGray,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 24,
-    marginBottom: 24,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 2,
-    borderColor: '#E8F0FE',
-    borderStyle: 'dashed',
+    marginBottom: 8,
   },
-  addCardText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0066FF',
-    marginLeft: 8,
+  actionIconActive: {
+    backgroundColor: '#FFF0F0',
+  },
+  actionLabel: {
+    fontSize: 12,
+    color: COLORS.darkGray,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  bottomPadding: {
+    height: 40,
   },
 });

@@ -2,7 +2,13 @@ import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+
+// HSBC Colors
+const COLORS = {
+  primary: '#DB0011',
+  white: '#FFFFFF',
+  gray: '#767676',
+};
 
 export default function SplashScreen() {
   const router = useRouter();
@@ -21,13 +27,20 @@ export default function SplashScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.logoContainer}>
-        <View style={styles.logoCircle}>
-          <Ionicons name="shield-checkmark" size={48} color="#FFFFFF" />
+        <View style={styles.hexagonGrid}>
+          <View style={styles.hexagonRow}>
+            <View style={[styles.hexagon, styles.hexagonRed]} />
+            <View style={[styles.hexagon, styles.hexagonWhite]} />
+          </View>
+          <View style={styles.hexagonRow}>
+            <View style={[styles.hexagon, styles.hexagonWhite]} />
+            <View style={[styles.hexagon, styles.hexagonRed]} />
+          </View>
         </View>
-        <Text style={styles.appName}>VaultBank</Text>
-        <Text style={styles.tagline}>Secure Banking Made Simple</Text>
+        <Text style={styles.brandName}>HSBC</Text>
+        <Text style={styles.tagline}>Mobile Banking</Text>
       </View>
-      <ActivityIndicator size="large" color="#0066FF" style={styles.loader} />
+      <ActivityIndicator size="large" color={COLORS.primary} style={styles.loader} />
     </View>
   );
 }
@@ -35,33 +48,44 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoContainer: {
     alignItems: 'center',
   },
-  logoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#0066FF',
-    alignItems: 'center',
-    justifyContent: 'center',
+  hexagonGrid: {
     marginBottom: 16,
   },
-  appName: {
-    fontSize: 32,
+  hexagonRow: {
+    flexDirection: 'row',
+  },
+  hexagon: {
+    width: 36,
+    height: 36,
+    margin: 1,
+  },
+  hexagonRed: {
+    backgroundColor: COLORS.primary,
+  },
+  hexagonWhite: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  brandName: {
+    fontSize: 42,
     fontWeight: '700',
-    color: '#1A1A2E',
-    marginBottom: 8,
+    color: COLORS.primary,
+    letterSpacing: 6,
   },
   tagline: {
-    fontSize: 16,
-    color: '#666666',
+    fontSize: 14,
+    color: COLORS.gray,
+    marginTop: 8,
   },
   loader: {
-    marginTop: 40,
+    marginTop: 48,
   },
 });
