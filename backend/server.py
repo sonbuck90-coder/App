@@ -475,6 +475,255 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         "recent_transactions": [Transaction(**txn).dict() for txn in transactions]
     }
 
+# ==================== PAYEE MANAGEMENT ====================
+
+class PayeeCreate(BaseModel):
+    name: str
+    sort_code: str
+    account_number: str
+
+class PayeeUpdate(BaseModel):
+    name: Optional[str] = None
+    sort_code: Optional[str] = None
+    account_number: Optional[str] = None
+
+@api_router.post("/payees")
+async def create_payee(payee_data: PayeeCreate, current_user: User = Depends(get_current_user)):
+    # Check for duplicate
+    existing = await db.payees.find_one({
+        "user_id": current_user.id,
+        "account_number": payee_data.account_number,
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Payee with this account number already exists")
+    
+    payee = Payee(
+        user_id=current_user.id,
+        name=payee_data.name,
+        sort_code=payee_data.sort_code,
+        account_number=payee_data.account_number,
+    )
+    await db.payees.insert_one(payee.dict())
+    return {k: v for k, v in payee.dict().items() if k != "_id"}
+
+@api_router.put("/payees/{payee_id}")
+async def update_payee(payee_id: str, payee_data: PayeeUpdate, current_user: User = Depends(get_current_user)):
+    update_fields = {k: v for k, v in payee_data.dict().items() if v is not None}
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    result = await db.payees.update_one(
+        {"id": payee_id, "user_id": current_user.id},
+        {"$set": update_fields}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Payee not found")
+    
+    updated = await db.payees.find_one({"id": payee_id}, {"_id": 0})
+    return updated
+
+# ==================== SPENDING ANALYTICS ====================
+
+@api_router.get("/analytics/spending")
+async def get_spending_analytics(current_user: User = Depends(get_current_user)):
+    now = datetime.utcnow()
+    start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # All transactions for this month
+    monthly_txns = await db.transactions.find({
+        "user_id": current_user.id,
+        "transaction_type": {"$in": ["transfer", "payment"]},
+        "timestamp": {"$gte": start_of_month}
+    }).to_list(1000)
+    
+    # Category breakdown
+    categories = {}
+    for txn in monthly_txns:
+        cat = txn.get("transaction_type", "other")
+        if cat == "payment":
+            desc = txn.get("description", "")
+            if "Electric" in desc or "Water" in desc or "Gas" in desc:
+                cat = "Utilities"
+            elif "Internet" in desc or "Cable" in desc:
+                cat = "Internet & TV"
+            elif "Mobile" in desc or "Phone" in desc:
+                cat = "Phone"
+            elif "Insurance" in desc:
+                cat = "Insurance"
+            elif "Credit Card" in desc:
+                cat = "Credit Card"
+            else:
+                cat = "Bills"
+        elif cat == "transfer":
+            cat = "Transfers"
+        
+        if cat not in categories:
+            categories[cat] = {"total": 0, "count": 0}
+        categories[cat]["total"] += txn["amount"]
+        categories[cat]["count"] += 1
+    
+    # Top payees
+    payee_totals = {}
+    for txn in monthly_txns:
+        name = txn.get("recipient_name", "Unknown")
+        if name not in payee_totals:
+            payee_totals[name] = 0
+        payee_totals[name] += txn["amount"]
+    
+    top_payees = sorted(payee_totals.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    # Monthly totals for last 6 months
+    monthly_totals = []
+    for i in range(6):
+        month_start = (now.replace(day=1) - timedelta(days=30 * i)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if i == 0:
+            month_end = now
+        else:
+            next_month = (month_start + timedelta(days=32)).replace(day=1)
+            month_end = next_month
+        
+        month_txns = await db.transactions.find({
+            "user_id": current_user.id,
+            "transaction_type": {"$in": ["transfer", "payment"]},
+            "timestamp": {"$gte": month_start, "$lt": month_end}
+        }).to_list(1000)
+        
+        total = sum(t["amount"] for t in month_txns)
+        monthly_totals.append({
+            "month": month_start.strftime("%b"),
+            "year": month_start.year,
+            "total": total,
+            "count": len(month_txns),
+        })
+    
+    total_spending = sum(txn["amount"] for txn in monthly_txns)
+    
+    return {
+        "total_spending": total_spending,
+        "transaction_count": len(monthly_txns),
+        "categories": [{"name": k, "total": v["total"], "count": v["count"]} for k, v in sorted(categories.items(), key=lambda x: x[1]["total"], reverse=True)],
+        "top_payees": [{"name": n, "total": t} for n, t in top_payees],
+        "monthly_trend": list(reversed(monthly_totals)),
+    }
+
+# ==================== AI CHAT ====================
+
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+@api_router.post("/chat")
+async def chat_with_ai(chat_req: ChatRequest, current_user: User = Depends(get_current_user)):
+    llm_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not llm_key:
+        raise HTTPException(status_code=500, detail="AI service not configured")
+    
+    # Gather user's financial context
+    accounts = await db.accounts.find({"user_id": current_user.id}).to_list(100)
+    total_balance = sum(acc["balance"] for acc in accounts)
+    
+    recent_txns = await db.transactions.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(10)
+    
+    txn_summary = ""
+    for txn in recent_txns:
+        txn_type = txn.get("transaction_type", "unknown")
+        amount = txn.get("amount", 0)
+        desc = txn.get("description", "")
+        recipient = txn.get("recipient_name", "")
+        ts = txn.get("timestamp", datetime.utcnow())
+        if isinstance(ts, datetime):
+            ts_str = ts.strftime("%b %d, %Y at %I:%M %p")
+        else:
+            ts_str = str(ts)
+        txn_summary += f"- {txn_type.title()}: ${amount:.2f} to {recipient or 'N/A'} ({desc}) on {ts_str}\n"
+    
+    accounts_summary = ""
+    for acc in accounts:
+        acc_type = acc.get("account_type", "unknown").title()
+        balance = acc.get("balance", 0)
+        acc_num = acc.get("account_number", "")
+        accounts_summary += f"- {acc_type} Account (****{acc_num[-4:]}): ${balance:.2f}\n"
+    
+    system_msg = f"""You are HSBC's AI Banking Assistant. You are helpful, professional, and concise.
+You have access to the customer's financial information:
+
+**Customer:** {current_user.name}
+**Total Balance:** ${total_balance:.2f}
+
+**Accounts:**
+{accounts_summary}
+
+**Recent Transactions (last 10):**
+{txn_summary if txn_summary else "No recent transactions."}
+
+**Guidelines:**
+- Answer questions about their accounts, transactions, and banking.
+- For "Last Transaction" queries, provide full details of their most recent transaction.
+- For "Transfer Delays" queries, explain that domestic transfers typically take 1-2 business days, international 3-5 business days, and same-day transfers are available for urgent payments before 2 PM.
+- For "Support Hours" queries, explain HSBC support is available 24/7 via phone (1-800-HSBC), Mon-Fri 8AM-8PM via live chat, and branches are open Mon-Fri 9AM-5PM, Sat 9AM-1PM.
+- Be specific with numbers and dates when discussing transactions.
+- Keep responses concise but comprehensive.
+- If asked about something you don't have data for, say so politely."""
+
+    session_id = chat_req.session_id or f"chat-{current_user.id}-{uuid.uuid4()}"
+    
+    # Store message in DB
+    await db.chat_messages.insert_one({
+        "user_id": current_user.id,
+        "session_id": session_id,
+        "role": "user",
+        "content": chat_req.message,
+        "timestamp": datetime.utcnow(),
+    })
+    
+    # Get chat history for context
+    history = await db.chat_messages.find({
+        "user_id": current_user.id,
+        "session_id": session_id,
+    }).sort("timestamp", 1).to_list(20)
+    
+    try:
+        chat = LlmChat(
+            api_key=llm_key,
+            session_id=session_id,
+            system_message=system_msg,
+        ).with_model("openai", "gpt-4.1-mini")
+        
+        # Replay history
+        for msg in history[:-1]:  # Exclude current message (already in LlmChat)
+            if msg["role"] == "user":
+                user_msg = UserMessage(text=msg["content"])
+                await chat.send_message(user_msg)
+        
+        # Send current message
+        user_msg = UserMessage(text=chat_req.message)
+        response = await chat.send_message(user_msg)
+        
+        # Store response
+        await db.chat_messages.insert_one({
+            "user_id": current_user.id,
+            "session_id": session_id,
+            "role": "assistant",
+            "content": response,
+            "timestamp": datetime.utcnow(),
+        })
+        
+        return {"response": response, "session_id": session_id}
+    except Exception as e:
+        logger.error(f"Chat error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
+@api_router.get("/chat/history")
+async def get_chat_history(current_user: User = Depends(get_current_user), session_id: Optional[str] = None):
+    query = {"user_id": current_user.id}
+    if session_id:
+        query["session_id"] = session_id
+    
+    messages = await db.chat_messages.find(query, {"_id": 0}).sort("timestamp", 1).to_list(50)
+    return messages
+
 # Include the router in the main app
 app.include_router(api_router)
 

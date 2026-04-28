@@ -11,6 +11,9 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="payees" />
+        <Stack.Screen name="analytics" />
+        <Stack.Screen name="chat" />
       </Stack>
     </AuthProvider>
   );

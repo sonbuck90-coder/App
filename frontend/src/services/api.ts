@@ -117,5 +117,52 @@ export interface Payee {
 
 export const payeesApi = {
   getRecent: () => api.get<Payee[]>('/payees'),
+  create: (data: { name: string; sort_code: string; account_number: string }) => api.post('/payees', data),
+  update: (id: string, data: { name?: string; sort_code?: string; account_number?: string }) => api.put(`/payees/${id}`, data),
   delete: (payeeId: string) => api.delete(`/payees/${payeeId}`),
+};
+
+// Analytics types
+export interface SpendingCategory {
+  name: string;
+  total: number;
+  count: number;
+}
+
+export interface TopPayee {
+  name: string;
+  total: number;
+}
+
+export interface MonthlyTrend {
+  month: string;
+  year: number;
+  total: number;
+  count: number;
+}
+
+export interface SpendingAnalytics {
+  total_spending: number;
+  transaction_count: number;
+  categories: SpendingCategory[];
+  top_payees: TopPayee[];
+  monthly_trend: MonthlyTrend[];
+}
+
+export const analyticsApi = {
+  getSpending: () => api.get<SpendingAnalytics>('/analytics/spending'),
+};
+
+// Chat types
+export interface ChatMessage {
+  user_id: string;
+  session_id: string;
+  role: string;
+  content: string;
+  timestamp: string;
+}
+
+export const chatApi = {
+  send: (message: string, session_id?: string) => api.post<{ response: string; session_id: string }>('/chat', { message, session_id }),
+  getHistory: (session_id?: string) => api.get<ChatMessage[]>(`/chat/history${session_id ? `?session_id=${session_id}` : ''}`),
 };

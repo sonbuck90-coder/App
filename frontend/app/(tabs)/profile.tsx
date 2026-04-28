@@ -47,6 +47,9 @@ export default function ProfileScreen() {
     {
       title: 'Account & Settings',
       items: [
+        { icon: 'people-outline', label: 'Manage Payees', chevron: true, onPress: () => router.push('/payees') },
+        { icon: 'analytics-outline', label: 'Spending Insights', chevron: true, onPress: () => router.push('/analytics') },
+        { icon: 'chatbubbles-outline', label: 'AI Assistant', chevron: true, onPress: () => router.push('/chat') },
         { icon: 'person-outline', label: 'Personal Details', chevron: true },
         { icon: 'lock-closed-outline', label: 'Security Settings', chevron: true },
         { icon: 'notifications-outline', label: 'Notifications', chevron: true },
@@ -132,6 +135,7 @@ export default function ProfileScreen() {
                     styles.menuItem,
                     itemIndex < section.items.length - 1 && styles.menuItemBorder,
                   ]}
+                  onPress={item.onPress}
                 >
                   <View style={styles.menuItemLeft}>
                     <Ionicons name={item.icon as any} size={22} color={COLORS.darkGray} />
