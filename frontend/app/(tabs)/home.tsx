@@ -136,7 +136,17 @@ export default function HomeScreen() {
       >
         {/* Total Balance Card */}
         <View style={[styles.totalBalanceCard, { borderLeftColor: customColors.primary }]}>
-          <Text style={styles.totalBalanceLabel}>Total Relationship Balance</Text>
+          <View style={styles.totalBalanceHeader}>
+            <Text style={styles.totalBalanceLabel}>Total Relationship Balance</Text>
+            <TouchableOpacity
+              style={[styles.totalAddFundsBtn, { backgroundColor: customColors.primary }]}
+              onPress={() => router.push('/add-money')}
+              testID="total-balance-add-funds"
+            >
+              <Ionicons name="add" size={16} color={COLORS.white} />
+              <Text style={styles.totalAddFundsText}>Add Funds</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.totalBalanceAmount}>
             {formatCurrency(stats?.total_balance || 0)}
           </Text>
@@ -379,10 +389,28 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: COLORS.primary,
   },
+  totalBalanceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   totalBalanceLabel: {
     fontSize: 14,
     color: COLORS.gray,
-    marginBottom: 8,
+  },
+  totalAddFundsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
+  totalAddFundsText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   totalBalanceAmount: {
     fontSize: 32,
