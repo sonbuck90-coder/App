@@ -144,11 +144,11 @@ export default function HomeScreen() {
 
         {/* Quick Actions */}
         <View style={styles.quickActionsContainer}>
-          <TouchableOpacity style={styles.quickAction}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/move-money')} testID="quick-action-move">
             <View style={styles.quickActionIcon}>
               <Ionicons name="swap-horizontal" size={22} color={customColors.primary} />
             </View>
-            <Text style={styles.quickActionText}>Transfer</Text>
+            <Text style={styles.quickActionText}>Move Money</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/add-money')} testID="quick-action-add-money">
             <View style={styles.quickActionIcon}>
@@ -179,10 +179,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
           {accounts.map((account) => (
-            <TouchableOpacity key={account.id} style={styles.accountCard}>
+            <View key={account.id} style={styles.accountCard}>
               <View style={styles.accountTop}>
                 <View style={styles.accountTypeContainer}>
-                  <View style={[styles.accountDot, { backgroundColor: account.account_type === 'checking' ? COLORS.primary : COLORS.success }]} />
+                  <View style={[styles.accountDot, { backgroundColor: account.account_type === 'checking' ? customColors.primary : COLORS.success }]} />
                   <Text style={styles.accountType}>
                     {account.account_type === 'checking' ? 'Current Account' : 'Savings Account'}
                   </Text>
@@ -195,8 +195,16 @@ export default function HomeScreen() {
                   <Text style={styles.balanceLabel}>Available Balance</Text>
                   <Text style={styles.accountBalance}>{formatCurrency(account.balance)}</Text>
                 </View>
+                <TouchableOpacity
+                  style={[styles.addFundsBtn, { backgroundColor: customColors.primary }]}
+                  onPress={() => router.push('/add-money')}
+                  testID={`add-funds-${account.account_type}`}
+                >
+                  <Ionicons name="add" size={16} color={COLORS.white} />
+                  <Text style={styles.addFundsBtnText}>Add Funds</Text>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
+            </View>
           ))}
         </View>
 
@@ -450,6 +458,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
+  },
+  addFundsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  addFundsBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   balanceLabel: {
     fontSize: 12,

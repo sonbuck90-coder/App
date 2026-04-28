@@ -823,6 +823,189 @@ async def add_money(deposit: DepositRequest, current_user: User = Depends(get_cu
     
     return {"message": "Deposit successful", "new_balance": account["balance"] + deposit.amount, "transaction_id": transaction.id}
 
+# ==================== INTER-ACCOUNT TRANSFER ====================
+
+class MoveMoneyRequest(BaseModel):
+    from_account_id: str
+    to_account_id: str
+    amount: float
+    description: str = ""
+
+@api_router.post("/move-money")
+async def move_money(req: MoveMoneyRequest, current_user: User = Depends(get_current_user)):
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    if req.from_account_id == req.to_account_id:
+        raise HTTPException(status_code=400, detail="Cannot transfer to the same account")
+    
+    from_acc = await db.accounts.find_one({"id": req.from_account_id, "user_id": current_user.id})
+    to_acc = await db.accounts.find_one({"id": req.to_account_id, "user_id": current_user.id})
+    
+    if not from_acc or not to_acc:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if from_acc["balance"] < req.amount:
+        raise HTTPException(status_code=400, detail="Insufficient funds")
+    
+    # Debit source, credit destination
+    await db.accounts.update_one({"id": req.from_account_id}, {"$inc": {"balance": -req.amount}})
+    await db.accounts.update_one({"id": req.to_account_id}, {"$inc": {"balance": req.amount}})
+    
+    from_type = from_acc.get("account_type", "").title()
+    to_type = to_acc.get("account_type", "").title()
+    desc = req.description or f"Move from {from_type} to {to_type}"
+    
+    txn = Transaction(
+        user_id=current_user.id,
+        from_account_id=req.from_account_id,
+        to_account_id=req.to_account_id,
+        amount=req.amount,
+        transaction_type="transfer",
+        description=desc,
+        recipient_name=f"Own {to_type} Account",
+    )
+    await db.transactions.insert_one(txn.dict())
+    
+    await create_notification(
+        current_user.id,
+        "Money Moved",
+        f"£{req.amount:.2f} moved from {from_type} to {to_type}",
+        "transfer",
+        {"transaction_id": txn.id, "amount": req.amount}
+    )
+    
+    new_from = from_acc["balance"] - req.amount
+    new_to = to_acc["balance"] + req.amount
+    return {"message": "Transfer successful", "from_balance": new_from, "to_balance": new_to, "transaction_id": txn.id}
+
+# ==================== SCHEDULED DEPOSITS ====================
+
+class ScheduledDeposit(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    account_id: str
+    amount: float
+    source: str = "quick_topup"
+    frequency: str  # weekly, monthly
+    next_run: datetime
+    end_date: Optional[datetime] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class ScheduleCreateRequest(BaseModel):
+    account_id: str
+    amount: float
+    source: str = "quick_topup"
+    frequency: str  # weekly, monthly
+    start_date: Optional[str] = None  # ISO date string
+    end_date: Optional[str] = None
+
+@api_router.post("/schedules")
+async def create_schedule(req: ScheduleCreateRequest, current_user: User = Depends(get_current_user)):
+    if req.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    if req.frequency not in ("weekly", "monthly"):
+        raise HTTPException(status_code=400, detail="Frequency must be weekly or monthly")
+    
+    account = await db.accounts.find_one({"id": req.account_id, "user_id": current_user.id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    next_run = datetime.utcnow()
+    if req.start_date:
+        try:
+            next_run = datetime.fromisoformat(req.start_date.replace("Z", "+00:00")).replace(tzinfo=None)
+        except:
+            next_run = datetime.utcnow()
+    
+    end_date = None
+    if req.end_date:
+        try:
+            end_date = datetime.fromisoformat(req.end_date.replace("Z", "+00:00")).replace(tzinfo=None)
+        except:
+            pass
+    
+    schedule = ScheduledDeposit(
+        user_id=current_user.id,
+        account_id=req.account_id,
+        amount=req.amount,
+        source=req.source,
+        frequency=req.frequency,
+        next_run=next_run,
+        end_date=end_date,
+    )
+    await db.schedules.insert_one(schedule.dict())
+    
+    acc_type = account.get("account_type", "").title()
+    await create_notification(
+        current_user.id,
+        "Schedule Created",
+        f"£{req.amount:.2f} {req.frequency} deposit to {acc_type} Account",
+        "system",
+    )
+    
+    result = schedule.dict()
+    result["next_run"] = result["next_run"].isoformat()
+    result["created_at"] = result["created_at"].isoformat()
+    if result.get("end_date"):
+        result["end_date"] = result["end_date"].isoformat()
+    return result
+
+@api_router.get("/schedules")
+async def get_schedules(current_user: User = Depends(get_current_user)):
+    schedules = await db.schedules.find({"user_id": current_user.id}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    
+    # Process any due schedules
+    now = datetime.utcnow()
+    for sched in schedules:
+        if sched.get("is_active") and sched.get("next_run"):
+            next_run = sched["next_run"]
+            if isinstance(next_run, datetime) and next_run <= now:
+                # Execute the deposit
+                account = await db.accounts.find_one({"id": sched["account_id"]})
+                if account:
+                    await db.accounts.update_one({"id": sched["account_id"]}, {"$inc": {"balance": sched["amount"]}})
+                    txn = Transaction(
+                        user_id=current_user.id,
+                        to_account_id=sched["account_id"],
+                        amount=sched["amount"],
+                        transaction_type="deposit",
+                        description=f"Scheduled {sched['frequency']} deposit",
+                        recipient_name="Self",
+                    )
+                    await db.transactions.insert_one(txn.dict())
+                
+                # Advance next_run
+                if sched["frequency"] == "weekly":
+                    new_next = next_run + timedelta(weeks=1)
+                else:
+                    new_next = next_run + timedelta(days=30)
+                
+                # Check end date
+                if sched.get("end_date") and isinstance(sched["end_date"], datetime) and new_next > sched["end_date"]:
+                    await db.schedules.update_one({"id": sched["id"]}, {"$set": {"is_active": False, "next_run": new_next}})
+                else:
+                    await db.schedules.update_one({"id": sched["id"]}, {"$set": {"next_run": new_next}})
+    
+    # Re-fetch after processing
+    schedules = await db.schedules.find({"user_id": current_user.id}, {"_id": 0}).sort("created_at", -1).to_list(50)
+    return schedules
+
+@api_router.delete("/schedules/{schedule_id}")
+async def cancel_schedule(schedule_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.schedules.delete_one({"id": schedule_id, "user_id": current_user.id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return {"message": "Schedule cancelled"}
+
+@api_router.post("/schedules/{schedule_id}/toggle")
+async def toggle_schedule(schedule_id: str, current_user: User = Depends(get_current_user)):
+    sched = await db.schedules.find_one({"id": schedule_id, "user_id": current_user.id})
+    if not sched:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    new_status = not sched.get("is_active", True)
+    await db.schedules.update_one({"id": schedule_id}, {"$set": {"is_active": new_status}})
+    return {"message": f"Schedule {'activated' if new_status else 'paused'}", "is_active": new_status}
+
 # ==================== PAYEE MANAGEMENT ====================
 
 class PayeeCreate(BaseModel):

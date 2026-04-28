@@ -196,3 +196,29 @@ export const depositsApi = {
   addMoney: (data: { account_id: string; amount: number; source: string; description?: string }) =>
     api.post<{ message: string; new_balance: number; transaction_id: string }>('/deposits', data),
 };
+
+export const moveMoneyApi = {
+  transfer: (data: { from_account_id: string; to_account_id: string; amount: number; description?: string }) =>
+    api.post<{ message: string; from_balance: number; to_balance: number; transaction_id: string }>('/move-money', data),
+};
+
+export interface Schedule {
+  id: string;
+  user_id: string;
+  account_id: string;
+  amount: number;
+  source: string;
+  frequency: string;
+  next_run: string;
+  end_date?: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export const schedulesApi = {
+  getAll: () => api.get<Schedule[]>('/schedules'),
+  create: (data: { account_id: string; amount: number; source?: string; frequency: string; start_date?: string; end_date?: string }) =>
+    api.post<Schedule>('/schedules', data),
+  delete: (id: string) => api.delete(`/schedules/${id}`),
+  toggle: (id: string) => api.post<{ message: string; is_active: boolean }>(`/schedules/${id}/toggle`),
+};
