@@ -191,3 +191,8 @@ export const notificationsApi = {
   markRead: (id: string) => api.post(`/notifications/${id}/read`),
   markAllRead: () => api.post('/notifications/read-all'),
 };
+
+export const depositsApi = {
+  addMoney: (data: { account_id: string; amount: number; source: string; description?: string }) =>
+    api.post<{ message: string; new_balance: number; transaction_id: string }>('/deposits', data),
+};

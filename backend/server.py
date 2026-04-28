@@ -771,6 +771,58 @@ async def get_dashboard_stats(current_user: User = Depends(get_current_user)):
         "recent_transactions": [Transaction(**txn).dict() for txn in transactions]
     }
 
+# ==================== DEPOSIT / ADD MONEY ====================
+
+class DepositRequest(BaseModel):
+    account_id: str
+    amount: float
+    source: str = "bank_transfer"  # bank_transfer, card_deposit, quick_topup
+    description: str = ""
+
+@api_router.post("/deposits")
+async def add_money(deposit: DepositRequest, current_user: User = Depends(get_current_user)):
+    if deposit.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+    
+    account = await db.accounts.find_one({"id": deposit.account_id, "user_id": current_user.id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Credit the account
+    await db.accounts.update_one(
+        {"id": deposit.account_id},
+        {"$inc": {"balance": deposit.amount}}
+    )
+    
+    source_labels = {
+        "bank_transfer": "Bank Transfer Deposit",
+        "card_deposit": "Card Deposit",
+        "quick_topup": "Quick Top-up",
+    }
+    desc = deposit.description or source_labels.get(deposit.source, "Deposit")
+    
+    transaction = Transaction(
+        user_id=current_user.id,
+        to_account_id=deposit.account_id,
+        amount=deposit.amount,
+        transaction_type="deposit",
+        description=desc,
+        recipient_name="Self",
+        status="completed",
+    )
+    await db.transactions.insert_one(transaction.dict())
+    
+    acc_type = account.get("account_type", "account").title()
+    await create_notification(
+        current_user.id,
+        "Money Added",
+        f"£{deposit.amount:.2f} added to your {acc_type} Account via {source_labels.get(deposit.source, deposit.source)}",
+        "deposit",
+        {"transaction_id": transaction.id, "amount": deposit.amount}
+    )
+    
+    return {"message": "Deposit successful", "new_balance": account["balance"] + deposit.amount, "transaction_id": transaction.id}
+
 # ==================== PAYEE MANAGEMENT ====================
 
 class PayeeCreate(BaseModel):

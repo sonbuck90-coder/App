@@ -146,25 +146,25 @@ export default function HomeScreen() {
         <View style={styles.quickActionsContainer}>
           <TouchableOpacity style={styles.quickAction}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="swap-horizontal" size={22} color={COLORS.primary} />
+              <Ionicons name="swap-horizontal" size={22} color={customColors.primary} />
             </View>
             <Text style={styles.quickActionText}>Transfer</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/add-money')} testID="quick-action-add-money">
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="add-circle-outline" size={22} color={customColors.primary} />
+            </View>
+            <Text style={styles.quickActionText}>Add Money</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.quickAction}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="receipt-outline" size={22} color={COLORS.primary} />
+              <Ionicons name="receipt-outline" size={22} color={customColors.primary} />
             </View>
             <Text style={styles.quickActionText}>Pay Bills</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickAction}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="qr-code-outline" size={22} color={COLORS.primary} />
-            </View>
-            <Text style={styles.quickActionText}>QR Pay</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="card-outline" size={22} color={COLORS.primary} />
+              <Ionicons name="card-outline" size={22} color={customColors.primary} />
             </View>
             <Text style={styles.quickActionText}>Cards</Text>
           </TouchableOpacity>

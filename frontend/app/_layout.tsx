@@ -19,6 +19,7 @@ export default function RootLayout() {
           <Stack.Screen name="notifications" />
           <Stack.Screen name="transactions" />
           <Stack.Screen name="customization" />
+        <Stack.Screen name="add-money" />
         </Stack>
       </CustomizationProvider>
     </AuthProvider>
