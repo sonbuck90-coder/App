@@ -3,13 +3,44 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Dimensions } fro
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { analyticsApi, SpendingAnalytics } from '../src/services/api';
+import { useCustomization } from '../src/context/CustomizationContext';
 
 const { width } = Dimensions.get('window');
-const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5' };
+const COLORS = { white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5' };
 
 const CATEGORY_COLORS = ['#DB0011', '#00847F', '#5856D6', '#FF9500', '#007AFF', '#34C759', '#AF52DE', '#FF2D55'];
 
+// Pie chart segment component
+function PieSegment({ startAngle, sweepAngle, color, radius }: { startAngle: number; sweepAngle: number; color: string; radius: number }) {
+  // Clamp sweep to max 180 per half
+  const segments = [];
+  let remaining = sweepAngle;
+  let current = startAngle;
+  while (remaining > 0) {
+    const angle = Math.min(remaining, 180);
+    segments.push({ start: current, sweep: angle });
+    remaining -= angle;
+    current += angle;
+  }
+
+  return (
+    <>
+      {segments.map((seg, i) => (
+        <View key={i} style={[pieStyles.segmentContainer, { width: radius * 2, height: radius * 2, transform: [{ rotate: `${seg.start}deg` }] }]}>
+          <View style={[pieStyles.segment, { width: radius * 2, height: radius, borderTopLeftRadius: radius, borderTopRightRadius: radius, backgroundColor: color, transform: [{ rotate: `${seg.sweep}deg` }, { translateY: radius / 2 }], transformOrigin: 'center bottom' }]} />
+        </View>
+      ))}
+    </>
+  );
+}
+
+const pieStyles = StyleSheet.create({
+  segmentContainer: { position: 'absolute', top: 0, left: 0, overflow: 'hidden' },
+  segment: { position: 'absolute', top: 0, left: 0 },
+});
+
 export default function AnalyticsScreen() {
+  const { colors: cc } = useCustomization();
   const [data, setData] = useState<SpendingAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -25,25 +56,91 @@ export default function AnalyticsScreen() {
 
   const fmt = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(v);
 
-  if (isLoading) return <SafeAreaView style={styles.loading}><ActivityIndicator size="large" color={COLORS.primary} /></SafeAreaView>;
+  if (isLoading) return <SafeAreaView style={styles.loading}><ActivityIndicator size="large" color={cc.primary} /></SafeAreaView>;
 
   const maxCat = data?.categories?.length ? Math.max(...data.categories.map(c => c.total)) : 1;
   const maxTrend = data?.monthly_trend?.length ? Math.max(...data.monthly_trend.map(m => m.total), 1) : 1;
+  const totalSpending = data?.total_spending || 1;
+
+  // Pie data with percentages
+  const pieData = (data?.categories || []).map((cat, i) => ({
+    ...cat,
+    color: CATEGORY_COLORS[i % CATEGORY_COLORS.length],
+    pct: Math.round((cat.total / totalSpending) * 100),
+  }));
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: cc.primary }]}>
         <Text style={styles.headerTitle}>Spending Insights</Text>
       </View>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Summary Card */}
-        <View style={styles.summaryCard}>
+        <View style={[styles.summaryCard, { borderLeftColor: cc.primary }]}>
           <Text style={styles.summaryLabel}>This Month's Spending</Text>
           <Text style={styles.summaryAmount}>{fmt(data?.total_spending || 0)}</Text>
           <Text style={styles.summaryCount}>{data?.transaction_count || 0} transactions</Text>
         </View>
 
-        {/* Category Breakdown */}
+        {/* Donut / Pie Chart */}
+        {pieData.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Spending Breakdown</Text>
+            <View style={styles.card}>
+              {/* Ring chart using bordered View */}
+              <View style={styles.ringChartContainer}>
+                <View style={styles.ringOuter}>
+                  {/* Build ring segments using absolute positioned arcs */}
+                  {(() => {
+                    let cumulative = 0;
+                    return pieData.map((seg, idx) => {
+                      const startPct = cumulative;
+                      cumulative += seg.pct;
+                      const rotation = (startPct / 100) * 360 - 90;
+                      const sweep = (seg.pct / 100) * 360;
+                      // Render as colored border segments
+                      if (sweep <= 0) return null;
+                      return (
+                        <View key={idx} style={[styles.ringSegment, {
+                          transform: [{ rotate: `${rotation}deg` }],
+                          borderTopColor: seg.color,
+                          borderRightColor: sweep > 90 ? seg.color : 'transparent',
+                          borderBottomColor: sweep > 180 ? seg.color : 'transparent',
+                          borderLeftColor: sweep > 270 ? seg.color : 'transparent',
+                        }]} />
+                      );
+                    });
+                  })()}
+                  {/* Center */}
+                  <View style={styles.ringCenter}>
+                    <Text style={styles.ringCenterAmount}>{fmt(data?.total_spending || 0)}</Text>
+                    <Text style={styles.ringCenterLabel}>Total Spent</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Stacked bar (horizontal pie representation) */}
+              <View style={styles.stackedBar}>
+                {pieData.map((seg, i) => (
+                  <View key={i} style={[styles.stackedSegment, { flex: seg.pct, backgroundColor: seg.color }]} />
+                ))}
+              </View>
+
+              {/* Legend */}
+              <View style={styles.legendGrid}>
+                {pieData.map((seg, i) => (
+                  <View key={i} style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: seg.color }]} />
+                    <View style={styles.legendText}>
+                      <Text style={styles.legendName}>{seg.name}</Text>
+                      <Text style={styles.legendPct}>{seg.pct}% · {fmt(seg.total)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>By Category</Text>
           <View style={styles.card}>
@@ -81,7 +178,7 @@ export default function AnalyticsScreen() {
                 <View key={`${month.month}-${month.year}`} style={styles.trendBar}>
                   <Text style={styles.trendAmount}>{month.total > 0 ? fmt(month.total) : '-'}</Text>
                   <View style={styles.trendBarOuter}>
-                    <View style={[styles.trendBarInner, { height: `${Math.max((month.total / maxTrend) * 100, 4)}%`, backgroundColor: i === (data?.monthly_trend?.length || 0) - 1 ? COLORS.primary : '#E0E0E0' }]} />
+                    <View style={[styles.trendBarInner, { height: `${Math.max((month.total / maxTrend) * 100, 4)}%`, backgroundColor: i === (data?.monthly_trend?.length || 0) - 1 ? cc.primary : '#E0E0E0' }]} />
                   </View>
                   <Text style={styles.trendMonth}>{month.month}</Text>
                 </View>
@@ -154,4 +251,21 @@ const styles = StyleSheet.create({
   topPayeeAmount: { fontSize: 15, fontWeight: '600', color: COLORS.primary },
   emptyState: { alignItems: 'center', paddingVertical: 24 },
   emptyText: { fontSize: 14, color: COLORS.gray, marginTop: 8 },
+  // Pie / Ring chart
+  ringChartContainer: { alignItems: 'center', marginBottom: 20 },
+  ringOuter: { width: 180, height: 180, borderRadius: 90, backgroundColor: '#E8E8E8', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
+  ringSegment: { position: 'absolute', width: 180, height: 180, borderRadius: 90, borderWidth: 35, borderColor: 'transparent' },
+  ringCenter: { width: 110, height: 110, borderRadius: 55, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
+  ringCenterAmount: { fontSize: 16, fontWeight: '700', color: COLORS.darkGray },
+  ringCenterLabel: { fontSize: 11, color: COLORS.gray, marginTop: 2 },
+  // Stacked bar
+  stackedBar: { flexDirection: 'row', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 20 },
+  stackedSegment: { height: '100%' },
+  // Legend
+  legendGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  legendItem: { flexDirection: 'row', alignItems: 'center', width: '50%', paddingVertical: 6 },
+  legendDot: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
+  legendText: { flex: 1 },
+  legendName: { fontSize: 13, fontWeight: '600', color: COLORS.darkGray },
+  legendPct: { fontSize: 11, color: COLORS.gray, marginTop: 1 },
 });
