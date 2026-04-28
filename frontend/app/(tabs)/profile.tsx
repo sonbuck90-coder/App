@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useCustomization } from '../../src/context/CustomizationContext';
 
 // HSBC Colors
 const COLORS = {
@@ -27,6 +28,7 @@ const COLORS = {
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { colors: customColors } = useCustomization();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -50,6 +52,7 @@ export default function ProfileScreen() {
         { icon: 'people-outline', label: 'Manage Payees', chevron: true, onPress: () => router.push('/payees') },
         { icon: 'analytics-outline', label: 'Spending Insights', chevron: true, onPress: () => router.push('/analytics') },
         { icon: 'chatbubbles-outline', label: 'AI Assistant', chevron: true, onPress: () => router.push('/chat') },
+        { icon: 'color-palette-outline', label: 'Customization', chevron: true, onPress: () => router.push('/customization') },
         { icon: 'person-outline', label: 'Personal Details', chevron: true },
         { icon: 'lock-closed-outline', label: 'Security Settings', chevron: true },
         { icon: 'notifications-outline', label: 'Notifications', chevron: true },
@@ -78,14 +81,14 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
         <Text style={styles.headerTitle}>More</Text>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* User Card */}
         <View style={styles.userCard}>
-          <View style={styles.userAvatar}>
+          <View style={[styles.userAvatar, { backgroundColor: customColors.primary }]}>
             <Text style={styles.avatarText}>
               {user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase() || 'U'}
             </Text>

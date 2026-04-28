@@ -12,11 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useCustomization } from '../../src/context/CustomizationContext';
+import AppLogo from '../../src/components/AppLogo';
 import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../../src/services/api';
 
 // HSBC Colors
 const COLORS = {
-  primary: '#DB0011',
   secondary: '#333333',
   white: '#FFFFFF',
   lightGray: '#F5F5F5',
@@ -29,6 +30,7 @@ const COLORS = {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { colors: customColors } = useCustomization();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -104,18 +106,9 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
         <View style={styles.headerTop}>
-          <View style={styles.logoContainer}>
-            <View style={styles.hexagonRow}>
-              <View style={[styles.hexagon, styles.hexagonRed]} />
-              <View style={[styles.hexagon, styles.hexagonWhite]} />
-            </View>
-            <View style={styles.hexagonRow}>
-              <View style={[styles.hexagon, styles.hexagonWhite]} />
-              <View style={[styles.hexagon, styles.hexagonRed]} />
-            </View>
-          </View>
+          <AppLogo variant="header" tint="#FFFFFF" />
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.headerIcon}>
               <Ionicons name="search" size={22} color={COLORS.white} />
@@ -142,7 +135,7 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Total Balance Card */}
-        <View style={styles.totalBalanceCard}>
+        <View style={[styles.totalBalanceCard, { borderLeftColor: customColors.primary }]}>
           <Text style={styles.totalBalanceLabel}>Total Relationship Balance</Text>
           <Text style={styles.totalBalanceAmount}>
             {formatCurrency(stats?.total_balance || 0)}

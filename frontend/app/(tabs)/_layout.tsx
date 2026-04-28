@@ -1,25 +1,20 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, View, StyleSheet } from 'react-native';
-
-// HSBC Colors
-const COLORS = {
-  primary: '#DB0011',
-  gray: '#767676',
-  white: '#FFFFFF',
-  lightGray: '#F5F5F5',
-};
+import { Platform } from 'react-native';
+import { useCustomization } from '../../src/context/CustomizationContext';
 
 export default function TabLayout() {
+  const { colors } = useCustomization();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: COLORS.primary,
-        tabBarInactiveTintColor: COLORS.gray,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: '#767676',
         tabBarStyle: {
-          backgroundColor: COLORS.white,
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
           borderTopColor: '#E0E0E0',
           height: Platform.OS === 'ios' ? 88 : 64,
