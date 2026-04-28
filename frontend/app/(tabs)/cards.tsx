@@ -1,56 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cardsApi, Card } from '../../src/services/api';
 import { useCustomization } from '../../src/context/CustomizationContext';
+import { useAuth } from '../../src/context/AuthContext';
 
 const { width } = Dimensions.get('window');
 
-// Static colors (non-primary)
-const COLORS = {
-  secondary: '#333333',
-  white: '#FFFFFF',
-  lightGray: '#F5F5F5',
-  gray: '#767676',
-  darkGray: '#333333',
-  black: '#000000',
-  success: '#00847F',
-  background: '#F5F5F5',
-};
+const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#FFFFFF', cardBg: '#E8E8E8' };
 
 export default function CardsScreen() {
-  const { colors: customColors } = useCustomization();
+  const { colors: cc } = useCustomization();
+  const { user } = useAuth();
   const [cards, setCards] = useState<Card[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [processingCardId, setProcessingCardId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('Cards');
   const [activeCardIndex, setActiveCardIndex] = useState(0);
 
-  useEffect(() => {
-    fetchCards();
-  }, []);
+  useEffect(() => { fetchCards(); }, []);
 
   const fetchCards = async () => {
-    try {
-      const response = await cardsApi.getAll();
-      setCards(response.data);
-    } catch (error) {
-      console.error('Error fetching cards:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    try { const r = await cardsApi.getAll(); setCards(r.data); }
+    catch (e) { console.error(e); }
+    finally { setIsLoading(false); }
   };
 
-  const toggleCardFreeze = async (card: Card) => {
+  const toggleFreeze = async (card: Card) => {
     setProcessingCardId(card.id);
     try {
       if (card.is_frozen) {
@@ -61,460 +38,231 @@ export default function CardsScreen() {
         Alert.alert('Card Frozen', 'Your card has been temporarily frozen');
       }
       fetchCards();
-    } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.detail || 'Failed to update card');
-    } finally {
-      setProcessingCardId(null);
-    }
+    } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed'); }
+    finally { setProcessingCardId(null); }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'GBP',
-    }).format(value);
-  };
+  const fmt = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(v);
 
-  if (isLoading) {
-    return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={customColors.primary} />
-      </SafeAreaView>
-    );
-  }
+  if (isLoading) return <SafeAreaView style={styles.loading}><ActivityIndicator size="large" color={cc.primary} /></SafeAreaView>;
+
+  const activeCard = cards[activeCardIndex];
+  const topTabs = ['Home', 'Pay', 'Cards', 'Invest'];
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
-        <Text style={styles.headerTitle}>Cards</Text>
+      {/* Top Navigation - matching HSBC */}
+      <View style={styles.topNav}>
+        <TouchableOpacity style={styles.topNavHomeBtn} testID="nav-home">
+          <Ionicons name="home-outline" size={22} color={C.darkGray} />
+        </TouchableOpacity>
+        <View style={styles.topNavDivider} />
+        {topTabs.slice(1).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={styles.topNavTab}
+            onPress={() => setActiveTab(tab)}
+            testID={`nav-tab-${tab}`}
+          >
+            <Text style={[styles.topNavTabText, activeTab === tab && [styles.topNavTabTextActive, { color: C.darkGray }]]}>{tab}</Text>
+            {activeTab === tab && <View style={[styles.topNavTabIndicator, { backgroundColor: cc.primary }]} />}
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity style={styles.topNavMenuBtn} testID="nav-menu">
+          <Ionicons name="menu" size={24} color={C.darkGray} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Card Carousel */}
+        {/* Account Header */}
+        <View style={styles.accountHeader}>
+          <Text style={styles.accountTitle}>BANK A/C</Text>
+          <Text style={styles.accountName}>{user?.name || 'Mr O sky'}</Text>
+        </View>
+
+        {/* Card Display */}
         <ScrollView
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           onScroll={(e) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / (width - 48));
-            setActiveCardIndex(index);
+            const idx = Math.round(e.nativeEvent.contentOffset.x / (width - 80));
+            setActiveCardIndex(idx);
           }}
           scrollEventThrottle={16}
-          contentContainerStyle={styles.cardCarousel}
+          contentContainerStyle={styles.cardScroll}
         >
-          {cards.map((card, index) => (
-            <View key={card.id} style={styles.cardWrapper}>
-              <View style={[styles.physicalCard, card.is_frozen && styles.frozenCard]}>
+          {cards.map((card) => (
+            <View key={card.id} style={styles.cardOuter}>
+              <View style={[styles.bankCard, card.is_frozen && styles.bankCardFrozen]}>
                 {card.is_frozen && (
-                  <View style={styles.frozenBadge}>
-                    <Ionicons name="snow" size={14} color={COLORS.white} />
-                    <Text style={styles.frozenBadgeText}>FROZEN</Text>
+                  <View style={styles.frozenBanner}>
+                    <Ionicons name="snow" size={14} color={C.white} />
+                    <Text style={styles.frozenBannerText}>FROZEN</Text>
                   </View>
                 )}
-                <View style={styles.cardTop}>
-                  <View style={styles.cardLogoContainer}>
-                    <View style={styles.cardHexagonRow}>
-                      <View style={[styles.cardHexagon, styles.cardHexagonWhite]} />
-                      <View style={[styles.cardHexagon, styles.cardHexagonRed]} />
-                    </View>
-                    <View style={styles.cardHexagonRow}>
-                      <View style={[styles.cardHexagon, styles.cardHexagonRed]} />
-                      <View style={[styles.cardHexagon, styles.cardHexagonWhite]} />
-                    </View>
-                  </View>
-                  <Text style={styles.cardBrandText}>HSBC</Text>
-                </View>
-                <View style={styles.cardChip}>
-                  <View style={styles.chipInner} />
-                </View>
-                <Text style={styles.cardNumberText}>{card.card_number_masked}</Text>
-                <View style={styles.cardBottom}>
-                  <View>
-                    <Text style={styles.cardLabel}>VALID THRU</Text>
-                    <Text style={styles.cardValue}>{card.expiry_date}</Text>
-                  </View>
-                  <View>
-                    <Text style={styles.cardLabel}>CARD TYPE</Text>
-                    <Text style={styles.cardValue}>{card.card_type.toUpperCase()}</Text>
-                  </View>
-                  <View style={styles.cardNetwork}>
-                    {card.card_type === 'debit' ? (
-                      <Text style={styles.networkText}>VISA</Text>
-                    ) : (
-                      <View style={styles.mastercardLogo}>
-                        <View style={[styles.mcCircle, styles.mcCircleRed]} />
-                        <View style={[styles.mcCircle, styles.mcCircleOrange]} />
+                {/* Card Top Row - Logo + Name + Type Badge */}
+                <View style={styles.cardTopRow}>
+                  <View style={styles.cardLogoRow}>
+                    {/* HSBC Hexagon Logo */}
+                    <View style={styles.hsbcLogo}>
+                      <View style={styles.hexRow}>
+                        <View style={[styles.hex, { backgroundColor: cc.primary }]} />
+                        <View style={[styles.hex, { backgroundColor: C.white, borderWidth: 1, borderColor: cc.primary }]} />
                       </View>
-                    )}
+                      <View style={styles.hexRow}>
+                        <View style={[styles.hex, { backgroundColor: C.white, borderWidth: 1, borderColor: cc.primary }]} />
+                        <View style={[styles.hex, { backgroundColor: cc.primary }]} />
+                      </View>
+                    </View>
+                    <Text style={styles.cardBankName}>HSBC UK</Text>
+                  </View>
+                  <View style={styles.cardTypeBadge}>
+                    <Text style={styles.cardTypeBadgeText}>
+                      {card.card_type === 'debit' ? 'Debit' : 'Credit'}
+                    </Text>
                   </View>
                 </View>
+
+                {/* Card Number at Bottom */}
+                <Text style={styles.cardMaskedNumber}>{card.card_number_masked}</Text>
               </View>
             </View>
           ))}
         </ScrollView>
 
         {/* Card Indicators */}
-        <View style={styles.cardIndicators}>
-          {cards.map((_, index) => (
-            <View
-              key={index}
-              style={[styles.indicator, activeCardIndex === index && [styles.indicatorActive, { backgroundColor: customColors.primary }]]}
-            />
-          ))}
-        </View>
-
-        {/* Card Info */}
-        {cards[activeCardIndex] && (
-          <View style={styles.cardInfoSection}>
-            <Text style={styles.cardInfoTitle}>{cards[activeCardIndex].card_name}</Text>
-            
-            {cards[activeCardIndex].card_type === 'credit' && cards[activeCardIndex].credit_limit && (
-              <View style={styles.creditInfoCard}>
-                <View style={styles.creditRow}>
-                  <Text style={styles.creditLabel}>Credit Limit</Text>
-                  <Text style={styles.creditValue}>{formatCurrency(cards[activeCardIndex].credit_limit || 0)}</Text>
-                </View>
-                <View style={styles.creditRow}>
-                  <Text style={styles.creditLabel}>Available Credit</Text>
-                  <Text style={[styles.creditValue, styles.availableCredit]}>
-                    {formatCurrency(cards[activeCardIndex].available_credit || 0)}
-                  </Text>
-                </View>
-                <View style={styles.creditProgressBar}>
-                  <View
-                    style={[
-                      styles.creditProgressFill,
-                      {
-                        width: `${((cards[activeCardIndex].credit_limit! - (cards[activeCardIndex].available_credit || 0)) / cards[activeCardIndex].credit_limit!) * 100}%`,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.creditUsed}>
-                  {formatCurrency(cards[activeCardIndex].credit_limit! - (cards[activeCardIndex].available_credit || 0))} used
-                </Text>
-              </View>
-            )}
+        {cards.length > 1 && (
+          <View style={styles.indicators}>
+            {cards.map((_, i) => (
+              <View key={i} style={[styles.indicator, activeCardIndex === i && [styles.indicatorActive, { backgroundColor: cc.primary }]]} />
+            ))}
           </View>
         )}
 
-        {/* Card Actions */}
-        <View style={styles.actionsSection}>
-          <Text style={styles.actionsTitle}>Card Actions</Text>
-          <View style={styles.actionsGrid}>
-            <TouchableOpacity
-              style={styles.actionItem}
-              onPress={() => cards[activeCardIndex] && toggleCardFreeze(cards[activeCardIndex])}
-              disabled={processingCardId === cards[activeCardIndex]?.id}
-            >
-              <View style={[styles.actionIcon, cards[activeCardIndex]?.is_frozen && styles.actionIconActive]}>
-                {processingCardId === cards[activeCardIndex]?.id ? (
-                  <ActivityIndicator size="small" color={customColors.primary} />
-                ) : (
-                  <Ionicons
-                    name={cards[activeCardIndex]?.is_frozen ? 'snow' : 'snow-outline'}
-                    size={24}
-                    color={cards[activeCardIndex]?.is_frozen ? customColors.primary : COLORS.darkGray}
-                  />
-                )}
-              </View>
-              <Text style={styles.actionLabel}>
-                {cards[activeCardIndex]?.is_frozen ? 'Unfreeze' : 'Freeze Card'}
-              </Text>
-            </TouchableOpacity>
+        {/* Card Details Link */}
+        <TouchableOpacity style={styles.cardDetailsLink} testID="card-details-link">
+          <Text style={styles.cardDetailsText}>Card details</Text>
+          <Ionicons name="arrow-forward" size={20} color={C.darkGray} />
+        </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.actionIcon}>
-                <Ionicons name="eye-outline" size={24} color={COLORS.darkGray} />
-              </View>
-              <Text style={styles.actionLabel}>View PIN</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.actionIcon}>
-                <Ionicons name="settings-outline" size={24} color={COLORS.darkGray} />
-              </View>
-              <Text style={styles.actionLabel}>Card Settings</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.actionIcon}>
-                <Ionicons name="location-outline" size={24} color={COLORS.darkGray} />
-              </View>
-              <Text style={styles.actionLabel}>ATM Locator</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.actionIcon}>
-                <Ionicons name="notifications-outline" size={24} color={COLORS.darkGray} />
-              </View>
-              <Text style={styles.actionLabel}>Alerts</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.actionItem}>
-              <View style={styles.actionIcon}>
-                <Ionicons name="help-circle-outline" size={24} color={COLORS.darkGray} />
-              </View>
-              <Text style={styles.actionLabel}>Report Lost</Text>
-            </TouchableOpacity>
+        {/* Credit Info (if credit card selected) */}
+        {activeCard && activeCard.card_type === 'credit' && activeCard.credit_limit && (
+          <View style={styles.creditSection}>
+            <View style={styles.creditRow}>
+              <Text style={styles.creditLabel}>Credit Limit</Text>
+              <Text style={styles.creditVal}>{fmt(activeCard.credit_limit)}</Text>
+            </View>
+            <View style={styles.creditRow}>
+              <Text style={styles.creditLabel}>Available</Text>
+              <Text style={[styles.creditVal, { color: C.success }]}>{fmt(activeCard.available_credit || 0)}</Text>
+            </View>
+            <View style={styles.creditBar}>
+              <View style={[styles.creditFill, { width: `${((activeCard.credit_limit - (activeCard.available_credit || 0)) / activeCard.credit_limit) * 100}%`, backgroundColor: cc.primary }]} />
+            </View>
           </View>
+        )}
+
+        {/* Divider */}
+        <View style={styles.divider} />
+
+        {/* Action Buttons - matching HSBC exactly */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity style={styles.actionItem} testID="action-report">
+            <View style={styles.actionCircle}>
+              <Ionicons name="warning-outline" size={26} color={C.darkGray} />
+            </View>
+            <Text style={styles.actionLabel}>Report a{'\n'}card issue</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionItem} testID="action-pin">
+            <View style={styles.actionCircle}>
+              <Ionicons name="eye-outline" size={26} color={C.darkGray} />
+            </View>
+            <Text style={styles.actionLabel}>View card{'\n'}PIN</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionItem}
+            onPress={() => activeCard && toggleFreeze(activeCard)}
+            disabled={processingCardId === activeCard?.id}
+            testID="action-freeze"
+          >
+            <View style={[styles.actionCircle, activeCard?.is_frozen && { backgroundColor: `${cc.primary}20` }]}>
+              {processingCardId === activeCard?.id ? (
+                <ActivityIndicator size="small" color={cc.primary} />
+              ) : (
+                <Ionicons name="snow" size={26} color={activeCard?.is_frozen ? cc.primary : C.darkGray} />
+              )}
+            </View>
+            <Text style={styles.actionLabel}>{activeCard?.is_frozen ? 'Unfreeze' : 'Freeze'}{'\n'}card</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionItem} testID="action-gambling">
+            <View style={styles.actionCircle}>
+              <Ionicons name="lock-closed-outline" size={26} color={C.darkGray} />
+            </View>
+            <Text style={styles.actionLabel}>Gambling{'\n'}restrictions</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.bottomPadding} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    backgroundColor: '#DB0011',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  cardCarousel: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-  },
-  cardWrapper: {
-    width: width - 48,
-    paddingRight: 16,
-  },
-  physicalCard: {
-    backgroundColor: '#1A1A2E',
-    borderRadius: 16,
-    padding: 20,
-    height: 200,
-    justifyContent: 'space-between',
-  },
-  frozenCard: {
-    opacity: 0.7,
-  },
-  frozenBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  frozenBadgeText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  cardLogoContainer: {},
-  cardHexagonRow: {
-    flexDirection: 'row',
-  },
-  cardHexagon: {
-    width: 10,
-    height: 10,
-    margin: 0.5,
-  },
-  cardHexagonWhite: {
-    backgroundColor: COLORS.white,
-  },
-  cardHexagonRed: {
-    backgroundColor: '#DB0011',
-  },
-  cardBrandText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  cardChip: {
-    width: 40,
-    height: 30,
-    backgroundColor: '#C4A86C',
-    borderRadius: 4,
-    padding: 4,
-    justifyContent: 'center',
-  },
-  chipInner: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    borderRadius: 2,
-  },
-  cardNumberText: {
-    color: COLORS.white,
-    fontSize: 18,
-    fontWeight: '600',
-    letterSpacing: 3,
-  },
-  cardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  cardLabel: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 9,
-    marginBottom: 2,
-  },
-  cardValue: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  cardNetwork: {},
-  networkText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-    fontStyle: 'italic',
-  },
-  mastercardLogo: {
-    flexDirection: 'row',
-  },
-  mcCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  mcCircleRed: {
-    backgroundColor: '#EB001B',
-  },
-  mcCircleOrange: {
-    backgroundColor: '#F79E1B',
-    marginLeft: -10,
-    opacity: 0.8,
-  },
-  cardIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 16,
-  },
-  indicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D0D0D0',
-    marginHorizontal: 4,
-  },
-  indicatorActive: {
-    backgroundColor: '#DB0011',
-    width: 24,
-  },
-  cardInfoSection: {
-    marginHorizontal: 24,
-    marginTop: 24,
-  },
-  cardInfoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-    marginBottom: 16,
-  },
-  creditInfoCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 16,
-  },
-  creditRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  creditLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  creditValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-  },
-  availableCredit: {
-    color: COLORS.success,
-  },
-  creditProgressBar: {
-    height: 8,
-    backgroundColor: '#E8E8E8',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  creditProgressFill: {
-    height: '100%',
-    backgroundColor: '#DB0011',
-    borderRadius: 4,
-  },
-  creditUsed: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 8,
-  },
-  actionsSection: {
-    marginHorizontal: 24,
-    marginTop: 24,
-  },
-  actionsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-    marginBottom: 16,
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 8,
-  },
-  actionItem: {
-    width: '33.33%',
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: COLORS.lightGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  actionIconActive: {
-    backgroundColor: '#FFF0F0',
-  },
-  actionLabel: {
-    fontSize: 12,
-    color: COLORS.darkGray,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  bottomPadding: {
-    height: 40,
-  },
+  container: { flex: 1, backgroundColor: C.bg },
+  loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  // Top Nav
+  topNav: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: '#E0E0E0' },
+  topNavHomeBtn: { padding: 4 },
+  topNavDivider: { width: 1, height: 20, backgroundColor: '#D0D0D0', marginHorizontal: 12 },
+  topNavTab: { paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', position: 'relative' },
+  topNavTabText: { fontSize: 16, fontWeight: '400', color: C.gray },
+  topNavTabTextActive: { fontWeight: '600' },
+  topNavTabIndicator: { position: 'absolute', bottom: 0, left: 8, right: 8, height: 3, borderRadius: 1.5 },
+  topNavMenuBtn: { marginLeft: 'auto', padding: 4 },
+  // Account Header
+  accountHeader: { alignItems: 'center', paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: '#E8E8E8' },
+  accountTitle: { fontSize: 20, fontWeight: '700', color: C.darkGray, letterSpacing: 0.5 },
+  accountName: { fontSize: 15, color: C.gray, marginTop: 4 },
+  // Card
+  cardScroll: { paddingHorizontal: 32, paddingTop: 24, paddingBottom: 8 },
+  cardOuter: { width: width - 64, marginRight: 16 },
+  bankCard: { backgroundColor: '#E0E0E0', borderRadius: 16, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20, height: 200, justifyContent: 'space-between' },
+  bankCardFrozen: { opacity: 0.6 },
+  frozenBanner: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, zIndex: 1 },
+  frozenBannerText: { color: C.white, fontSize: 10, fontWeight: '700', marginLeft: 4 },
+  cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardLogoRow: { flexDirection: 'row', alignItems: 'center' },
+  hsbcLogo: { marginRight: 10 },
+  hexRow: { flexDirection: 'row' },
+  hex: { width: 12, height: 12, margin: 0.5 },
+  cardBankName: { fontSize: 17, fontWeight: '700', color: C.darkGray },
+  cardTypeBadge: { backgroundColor: C.white, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 4 },
+  cardTypeBadgeText: { fontSize: 13, fontWeight: '500', color: C.darkGray },
+  cardMaskedNumber: { fontSize: 16, color: '#666666', letterSpacing: 2 },
+  // Indicators
+  indicators: { flexDirection: 'row', justifyContent: 'center', marginTop: 12 },
+  indicator: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#D0D0D0', marginHorizontal: 4 },
+  indicatorActive: { width: 20 },
+  // Card Details Link
+  cardDetailsLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 20 },
+  cardDetailsText: { fontSize: 16, color: C.darkGray, marginRight: 8 },
+  // Credit Section
+  creditSection: { marginHorizontal: 32, marginBottom: 16, backgroundColor: C.lightGray, borderRadius: 8, padding: 16 },
+  creditRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  creditLabel: { fontSize: 14, color: C.gray },
+  creditVal: { fontSize: 14, fontWeight: '600', color: C.darkGray },
+  creditBar: { height: 6, backgroundColor: '#D0D0D0', borderRadius: 3, overflow: 'hidden', marginTop: 8 },
+  creditFill: { height: '100%', borderRadius: 3 },
+  // Divider
+  divider: { height: 1, backgroundColor: '#E0E0E0', marginHorizontal: 0 },
+  // Actions
+  actionsRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 24, paddingHorizontal: 16 },
+  actionItem: { alignItems: 'center', width: 80 },
+  actionCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: C.lightGray, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  actionLabel: { fontSize: 12, color: C.darkGray, textAlign: 'center', lineHeight: 16 },
 });
