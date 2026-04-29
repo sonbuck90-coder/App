@@ -184,7 +184,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 # ==================== AUTH ENDPOINTS ====================
 
 VALID_PASSCODE = "0503"
-DEFAULT_USER_NAME = "HSBC Customer"
+DEFAULT_USER_NAME = "Oliver"
 DEFAULT_USER_EMAIL = "customer@hsbc.co.uk"
 
 @api_router.post("/auth/passcode")

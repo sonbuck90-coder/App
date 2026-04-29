@@ -139,7 +139,7 @@ export default function HomeScreen() {
         {/* Total Balance Card */}
         <View style={[styles.totalBalanceCard, { borderLeftColor: customColors.primary }]}>
           <View style={styles.totalBalanceHeader}>
-            <Text style={styles.totalBalanceLabel}>Total Relationship Balance</Text>
+            <Text style={styles.totalBalanceLabel}>Total Account Balance</Text>
             <TouchableOpacity
               style={[styles.totalAddFundsBtn, { backgroundColor: customColors.primary }]}
               onPress={() => router.push('/add-money')}
