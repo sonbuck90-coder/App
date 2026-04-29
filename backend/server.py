@@ -406,6 +406,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
+    email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
 

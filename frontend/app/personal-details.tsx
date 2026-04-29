@@ -14,6 +14,7 @@ export default function PersonalDetailsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -31,6 +32,7 @@ export default function PersonalDetailsScreen() {
       ]);
       const p = profileRes.data;
       setName(p.name || '');
+      setEmail(p.email || '');
       setPhone(p.phone || '');
       setAddress(p.address || '');
       setAccounts(accountsRes.data);
@@ -42,7 +44,7 @@ export default function PersonalDetailsScreen() {
     if (!name.trim()) { Alert.alert('Error', 'Name is required'); return; }
     setIsSaving(true);
     try {
-      await api.put('/profile', { name: name.trim(), phone: phone.trim(), address: address.trim() });
+      await api.put('/profile', { name: name.trim(), email: email.trim(), phone: phone.trim(), address: address.trim() });
       Alert.alert('Saved', 'Personal details updated successfully');
     } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed to save'); }
     finally { setIsSaving(false); }
@@ -94,6 +96,11 @@ export default function PersonalDetailsScreen() {
               <View style={s.field}>
                 <Text style={s.label}>Full Name</Text>
                 <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Enter your name" placeholderTextColor={C.gray} testID="name-input" />
+              </View>
+              <View style={s.divider} />
+              <View style={s.field}>
+                <Text style={s.label}>Email Address</Text>
+                <TextInput style={s.input} value={email} onChangeText={setEmail} placeholder="Enter your email" placeholderTextColor={C.gray} keyboardType="email-address" autoCapitalize="none" testID="email-input" />
               </View>
               <View style={s.divider} />
               <View style={s.field}>
