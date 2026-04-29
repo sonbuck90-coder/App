@@ -47,6 +47,17 @@ export default function TransfersScreen() {
   const [sortCodeError, setSortCodeError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receiptData, setReceiptData] = useState<{
+    amount: number;
+    recipient: string;
+    sortCode: string;
+    accountNumber: string;
+    description: string;
+    date: string;
+    reference: string;
+    fromAccount: string;
+  } | null>(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -185,7 +196,7 @@ export default function TransfersScreen() {
     setProcessingProgress(100);
     
     try {
-      await transfersApi.create({
+      const result = await transfersApi.create({
         from_account_id: selectedAccount.id,
         to_account_number: recipientAccount,
         amount: transferAmount,
@@ -194,22 +205,20 @@ export default function TransfersScreen() {
         sort_code: sortCode,
       });
 
-      Alert.alert('Transfer Successful', `${formatCurrency(transferAmount)} has been transferred successfully`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            setRecipientAccount('');
-            setRecipientName('');
-            setSortCode('');
-            setBankLookupResult(null);
-            setSortCodeError('');
-            setAmount('');
-            setDescription('');
-            fetchAccounts();
-            fetchRecentPayees();
-          },
-        },
-      ]);
+      // Show receipt
+      setReceiptData({
+        amount: transferAmount,
+        recipient: recipientName,
+        sortCode: sortCode,
+        accountNumber: recipientAccount,
+        description: description || `Transfer to ${recipientName}`,
+        date: new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' }),
+        reference: result.data.id.slice(0, 12).toUpperCase(),
+        fromAccount: `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}`,
+      });
+      setShowReceipt(true);
+      fetchAccounts();
+      fetchRecentPayees();
     } catch (error: any) {
       Alert.alert('Transfer Failed', error.response?.data?.detail || 'Unable to complete transfer');
     } finally {

@@ -2,9 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { chatApi } from '../src/services/api';
+import { transactionsApi, accountsApi, Transaction, Account } from '../src/services/api';
+import { useCustomization } from '../src/context/CustomizationContext';
+import { useAuth } from '../src/context/AuthContext';
 
-const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5' };
+const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5' };
 
 interface Message {
   role: 'user' | 'assistant';
@@ -12,17 +14,164 @@ interface Message {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Last Transaction', icon: 'receipt-outline', message: 'What was my last transaction? Give me full details including amount, date, and recipient.' },
-  { label: 'Transfer Delays', icon: 'time-outline', message: 'What are the typical transfer processing times and any potential delays I should know about?' },
-  { label: 'Support Hours', icon: 'call-outline', message: 'What are HSBC support hours and how can I contact customer service?' },
+  { label: 'Last Transaction', icon: 'receipt-outline', message: 'Show me my last transaction' },
+  { label: 'Transfer Delays', icon: 'time-outline', message: 'How long do transfers take?' },
+  { label: 'Support Hours', icon: 'call-outline', message: 'What are your support hours?' },
 ];
 
 export default function ChatScreen() {
+  const { colors: cc } = useCustomization();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string | undefined>();
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [txnRes, accRes] = await Promise.all([
+        transactionsApi.getAll(20),
+        accountsApi.getAll(),
+      ]);
+      setTransactions(txnRes.data);
+      setAccounts(accRes.data);
+    } catch (e) { console.error(e); }
+  };
+
+  const fmt = (v: number) => `£${v.toFixed(2)}`;
+  const fmtDate = (ts: string) => new Date(ts).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const fmtTime = (ts: string) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const getScriptedResponse = (userMsg: string): string => {
+    const msg = userMsg.toLowerCase();
+
+    // Last transaction / receipt
+    if (msg.includes('last transaction') || msg.includes('recent transaction') || msg.includes('latest transaction') || msg.includes('receipt')) {
+      if (transactions.length === 0) {
+        return "You don't have any transactions yet. Once you make a transfer or payment, I'll be able to show you the details here.";
+      }
+      const txn = transactions[0];
+      const type = txn.transaction_type === 'deposit' ? 'Deposit' : txn.transaction_type === 'payment' ? 'Bill Payment' : 'Transfer';
+      const direction = txn.transaction_type === 'deposit' ? 'Received' : 'Sent';
+      
+      return `📋 **TRANSACTION RECEIPT**\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `\n` +
+        `**${type}** — ${direction}\n` +
+        `\n` +
+        `**Amount:** ${txn.transaction_type === 'deposit' ? '+' : '-'}${fmt(txn.amount)}\n` +
+        `**To:** ${txn.recipient_name || 'N/A'}\n` +
+        `**Description:** ${txn.description}\n` +
+        `**Date:** ${fmtDate(txn.timestamp)}\n` +
+        `**Time:** ${fmtTime(txn.timestamp)}\n` +
+        `**Status:** ✅ ${txn.status.charAt(0).toUpperCase() + txn.status.slice(1)}\n` +
+        `**Reference:** ${txn.id.slice(0, 12).toUpperCase()}\n` +
+        `\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `HSBC UK | Secure Banking`;
+    }
+
+    // Transfer delays
+    if (msg.includes('transfer') && (msg.includes('delay') || msg.includes('long') || msg.includes('time') || msg.includes('how long'))) {
+      return `⏱️ **Transfer Processing Times**\n\n` +
+        `**Domestic (UK) Transfers:**\n` +
+        `• Faster Payments: Instant - 2 hours\n` +
+        `• Same-day: By 3:30 PM if submitted before 2:00 PM\n` +
+        `• BACS: 1-2 business days\n\n` +
+        `**International Transfers:**\n` +
+        `• SWIFT: 3-5 business days\n` +
+        `• Urgent (CHAPS): Same day (fee applies)\n\n` +
+        `**Possible Delays:**\n` +
+        `• Weekends & bank holidays\n` +
+        `• Security checks on large amounts (£10,000+)\n` +
+        `• Incorrect sort code/account number\n\n` +
+        `Need help with a specific transfer? Just ask! — Ellie`;
+    }
+
+    // Support hours
+    if (msg.includes('support') || msg.includes('contact') || msg.includes('help') || msg.includes('hours') || msg.includes('phone')) {
+      return `📞 **HSBC Support Channels**\n\n` +
+        `**Phone Banking:**\n` +
+        `• 03457 404 404 — Available 24/7\n` +
+        `• From abroad: +44 1226 261 010\n\n` +
+        `**Live Chat:**\n` +
+        `• Mon-Fri: 8:00 AM - 8:00 PM\n` +
+        `• Sat-Sun: 9:00 AM - 5:00 PM\n\n` +
+        `**Branch Hours:**\n` +
+        `• Mon-Fri: 9:00 AM - 5:00 PM\n` +
+        `• Saturday: 9:00 AM - 1:00 PM\n` +
+        `• Sunday: Closed\n\n` +
+        `**Emergencies (Lost/Stolen Card):**\n` +
+        `• 0800 783 7654 — 24/7\n\n` +
+        `I'm also here to help anytime! — Ellie`;
+    }
+
+    // Balance
+    if (msg.includes('balance') || msg.includes('how much') || msg.includes('money')) {
+      const total = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+      const accsInfo = accounts.map(a => `• ${a.account_type === 'checking' ? 'Current' : 'Savings'} Account: ${fmt(a.balance)}`).join('\n');
+      return `💰 **Your Account Balances**\n\n` +
+        `**Total: ${fmt(total)}**\n\n` +
+        `${accsInfo}\n\n` +
+        `Want to add funds or make a transfer? I can guide you through it! — Ellie`;
+    }
+
+    // Transactions history
+    if (msg.includes('transactions') || msg.includes('history') || msg.includes('spending') || msg.includes('activity')) {
+      const recent = transactions.slice(0, 5);
+      if (recent.length === 0) return "No recent activity to show yet. Make a transfer or payment and it'll appear here!";
+      const list = recent.map(t => {
+        const prefix = t.transaction_type === 'deposit' ? '+' : '-';
+        return `• ${prefix}${fmt(t.amount)} — ${t.recipient_name || t.description} (${fmtDate(t.timestamp).split(',')[0]})`;
+      }).join('\n');
+      return `📊 **Recent Activity (Last 5)**\n\n${list}\n\n` +
+        `Want details on a specific transaction? Ask me about your "last transaction" for a full receipt! — Ellie`;
+    }
+
+    // Account details
+    if (msg.includes('account') && (msg.includes('number') || msg.includes('sort') || msg.includes('details'))) {
+      const accsInfo = accounts.map(a =>
+        `**${a.account_type === 'checking' ? 'Current' : 'Savings'} Account**\n` +
+        `• Sort Code: ${a.sort_code || 'Not set'}\n` +
+        `• Account No: ${a.account_number}`
+      ).join('\n\n');
+      return `🏦 **Your Account Details**\n\n${accsInfo}\n\n` +
+        `You can update these in Settings → Personal Details. — Ellie`;
+    }
+
+    // Greeting
+    if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey') || msg === 'hey ellie' || msg === 'hi ellie') {
+      return `Hello${user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋 I'm Ellie, your personal banking assistant.\n\n` +
+        `Here's what I can help with:\n` +
+        `• View your last transaction receipt\n` +
+        `• Check your balance\n` +
+        `• Transfer processing times\n` +
+        `• Support hours & contact info\n` +
+        `• Account details\n\n` +
+        `Just ask me anything! — Ellie`;
+    }
+
+    // Thank you
+    if (msg.includes('thank') || msg.includes('thanks') || msg.includes('cheers')) {
+      return `You're welcome! 😊 Happy to help anytime. Is there anything else I can assist you with? — Ellie`;
+    }
+
+    // Default fallback
+    return `I'm not sure I understand that one. Here's what I can help with:\n\n` +
+      `• **"Last transaction"** — Full receipt with payee details\n` +
+      `• **"Balance"** — Your current account balances\n` +
+      `• **"Transfer delays"** — Processing times\n` +
+      `• **"Support hours"** — How to contact HSBC\n` +
+      `• **"Account details"** — Sort code & account number\n` +
+      `• **"Recent activity"** — Last 5 transactions\n\n` +
+      `Try one of these or tap a quick action below! — Ellie`;
+  };
 
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -33,20 +182,16 @@ export default function ChatScreen() {
     setIsLoading(true);
     Keyboard.dismiss();
 
-    // 10-second response delay for realistic feel
-    await new Promise(resolve => setTimeout(resolve, 10000));
+    // Refresh data for accurate responses
+    await loadData();
 
-    try {
-      const res = await chatApi.send(text.trim(), sessionId);
-      setSessionId(res.data.session_id);
-      const aiMsg: Message = { role: 'assistant', content: res.data.response };
-      setMessages(prev => [...prev, aiMsg]);
-    } catch (e: any) {
-      const errMsg: Message = { role: 'assistant', content: 'Sorry, I\'m having trouble connecting. Please try again.' };
-      setMessages(prev => [...prev, errMsg]);
-    } finally {
-      setIsLoading(false);
-    }
+    // 3-second typing delay
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    const response = getScriptedResponse(text.trim());
+    const aiMsg: Message = { role: 'assistant', content: response };
+    setMessages(prev => [...prev, aiMsg]);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -55,10 +200,10 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: cc.primary }]}>
         <View style={styles.headerLeft}>
-          <View style={styles.aiAvatar}>
-            <Ionicons name="chatbubbles" size={18} color={COLORS.white} />
+          <View style={[styles.aiAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <Ionicons name="chatbubbles" size={18} color={C.white} />
           </View>
           <View>
             <Text style={styles.headerTitle}>Ellie</Text>
@@ -75,16 +220,15 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Welcome message */}
+          {/* Welcome */}
           {messages.length === 0 && (
             <View style={styles.welcomeContainer}>
-              <View style={styles.welcomeAvatar}>
-                <Ionicons name="chatbubbles" size={32} color={COLORS.primary} />
+              <View style={[styles.welcomeAvatar, { backgroundColor: `${cc.primary}15` }]}>
+                <Ionicons name="chatbubbles" size={32} color={cc.primary} />
               </View>
               <Text style={styles.welcomeTitle}>Hello! I'm Ellie</Text>
-              <Text style={styles.welcomeText}>Your personal HSBC banking assistant. I can help with account info, transactions, transfers, and more. Try a quick action below or type your question.</Text>
+              <Text style={styles.welcomeText}>Your personal HSBC banking assistant. I can show you transaction receipts, check balances, and answer banking questions.</Text>
 
-              {/* Quick Actions */}
               <View style={styles.quickActionsContainer}>
                 {QUICK_ACTIONS.map((action, i) => (
                   <TouchableOpacity
@@ -93,7 +237,7 @@ export default function ChatScreen() {
                     onPress={() => sendMessage(action.message)}
                     testID={`quick-action-${i}`}
                   >
-                    <Ionicons name={action.icon as any} size={22} color={COLORS.primary} />
+                    <Ionicons name={action.icon as any} size={22} color={cc.primary} />
                     <Text style={styles.quickActionLabel}>{action.label}</Text>
                   </TouchableOpacity>
                 ))}
@@ -105,11 +249,11 @@ export default function ChatScreen() {
           {messages.map((msg, i) => (
             <View key={i} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
               {msg.role === 'assistant' && (
-                <View style={styles.aiIcon}>
-                  <Ionicons name="chatbubbles" size={14} color={COLORS.white} />
+                <View style={[styles.aiIcon, { backgroundColor: cc.primary }]}>
+                  <Ionicons name="chatbubbles" size={14} color={C.white} />
                 </View>
               )}
-              <View style={[styles.messageContent, msg.role === 'user' ? styles.userContent : styles.aiContent]}>
+              <View style={[styles.messageContent, msg.role === 'user' ? [styles.userContent, { backgroundColor: cc.primary }] : styles.aiContent]}>
                 <Text style={[styles.messageText, msg.role === 'user' ? styles.userText : styles.aiText]}>{msg.content}</Text>
               </View>
             </View>
@@ -117,26 +261,22 @@ export default function ChatScreen() {
 
           {isLoading && (
             <View style={[styles.messageBubble, styles.aiBubble]}>
-              <View style={styles.aiIcon}>
-                <Ionicons name="chatbubbles" size={14} color={COLORS.white} />
+              <View style={[styles.aiIcon, { backgroundColor: cc.primary }]}>
+                <Ionicons name="chatbubbles" size={14} color={C.white} />
               </View>
               <View style={[styles.messageContent, styles.aiContent, styles.typingContainer]}>
-                <ActivityIndicator size="small" color={COLORS.primary} />
+                <ActivityIndicator size="small" color={cc.primary} />
                 <Text style={styles.typingText}>Ellie is typing...</Text>
               </View>
             </View>
           )}
 
-          {/* Quick actions after first response */}
+          {/* Quick actions after responses */}
           {messages.length > 0 && !isLoading && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.inlineQuickActions}>
               {QUICK_ACTIONS.map((action, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={styles.inlineQuickAction}
-                  onPress={() => sendMessage(action.message)}
-                >
-                  <Ionicons name={action.icon as any} size={16} color={COLORS.primary} />
+                <TouchableOpacity key={i} style={styles.inlineQuickAction} onPress={() => sendMessage(action.message)}>
+                  <Ionicons name={action.icon as any} size={16} color={cc.primary} />
                   <Text style={styles.inlineQuickActionText}>{action.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -148,8 +288,8 @@ export default function ChatScreen() {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Ask me anything..."
-            placeholderTextColor={COLORS.gray}
+            placeholder="Ask Ellie anything..."
+            placeholderTextColor={C.gray}
             value={input}
             onChangeText={setInput}
             multiline
@@ -157,12 +297,12 @@ export default function ChatScreen() {
             testID="chat-input"
           />
           <TouchableOpacity
-            style={[styles.sendButton, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
+            style={[styles.sendButton, { backgroundColor: cc.primary }, (!input.trim() || isLoading) && styles.sendButtonDisabled]}
             onPress={() => sendMessage(input)}
             disabled={!input.trim() || isLoading}
             testID="chat-send-btn"
           >
-            <Ionicons name="send" size={20} color={COLORS.white} />
+            <Ionicons name="send" size={20} color={C.white} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -171,39 +311,39 @@ export default function ChatScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: C.bg },
   flex: { flex: 1 },
-  header: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  header: { paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  aiAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  headerTitle: { fontSize: 18, fontWeight: '600', color: COLORS.white },
+  aiAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: C.white },
   headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
   chatArea: { flex: 1 },
   chatContent: { paddingHorizontal: 16, paddingBottom: 16 },
   welcomeContainer: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 16 },
-  welcomeAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#FFF0F0', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  welcomeTitle: { fontSize: 20, fontWeight: '700', color: COLORS.darkGray, marginBottom: 8, textAlign: 'center' },
-  welcomeText: { fontSize: 14, color: COLORS.gray, textAlign: 'center', lineHeight: 20 },
+  welcomeAvatar: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  welcomeTitle: { fontSize: 20, fontWeight: '700', color: C.darkGray, marginBottom: 8, textAlign: 'center' },
+  welcomeText: { fontSize: 14, color: C.gray, textAlign: 'center', lineHeight: 20 },
   quickActionsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 24, gap: 12 },
-  quickActionCard: { backgroundColor: COLORS.white, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', width: '45%', minWidth: 140 },
-  quickActionLabel: { fontSize: 13, fontWeight: '600', color: COLORS.darkGray, marginTop: 8, textAlign: 'center' },
+  quickActionCard: { backgroundColor: C.white, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', width: '45%', minWidth: 140 },
+  quickActionLabel: { fontSize: 13, fontWeight: '600', color: C.darkGray, marginTop: 8, textAlign: 'center' },
   messageBubble: { flexDirection: 'row', marginTop: 12, maxWidth: '85%' },
   userBubble: { alignSelf: 'flex-end' },
   aiBubble: { alignSelf: 'flex-start' },
-  aiIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 2 },
+  aiIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 2 },
   messageContent: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, maxWidth: '90%' },
-  userContent: { backgroundColor: COLORS.primary, borderBottomRightRadius: 4 },
-  aiContent: { backgroundColor: COLORS.white, borderBottomLeftRadius: 4 },
-  messageText: { fontSize: 15, lineHeight: 22 },
-  userText: { color: COLORS.white },
-  aiText: { color: COLORS.darkGray },
+  userContent: { borderBottomRightRadius: 4 },
+  aiContent: { backgroundColor: C.white, borderBottomLeftRadius: 4 },
+  messageText: { fontSize: 14, lineHeight: 21 },
+  userText: { color: C.white },
+  aiText: { color: C.darkGray },
   typingContainer: { flexDirection: 'row', alignItems: 'center' },
-  typingText: { fontSize: 14, color: COLORS.gray, marginLeft: 8 },
+  typingText: { fontSize: 14, color: C.gray, marginLeft: 8 },
   inlineQuickActions: { paddingTop: 12, paddingBottom: 4 },
-  inlineQuickAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: '#E0E0E0' },
-  inlineQuickActionText: { fontSize: 13, color: COLORS.darkGray, fontWeight: '500', marginLeft: 6 },
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: '#E0E0E0' },
-  input: { flex: 1, backgroundColor: COLORS.lightGray, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: COLORS.black, maxHeight: 100, marginRight: 10 },
-  sendButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  inlineQuickAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: '#E0E0E0' },
+  inlineQuickActionText: { fontSize: 13, color: C.darkGray, fontWeight: '500', marginLeft: 6 },
+  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.white, borderTopWidth: 1, borderTopColor: '#E0E0E0' },
+  input: { flex: 1, backgroundColor: C.lightGray, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: C.black, maxHeight: 100, marginRight: 10 },
+  sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   sendButtonDisabled: { opacity: 0.5 },
 });
