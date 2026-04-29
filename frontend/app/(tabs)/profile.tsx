@@ -54,7 +54,7 @@ export default function ProfileScreen() {
         { icon: 'calendar-outline', label: 'Scheduled Deposits', chevron: true, onPress: () => router.push('/schedules') },
         { icon: 'chatbubbles-outline', label: 'AI Assistant', chevron: true, onPress: () => router.push('/chat') },
         { icon: 'color-palette-outline', label: 'Customization', chevron: true, onPress: () => router.push('/customization') },
-        { icon: 'person-outline', label: 'Personal Details', chevron: true },
+        { icon: 'person-outline', label: 'Personal Details', chevron: true, onPress: () => router.push('/personal-details') },
         { icon: 'lock-closed-outline', label: 'Security Settings', chevron: true },
         { icon: 'notifications-outline', label: 'Notifications', chevron: true },
         { icon: 'finger-print-outline', label: 'Biometric Login', toggle: true },

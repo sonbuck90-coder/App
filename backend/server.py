@@ -404,6 +404,46 @@ async def login(user_data: UserLogin):
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+
+class AccountDetailsUpdate(BaseModel):
+    account_id: str
+    sort_code: Optional[str] = None
+    account_number: Optional[str] = None
+
+@api_router.get("/profile")
+async def get_profile(current_user: User = Depends(get_current_user)):
+    user_data = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    return user_data
+
+@api_router.put("/profile")
+async def update_profile(data: ProfileUpdate, current_user: User = Depends(get_current_user)):
+    update_fields = {k: v for k, v in data.dict().items() if v is not None}
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    await db.users.update_one({"id": current_user.id}, {"$set": update_fields})
+    updated = await db.users.find_one({"id": current_user.id}, {"_id": 0})
+    return updated
+
+@api_router.put("/accounts/details")
+async def update_account_details(data: AccountDetailsUpdate, current_user: User = Depends(get_current_user)):
+    account = await db.accounts.find_one({"id": data.account_id, "user_id": current_user.id})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    update_fields = {}
+    if data.sort_code:
+        update_fields["sort_code"] = data.sort_code
+    if data.account_number:
+        update_fields["account_number"] = data.account_number
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    await db.accounts.update_one({"id": data.account_id}, {"$set": update_fields})
+    updated = await db.accounts.find_one({"id": data.account_id}, {"_id": 0})
+    return updated
+
 # ==================== ACCOUNT ENDPOINTS ====================
 
 @api_router.get("/accounts", response_model=List[Account])
