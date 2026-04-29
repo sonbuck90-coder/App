@@ -240,6 +240,127 @@ export default function TransfersScreen() {
     );
   }
 
+  // Receipt Screen
+  if (showReceipt && receiptData) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+          <Text style={styles.headerTitle}>Transfer Complete</Text>
+        </View>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.receiptScroll}>
+          {/* Success Icon */}
+          <View style={styles.receiptSuccess}>
+            <View style={[styles.receiptSuccessCircle, { backgroundColor: COLORS.success }]}>
+              <Ionicons name="checkmark" size={40} color={COLORS.white} />
+            </View>
+            <Text style={styles.receiptSuccessText}>Payment Sent</Text>
+            <Text style={[styles.receiptAmount, { color: customColors.primary }]}>-£{receiptData.amount.toFixed(2)}</Text>
+          </View>
+
+          {/* Receipt Card */}
+          <View style={styles.receiptCard}>
+            <View style={styles.receiptCardHeader}>
+              <Ionicons name="receipt" size={20} color={customColors.primary} />
+              <Text style={styles.receiptCardTitle}>Transaction Receipt</Text>
+            </View>
+
+            <View style={styles.receiptDivider} />
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Recipient</Text>
+              <Text style={styles.receiptValue}>{receiptData.recipient}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Sort Code</Text>
+              <Text style={styles.receiptValue}>{receiptData.sortCode}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Account Number</Text>
+              <Text style={styles.receiptValue}>{receiptData.accountNumber}</Text>
+            </View>
+
+            <View style={styles.receiptDivider} />
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Amount</Text>
+              <Text style={[styles.receiptValue, styles.receiptValueBold]}>£{receiptData.amount.toFixed(2)}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>From</Text>
+              <Text style={styles.receiptValue}>{receiptData.fromAccount}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Description</Text>
+              <Text style={styles.receiptValue}>{receiptData.description || 'N/A'}</Text>
+            </View>
+
+            <View style={styles.receiptDivider} />
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Date & Time</Text>
+              <Text style={styles.receiptValue}>{receiptData.date}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Reference</Text>
+              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>{receiptData.reference}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Status</Text>
+              <View style={styles.receiptStatusBadge}>
+                <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
+                <Text style={styles.receiptStatusText}>Completed</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.receiptFooter}>
+            <Text style={styles.receiptFooterText}>HSBC UK | Secure Banking</Text>
+          </View>
+
+          {/* Buttons */}
+          <TouchableOpacity
+            style={[styles.receiptDoneBtn, { backgroundColor: customColors.primary }]}
+            onPress={() => {
+              setShowReceipt(false);
+              setReceiptData(null);
+              setRecipientAccount('');
+              setRecipientName('');
+              setSortCode('');
+              setBankLookupResult(null);
+              setSortCodeError('');
+              setAmount('');
+              setDescription('');
+            }}
+            testID="receipt-done-btn"
+          >
+            <Text style={styles.receiptDoneBtnText}>Done</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.receiptAnotherBtn}
+            onPress={() => {
+              setShowReceipt(false);
+              setReceiptData(null);
+              setRecipientAccount('');
+              setRecipientName('');
+              setSortCode('');
+              setBankLookupResult(null);
+              setSortCodeError('');
+              setAmount('');
+              setDescription('');
+            }}
+            testID="receipt-another-btn"
+          >
+            <Text style={[styles.receiptAnotherBtnText, { color: customColors.primary }]}>Make Another Transfer</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
@@ -831,5 +952,117 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 40,
+  },
+  // Receipt styles
+  receiptScroll: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+  },
+  receiptSuccess: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  receiptSuccessCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  receiptSuccessText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.darkGray,
+    marginBottom: 4,
+  },
+  receiptAmount: {
+    fontSize: 36,
+    fontWeight: '700',
+  },
+  receiptCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  receiptCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  receiptCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+    marginLeft: 8,
+  },
+  receiptDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 14,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  receiptLabel: {
+    fontSize: 14,
+    color: COLORS.gray,
+  },
+  receiptValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+    maxWidth: '55%',
+    textAlign: 'right',
+  },
+  receiptValueBold: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  receiptStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  receiptStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#00847F',
+    marginLeft: 4,
+  },
+  receiptFooter: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  receiptFooterText: {
+    fontSize: 12,
+    color: COLORS.gray,
+  },
+  receiptDoneBtn: {
+    height: 52,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  receiptDoneBtnText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  receiptAnotherBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  receiptAnotherBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
