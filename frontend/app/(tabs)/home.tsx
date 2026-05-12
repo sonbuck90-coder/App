@@ -244,10 +244,16 @@ export default function HomeScreen() {
           <View style={styles.transactionsCard}>
             {stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
               stats.recent_transactions.map((transaction, index) => (
-                <View key={transaction.id} style={[
-                  styles.transactionItem,
-                  index < stats.recent_transactions.length - 1 && styles.transactionBorder
-                ]}>
+                <TouchableOpacity
+                  key={transaction.id}
+                  style={[
+                    styles.transactionItem,
+                    index < stats.recent_transactions.length - 1 && styles.transactionBorder
+                  ]}
+                  onPress={() => router.push({ pathname: '/transaction-detail', params: { id: transaction.id } })}
+                  activeOpacity={0.6}
+                  testID={`home-txn-${transaction.id}`}
+                >
                   <View style={styles.transactionLeft}>
                     <View style={styles.transactionIconContainer}>
                       <Ionicons
@@ -276,7 +282,7 @@ export default function HomeScreen() {
                     {transaction.transaction_type === 'deposit' ? '+' : '-'}
                     {formatCurrency(transaction.amount)}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyState}>

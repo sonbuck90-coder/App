@@ -26,10 +26,11 @@ const ACCENT_COLORS = [
   { label: 'Pink', value: '#E91E63' },
 ];
 
-const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' }> = [
+const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' | 'xlarge' }> = [
   { label: 'Small', value: 'small' },
   { label: 'Medium', value: 'medium' },
   { label: 'Large', value: 'large' },
+  { label: 'X-Large', value: 'xlarge' },
 ];
 
 export default function CustomizationScreen() {

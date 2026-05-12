@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { api, accountsApi, Account } from '../src/services/api';
+import { api, accountsApi, cardsApi, Account, Card } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 
 const C = { white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5' };
@@ -21,14 +21,21 @@ export default function PersonalDetailsScreen() {
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
   const [editSortCode, setEditSortCode] = useState('');
   const [editAccountNumber, setEditAccountNumber] = useState('');
+  // Cards
+  const [cards, setCards] = useState<Card[]>([]);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editCardName, setEditCardName] = useState('');
+  const [editCardNumber, setEditCardNumber] = useState('');
+  const [editCardExpiry, setEditCardExpiry] = useState('');
 
   useEffect(() => { load(); }, []);
 
   const load = async () => {
     try {
-      const [profileRes, accountsRes] = await Promise.all([
+      const [profileRes, accountsRes, cardsRes] = await Promise.all([
         api.get('/profile'),
         accountsApi.getAll(),
+        cardsApi.getAll(),
       ]);
       const p = profileRes.data;
       setName(p.name || '');
@@ -36,6 +43,7 @@ export default function PersonalDetailsScreen() {
       setPhone(p.phone || '');
       setAddress(p.address || '');
       setAccounts(accountsRes.data);
+      setCards(cardsRes.data);
     } catch (e) { console.error(e); }
     finally { setIsLoading(false); }
   };
@@ -71,6 +79,49 @@ export default function PersonalDetailsScreen() {
       });
       Alert.alert('Saved', 'Account details updated');
       setEditingAccountId(null);
+      load();
+    } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed to save'); }
+    finally { setIsSaving(false); }
+  };
+
+  const startEditCard = (card: Card) => {
+    setEditingCardId(card.id);
+    setEditCardName(card.card_name || '');
+    setEditCardNumber(card.card_number || '');
+    setEditCardExpiry(card.expiry_date || '');
+  };
+
+  const formatCardNumber = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 19);
+    return digits.replace(/(.{4})/g, '$1 ').trim();
+  };
+
+  const formatExpiry = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  };
+
+  const handleSaveCardDetails = async () => {
+    if (!editingCardId) return;
+    if (!editCardName.trim() || !editCardNumber.trim() || !editCardExpiry.trim()) {
+      Alert.alert('Error', 'All card fields are required');
+      return;
+    }
+    const cleanNumber = editCardNumber.replace(/\s/g, '');
+    if (cleanNumber.length < 12) {
+      Alert.alert('Error', 'Card number must be at least 12 digits');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await cardsApi.update(editingCardId, {
+        card_name: editCardName.trim(),
+        card_number: cleanNumber,
+        expiry_date: editCardExpiry.trim(),
+      });
+      Alert.alert('Saved', 'Card details updated');
+      setEditingCardId(null);
       load();
     } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed to save'); }
     finally { setIsSaving(false); }
@@ -170,6 +221,90 @@ export default function PersonalDetailsScreen() {
                 )}
               </View>
             ))}
+          </View>
+
+          {/* Bank Cards */}
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>Bank Cards</Text>
+            {cards.length === 0 ? (
+              <View style={s.card}>
+                <Text style={s.accLabel}>No cards on file</Text>
+              </View>
+            ) : (
+              cards.map((card) => (
+                <View key={card.id} style={s.card}>
+                  <View style={s.accHeader}>
+                    <View style={s.accHeaderLeft}>
+                      <Ionicons name="card" size={20} color={cc.primary} style={{ marginRight: 8 }} />
+                      <Text style={s.accTitle}>{card.card_name || (card.card_type === 'credit' ? 'Credit Card' : 'Debit Card')}</Text>
+                    </View>
+                    {editingCardId !== card.id && (
+                      <TouchableOpacity onPress={() => startEditCard(card)} testID={`edit-card-${card.id}`}>
+                        <Ionicons name="create-outline" size={20} color={cc.primary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+
+                  {editingCardId === card.id ? (
+                    <View style={s.editSection}>
+                      <View style={s.field}>
+                        <Text style={s.label}>Cardholder Name</Text>
+                        <TextInput style={s.input} value={editCardName} onChangeText={setEditCardName} placeholder="OLIVER SMITH" placeholderTextColor={C.gray} autoCapitalize="characters" testID={`card-name-edit-${card.id}`} />
+                      </View>
+                      <View style={s.field}>
+                        <Text style={s.label}>Card Number</Text>
+                        <TextInput
+                          style={s.input}
+                          value={editCardNumber}
+                          onChangeText={(t) => setEditCardNumber(formatCardNumber(t))}
+                          placeholder="1234 5678 9012 3456"
+                          placeholderTextColor={C.gray}
+                          keyboardType="numeric"
+                          maxLength={23}
+                          testID={`card-number-edit-${card.id}`}
+                        />
+                      </View>
+                      <View style={s.field}>
+                        <Text style={s.label}>Expiry Date</Text>
+                        <TextInput
+                          style={s.input}
+                          value={editCardExpiry}
+                          onChangeText={(t) => setEditCardExpiry(formatExpiry(t))}
+                          placeholder="MM/YY"
+                          placeholderTextColor={C.gray}
+                          keyboardType="numeric"
+                          maxLength={5}
+                          testID={`card-expiry-edit-${card.id}`}
+                        />
+                      </View>
+                      <View style={s.editBtns}>
+                        <TouchableOpacity style={s.cancelBtn} onPress={() => setEditingCardId(null)}>
+                          <Text style={s.cancelBtnText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[s.confirmBtn, { backgroundColor: cc.primary }]} onPress={handleSaveCardDetails} disabled={isSaving} testID={`save-card-${card.id}`}>
+                          {isSaving ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.confirmBtnText}>Save</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={s.accDisplay}>
+                      <View style={s.accRow}>
+                        <Text style={s.accLabel}>Cardholder</Text>
+                        <Text style={s.accValue}>{card.card_name || '—'}</Text>
+                      </View>
+                      <View style={s.accRow}>
+                        <Text style={s.accLabel}>Card Number</Text>
+                        <Text style={s.accValue}>{card.card_number_masked || '—'}</Text>
+                      </View>
+                      <View style={s.accRow}>
+                        <Text style={s.accLabel}>Expires</Text>
+                        <Text style={s.accValue}>{card.expiry_date || '—'}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+              ))
+            )}
           </View>
 
           <View style={{ height: 40 }} />

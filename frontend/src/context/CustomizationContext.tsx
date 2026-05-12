@@ -10,7 +10,7 @@ export interface CustomColors {
 
 export interface LogoSettings {
   url: string;
-  size: 'small' | 'medium' | 'large';
+  size: 'small' | 'medium' | 'large' | 'xlarge';
 }
 
 export interface CustomizationSettings {
@@ -31,7 +31,7 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   },
 };
 
-const LOGO_SIZES = { small: 28, medium: 40, large: 56 };
+const LOGO_SIZES = { small: 28, medium: 40, large: 64, xlarge: 80 };
 
 interface CustomizationContextType {
   settings: CustomizationSettings;

@@ -24,6 +24,7 @@ export default function RootLayout() {
         <Stack.Screen name="schedules" />
         <Stack.Screen name="card-details" />
         <Stack.Screen name="personal-details" />
+        <Stack.Screen name="transaction-detail" />
         </Stack>
       </CustomizationProvider>
     </AuthProvider>

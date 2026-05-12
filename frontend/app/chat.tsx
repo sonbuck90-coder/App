@@ -94,6 +94,21 @@ export default function ChatScreen() {
         `Need help with a specific transfer? Just ask! — Ellie`;
     }
 
+    // Cancel payment / reverse
+    if (msg.includes('cancel') || msg.includes('reverse') || msg.includes('stop payment') || msg.includes('recall') || msg.includes('get money back') || msg.includes('undo')) {
+      return `⚠️ **Payment Cancellation**\n\n` +
+        `Once a Faster Payment has been sent, it **cannot be cancelled or reversed** because funds are transferred almost instantly.\n\n` +
+        `However, if the payment was made to the wrong account:\n\n` +
+        `1. **Contact HSBC immediately** on 03457 404 404 to request a recall\n` +
+        `2. You may need to **contact the recipient directly** to request a refund\n` +
+        `3. HSBC will attempt to recover the funds on your behalf, but this is not guaranteed\n\n` +
+        `**Timeframes:**\n` +
+        `• Recall requests should be made within 24 hours\n` +
+        `• The receiving bank has up to 20 working days to respond\n` +
+        `• If the recipient agrees, funds are usually returned within 5 working days\n\n` +
+        `Need me to help with anything else? — Ellie`;
+    }
+
     // Support hours
     if (msg.includes('support') || msg.includes('contact') || msg.includes('help') || msg.includes('hours') || msg.includes('phone')) {
       return `📞 **HSBC Support Channels**\n\n` +

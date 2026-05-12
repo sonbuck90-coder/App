@@ -30,6 +30,10 @@ export interface Transaction {
   transaction_type: string;
   description: string;
   recipient_name?: string;
+  recipient_sort_code?: string;
+  recipient_account_number?: string;
+  recipient_bank_name?: string;
+  reference?: string;
   status: string;
   timestamp: string;
 }
@@ -79,6 +83,7 @@ export const transactionsApi = {
     const qs = params.toString();
     return api.get<Transaction[]>(`/transactions${qs ? `?${qs}` : ''}`);
   },
+  getById: (id: string) => api.get<Transaction>(`/transactions/${id}`),
 };
 
 export const transfersApi = {
@@ -106,6 +111,8 @@ export const cardsApi = {
   getAll: () => api.get<Card[]>('/cards'),
   freeze: (cardId: string) => api.post(`/cards/${cardId}/freeze`),
   unfreeze: (cardId: string) => api.post(`/cards/${cardId}/unfreeze`),
+  update: (cardId: string, data: { card_name?: string; card_number?: string; expiry_date?: string }) =>
+    api.put<Card>(`/cards/${cardId}`, data),
 };
 
 export const dashboardApi = {

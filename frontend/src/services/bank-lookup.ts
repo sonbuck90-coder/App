@@ -150,11 +150,11 @@ export function lookupBank(sortCode: string): LookupResult {
     };
   }
   
-  // Sort code format is valid but bank not found
+  // Sort code format is valid but bank not found - fallback to generic "UK Bank"
   return {
-    found: false,
+    found: true,
+    bank: { name: 'UK Bank', shortName: 'UK Bank' },
     formattedSortCode,
-    error: 'Bank not recognized for this sort code',
   };
 }
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { transactionsApi, Transaction } from '../src/services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
@@ -15,6 +16,7 @@ const FILTERS = [
 ];
 
 export default function TransactionsScreen() {
+  const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -175,7 +177,13 @@ export default function TransactionsScreen() {
               <Text style={styles.dateHeader}>{date}</Text>
               <View style={styles.transactionsCard}>
                 {txns.map((txn, i) => (
-                  <View key={txn.id} style={[styles.txnRow, i < txns.length - 1 && styles.txnBorder]}>
+                  <TouchableOpacity
+                    key={txn.id}
+                    style={[styles.txnRow, i < txns.length - 1 && styles.txnBorder]}
+                    onPress={() => router.push({ pathname: '/transaction-detail', params: { id: txn.id } })}
+                    testID={`txn-row-${txn.id}`}
+                    activeOpacity={0.6}
+                  >
                     <View style={[styles.txnIcon, { backgroundColor: `${getIconColor(txn.transaction_type)}15` }]}>
                       <Ionicons name={getIcon(txn.transaction_type)} size={20} color={getIconColor(txn.transaction_type)} />
                     </View>
@@ -194,7 +202,8 @@ export default function TransactionsScreen() {
                         </Text>
                       </View>
                     </View>
-                  </View>
+                    <Ionicons name="chevron-forward" size={16} color={COLORS.gray} style={{ marginLeft: 6 }} />
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>

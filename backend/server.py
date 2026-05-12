@@ -91,6 +91,10 @@ class Transaction(BaseModel):
     transaction_type: str  # transfer, payment, deposit, withdrawal
     description: str
     recipient_name: Optional[str] = None
+    recipient_sort_code: Optional[str] = None
+    recipient_account_number: Optional[str] = None
+    recipient_bank_name: Optional[str] = None
+    reference: Optional[str] = None
     status: str = "completed"  # pending, completed, failed
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -477,6 +481,13 @@ async def get_transactions(
     transactions = await db.transactions.find(query).sort("timestamp", -1).to_list(limit)
     return [Transaction(**txn) for txn in transactions]
 
+@api_router.get("/transactions/{transaction_id}", response_model=Transaction)
+async def get_transaction(transaction_id: str, current_user: User = Depends(get_current_user)):
+    txn = await db.transactions.find_one({"id": transaction_id, "user_id": current_user.id})
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return Transaction(**txn)
+
 @api_router.get("/statements/csv")
 async def download_csv_statement(current_user: User = Depends(get_current_user), limit: int = 100):
     transactions = await db.transactions.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(limit)
@@ -652,6 +663,13 @@ async def create_transfer(transfer: TransferRequest, current_user: User = Depend
             {"$inc": {"balance": transfer.amount}}
         )
     
+    # Determine recipient bank name (UK Bank fallback if not recognised)
+    recipient_bank_name = None
+    if to_account:
+        recipient_bank_name = "HSBC UK Bank plc"
+    elif transfer.sort_code:
+        recipient_bank_name = "UK Bank"
+
     # Create transaction record
     transaction = Transaction(
         user_id=current_user.id,
@@ -660,7 +678,11 @@ async def create_transfer(transfer: TransferRequest, current_user: User = Depend
         amount=transfer.amount,
         transaction_type="transfer",
         description=transfer.description or f"Transfer to {transfer.to_account_number}",
-        recipient_name=transfer.recipient_name or "External Account"
+        recipient_name=transfer.recipient_name or "External Account",
+        recipient_sort_code=transfer.sort_code or None,
+        recipient_account_number=transfer.to_account_number,
+        recipient_bank_name=recipient_bank_name,
+        reference=transfer.description or None,
     )
     await db.transactions.insert_one(transaction.dict())
     
@@ -795,6 +817,36 @@ async def unfreeze_card(card_id: str, current_user: User = Depends(get_current_u
         raise HTTPException(status_code=404, detail="Card not found")
     await create_notification(current_user.id, "Card Activated", "Your card has been unfrozen and is now active", "card", {"card_id": card_id, "action": "unfrozen"})
     return {"message": "Card unfrozen successfully"}
+
+class CardUpdateRequest(BaseModel):
+    card_name: Optional[str] = None
+    card_number: Optional[str] = None
+    expiry_date: Optional[str] = None
+
+@api_router.put("/cards/{card_id}")
+async def update_card(card_id: str, data: CardUpdateRequest, current_user: User = Depends(get_current_user)):
+    card = await db.cards.find_one({"id": card_id, "user_id": current_user.id})
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    update_fields = {}
+    if data.card_name is not None and data.card_name.strip():
+        update_fields["card_name"] = data.card_name.strip()
+    if data.card_number is not None and data.card_number.strip():
+        # Strip spaces from card number
+        clean_number = data.card_number.replace(" ", "").replace("-", "")
+        if not clean_number.isdigit() or len(clean_number) < 12:
+            raise HTTPException(status_code=400, detail="Invalid card number")
+        update_fields["card_number"] = clean_number
+    if data.expiry_date is not None and data.expiry_date.strip():
+        update_fields["expiry_date"] = data.expiry_date.strip()
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    await db.cards.update_one({"id": card_id}, {"$set": update_fields})
+    updated = await db.cards.find_one({"id": card_id})
+    updated_dict = dict(updated)
+    updated_dict["card_number_masked"] = mask_card_number(updated["card_number"])
+    del updated_dict["_id"]
+    return updated_dict
 
 # ==================== DASHBOARD STATS ====================
 

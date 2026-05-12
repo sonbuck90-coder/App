@@ -361,6 +361,42 @@ metadata:
   test_sequence: 2
   run_ui: false
 
+  - task: "PUT /api/cards/{card_id} - Update card details"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: PUT /api/cards/{card_id} working correctly. Updating card_name='OLIVER SMITH', card_number='4567890123451234', expiry_date='12/29' returns 200 with raw digits saved, card_number_masked='****1234', and all fields persisted. Invalid card_number 'abc' returns 400 ('Invalid card number'). Empty body returns 400 ('No fields to update')."
+
+  - task: "GET /api/transactions/{id} - Fetch single transaction"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: GET /api/transactions/{transaction_id} returns 200 with the full Transaction object matching the one from GET /api/transactions. GET /api/transactions/nonexistent-id correctly returns 404 ('Transaction not found')."
+
+  - task: "POST /api/transfers - Persist recipient_sort_code/account_number/bank_name (UK Bank fallback)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: POST /api/transfers with sort_code='55-55-55' and to_account_number='99887766' persisted recipient_sort_code='55-55-55', recipient_account_number='99887766', and recipient_bank_name='UK Bank' (fallback applied because sort code does not match an HSBC internal account). Confirmed via GET /api/transactions/{returned.id} that the fields persist in MongoDB."
+
 test_plan:
   current_focus: []
   stuck_tasks: []
@@ -372,3 +408,7 @@ agent_communication:
     message: "Initial implementation complete. Built full VaultBank app with JWT auth, account management, transfers, bill payments, cards. All backend APIs need testing. Frontend UI is rendering correctly. Test credentials: test@vaultbank.com / Test123!"
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE: All 11 backend APIs tested successfully. Authentication, account management, transfers, bill payments, card operations, and dashboard stats all working correctly. No critical issues found. Backend is fully functional and ready for production."
+  - agent: "main"
+    message: "Added three new backend changes that need testing: (1) PUT /api/cards/{card_id} accepts card_name, card_number (>=12 digits), expiry_date and returns updated card with masked card_number. (2) GET /api/transactions/{transaction_id} returns a single transaction for the authenticated user. (3) POST /api/transfers now stores recipient_sort_code, recipient_account_number, and recipient_bank_name (set to 'UK Bank' for external sort codes, 'HSBC UK Bank plc' for internal). Use passcode 0503 via /api/auth/passcode to obtain JWT for testing."
+  - agent: "testing"
+    message: "✅ FOCUSED RETEST COMPLETE (7/7 passed): (1) PUT /api/cards/{card_id} updates card_name/card_number/expiry_date, stores digits-only card_number, returns card_number_masked='****1234'; invalid number → 400; empty body → 400. (2) GET /api/transactions/{id} returns the full Transaction; nonexistent id → 404. (3) POST /api/transfers with sort_code='55-55-55' & to_account_number='99887766' persists recipient_sort_code, recipient_account_number, and recipient_bank_name='UK Bank' (fallback since sort code unknown). All three review-requested endpoints are working. No issues found."
