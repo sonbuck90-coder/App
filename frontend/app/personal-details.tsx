@@ -165,7 +165,12 @@ export default function PersonalDetailsScreen() {
               </View>
             </View>
             <TouchableOpacity style={[s.saveBtn, { backgroundColor: cc.primary }, isSaving && { opacity: 0.7 }]} onPress={handleSaveProfile} disabled={isSaving} testID="save-profile-btn">
-              {isSaving ? <ActivityIndicator color={C.white} /> : <Text style={s.saveBtnText}>Save Changes</Text>}
+              {isSaving ? <ActivityIndicator color={C.white} /> : (
+                <View style={s.saveBtnInner}>
+                  <Ionicons name="information-circle-outline" size={20} color={C.white} />
+                  <Text style={s.saveBtnText}>Save Changes</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
@@ -202,7 +207,12 @@ export default function PersonalDetailsScreen() {
                         <Text style={s.cancelBtnText}>Cancel</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[s.confirmBtn, { backgroundColor: cc.primary }]} onPress={handleSaveAccountDetails} disabled={isSaving} testID={`save-account-${acc.account_type}`}>
-                        {isSaving ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.confirmBtnText}>Save</Text>}
+                        {isSaving ? <ActivityIndicator color={C.white} size="small" /> : (
+                          <View style={s.saveBtnInner}>
+                            <Ionicons name="information-circle-outline" size={18} color={C.white} />
+                            <Text style={s.confirmBtnText}>Save</Text>
+                          </View>
+                        )}
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -282,7 +292,12 @@ export default function PersonalDetailsScreen() {
                           <Text style={s.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[s.confirmBtn, { backgroundColor: cc.primary }]} onPress={handleSaveCardDetails} disabled={isSaving} testID={`save-card-${card.id}`}>
-                          {isSaving ? <ActivityIndicator color={C.white} size="small" /> : <Text style={s.confirmBtnText}>Save</Text>}
+                          {isSaving ? <ActivityIndicator color={C.white} size="small" /> : (
+                            <View style={s.saveBtnInner}>
+                              <Ionicons name="information-circle-outline" size={18} color={C.white} />
+                              <Text style={s.confirmBtnText}>Save</Text>
+                            </View>
+                          )}
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -330,7 +345,8 @@ const s = StyleSheet.create({
   multilineInput: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
   divider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 12 },
   saveBtn: { height: 48, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  saveBtnText: { color: C.white, fontSize: 16, fontWeight: '600' },
+  saveBtnText: { color: C.white, fontSize: 16, fontWeight: '600', marginLeft: 8 },
+  saveBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   // Account details
   accHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   accHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
@@ -346,5 +362,5 @@ const s = StyleSheet.create({
   cancelBtn: { flex: 1, height: 44, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: C.lightGray },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: C.darkGray },
   confirmBtn: { flex: 1, height: 44, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  confirmBtnText: { fontSize: 15, fontWeight: '600', color: C.white },
+  confirmBtnText: { fontSize: 15, fontWeight: '600', color: C.white, marginLeft: 6 },
 });

@@ -389,7 +389,7 @@ async def register(user_data: UserCreate):
     user = User(id=user_id, email=user_data.email, name=user_data.name)
     
     # Welcome notification
-    await create_notification(user_id, "Welcome to HSBC!", f"Hello {user_data.name}, your accounts are ready. You have $5,000 in Checking and $10,000 in Savings.", "welcome")
+    await create_notification(user_id, "Welcome to HSBC!", f"Hello {user_data.name}, your accounts are ready. You have £5,000 in Checking and £10,000 in Savings.", "welcome")
     
     return Token(access_token=access_token, token_type="bearer", user=user)
 
@@ -510,7 +510,7 @@ async def download_csv_statement(current_user: User = Depends(get_current_user),
         status = txn.get("status", "completed").title()
         
         prefix = "+" if txn.get("transaction_type") == "deposit" else "-"
-        writer.writerow([date_str, txn_type, desc, recipient, f"{prefix}${amount:.2f}", status])
+        writer.writerow([date_str, txn_type, desc, recipient, f"{prefix}£{amount:.2f}", status])
     
     output.seek(0)
     return StreamingResponse(
@@ -543,7 +543,7 @@ async def download_pdf_statement(current_user: User = Depends(get_current_user),
     elements.append(Paragraph(f"Customer: {current_user.name}", styles['Normal']))
     elements.append(Paragraph(f"Email: {current_user.email}", styles['Normal']))
     elements.append(Paragraph(f"Date: {datetime.utcnow().strftime('%B %d, %Y')}", styles['Normal']))
-    elements.append(Paragraph(f"Total Balance: ${total_balance:,.2f}", styles['Normal']))
+    elements.append(Paragraph(f"Total Balance: £{total_balance:,.2f}", styles['Normal']))
     elements.append(Spacer(1, 10*mm))
     
     # Table
@@ -556,7 +556,7 @@ async def download_pdf_statement(current_user: User = Depends(get_current_user),
         amount = txn.get("amount", 0)
         prefix = "+" if txn.get("transaction_type") == "deposit" else "-"
         status = txn.get("status", "completed").title()
-        data.append([date_str, txn_type, desc, f"{prefix}${amount:.2f}", status])
+        data.append([date_str, txn_type, desc, f"{prefix}£{amount:.2f}", status])
     
     table = Table(data, colWidths=[80, 60, 180, 80, 60])
     table.setStyle(TableStyle([
@@ -708,7 +708,7 @@ async def create_transfer(transfer: TransferRequest, current_user: User = Depend
     
     # Transfer notification
     recipient = transfer.recipient_name or "External Account"
-    await create_notification(current_user.id, "Transfer Sent", f"${transfer.amount:.2f} sent to {recipient}", "transfer", {"transaction_id": transaction.id, "amount": transfer.amount})
+    await create_notification(current_user.id, "Transfer Sent", f"£{transfer.amount:.2f} sent to {recipient}", "transfer", {"transaction_id": transaction.id, "amount": transfer.amount})
     
     return transaction
 
@@ -778,7 +778,7 @@ async def pay_bill(payment: BillPaymentRequest, current_user: User = Depends(get
     await db.transactions.insert_one(transaction.dict())
     
     # Bill payment notification
-    await create_notification(current_user.id, "Bill Payment", f"${payment.amount:.2f} paid to {biller.name}", "payment", {"transaction_id": transaction.id, "biller": biller.name})
+    await create_notification(current_user.id, "Bill Payment", f"£{payment.amount:.2f} paid to {biller.name}", "payment", {"transaction_id": transaction.id, "biller": biller.name})
     
     return transaction
 
@@ -1273,14 +1273,14 @@ async def chat_with_ai(chat_req: ChatRequest, current_user: User = Depends(get_c
             ts_str = ts.strftime("%b %d, %Y at %I:%M %p")
         else:
             ts_str = str(ts)
-        txn_summary += f"- {txn_type.title()}: ${amount:.2f} to {recipient or 'N/A'} ({desc}) on {ts_str}\n"
+        txn_summary += f"- {txn_type.title()}: £{amount:.2f} to {recipient or 'N/A'} ({desc}) on {ts_str}\n"
     
     accounts_summary = ""
     for acc in accounts:
         acc_type = acc.get("account_type", "unknown").title()
         balance = acc.get("balance", 0)
         acc_num = acc.get("account_number", "")
-        accounts_summary += f"- {acc_type} Account (****{acc_num[-4:]}): ${balance:.2f}\n"
+        accounts_summary += f"- {acc_type} Account (****{acc_num[-4:]}): £{balance:.2f}\n"
     
     system_msg = f"""You are Ellie, HSBC's friendly AI Banking Assistant. You are helpful, warm, professional, and concise.
 You have access to the customer's financial information:
