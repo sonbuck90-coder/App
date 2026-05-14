@@ -175,16 +175,12 @@ export default function TransfersScreen() {
     setShowReview(true);
   };
 
-  // Second step: user has confirmed the review → authenticate, run the
-  // simulated processing screen (3 s), and create the transfer.
+  // Second step: user has confirmed the review → run the simulated processing
+  // screen (3 s) and create the transfer. The Review screen itself is the
+  // confirmation — we used to also pop an extra Face ID gate here, but on
+  // iOS Expo Go that Modal-in-Modal could fail to display, freezing the flow.
   const handleConfirmAndSend = async () => {
     if (!selectedAccount || isProcessing) return;
-
-    const authed = await authGate.confirm({
-      title: 'Confirm payment',
-      subtitle: `Authorise £${parseFloat(amount).toFixed(2)} to ${recipientName} · ${sortCode} ${recipientAccount}`,
-    });
-    if (!authed) return;
 
     const transferAmount = parseFloat(amount);
     setIsProcessing(true);
@@ -242,6 +238,79 @@ export default function TransfersScreen() {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={customColors.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  // Review Screen — full-screen replacement of the form (no Modal stacking).
+  if (showReview) {
+    return (
+      <SafeAreaView style={styles.reviewContainer} edges={['top']}>
+        <View style={[styles.reviewHeader, { backgroundColor: customColors.header }]}>
+          <TouchableOpacity onPress={() => !isProcessing && setShowReview(false)} disabled={isProcessing} style={styles.reviewBackBtn} testID="review-back-btn">
+            <Ionicons name="chevron-back" size={26} color={headerTextColor} />
+          </TouchableOpacity>
+          <Text style={[styles.reviewHeaderTitle, { color: headerTextColor }]}>Review payment</Text>
+          <View style={{ width: 26 }} />
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+          <Text style={styles.reviewIntro}>Please check the details below. Once you tap &quot;Confirm &amp; Send&quot; the payment will be processed.</Text>
+
+          <View style={styles.reviewCard}>
+            <Text style={styles.reviewAmountLabel}>Amount</Text>
+            <Text style={[styles.reviewAmount, { color: customColors.primary }]}>£{(parseFloat(amount || '0')).toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.reviewCard}>
+            <Text style={styles.reviewSectionTitle}>To</Text>
+            <View style={styles.reviewRow}><Text style={styles.reviewKey}>Recipient</Text><Text style={styles.reviewVal}>{recipientName || '—'}</Text></View>
+            <View style={styles.reviewRow}><Text style={styles.reviewKey}>Sort code</Text><Text style={styles.reviewVal}>{sortCode || '—'}</Text></View>
+            <View style={styles.reviewRow}><Text style={styles.reviewKey}>Account number</Text><Text style={styles.reviewVal}>{recipientAccount || '—'}</Text></View>
+            {bankLookupResult?.bankName && (
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Bank</Text><Text style={styles.reviewVal}>{bankLookupResult.bankName}</Text></View>
+            )}
+            {!!description && (
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Reference</Text><Text style={styles.reviewVal}>{description}</Text></View>
+            )}
+          </View>
+
+          <View style={styles.reviewCard}>
+            <Text style={styles.reviewSectionTitle}>From</Text>
+            <View style={styles.reviewRow}><Text style={styles.reviewKey}>Account</Text><Text style={styles.reviewVal}>{selectedAccount ? `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}` : '—'}</Text></View>
+            <View style={styles.reviewRow}><Text style={styles.reviewKey}>Available balance</Text><Text style={styles.reviewVal}>£{(selectedAccount?.balance || 0).toFixed(2)}</Text></View>
+          </View>
+
+          <View style={styles.reviewNotice}>
+            <Ionicons name="shield-checkmark-outline" size={18} color={customColors.accent} />
+            <Text style={styles.reviewNoticeText}>This payment is protected by your bank&apos;s secure authentication.</Text>
+          </View>
+        </ScrollView>
+
+        <View style={styles.reviewFooter}>
+          <TouchableOpacity
+            style={[styles.confirmBtn, { backgroundColor: customColors.primary }, isProcessing && { opacity: 0.7 }]}
+            onPress={handleConfirmAndSend}
+            disabled={isProcessing}
+            testID="confirm-send-btn"
+          >
+            {isProcessing ? (
+              <View style={styles.processingContainer}>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.confirmBtnText}>Processing… {processingProgress}%</Text>
+              </View>
+            ) : (
+              <Text style={styles.confirmBtnText}>Confirm &amp; Send</Text>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.editBtn}
+            onPress={() => !isProcessing && setShowReview(false)}
+            disabled={isProcessing}
+          >
+            <Text style={styles.editBtnText}>Edit details</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -612,78 +681,6 @@ export default function TransfersScreen() {
           <View style={styles.bottomPadding} />
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Review / Confirmation modal */}
-      <Modal visible={showReview} transparent={false} animationType="slide" onRequestClose={() => !isProcessing && setShowReview(false)}>
-        <SafeAreaView style={styles.reviewContainer} edges={['top']}>
-          <View style={[styles.reviewHeader, { backgroundColor: customColors.header }]}>
-            <TouchableOpacity onPress={() => !isProcessing && setShowReview(false)} disabled={isProcessing} style={styles.reviewBackBtn}>
-              <Ionicons name="chevron-back" size={26} color={headerTextColor} />
-            </TouchableOpacity>
-            <Text style={[styles.reviewHeaderTitle, { color: headerTextColor }]}>Review payment</Text>
-            <View style={{ width: 26 }} />
-          </View>
-
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
-            <Text style={styles.reviewIntro}>Please check the details below. Once you tap "Confirm &amp; Send" the payment will be processed.</Text>
-
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewAmountLabel}>Amount</Text>
-              <Text style={[styles.reviewAmount, { color: customColors.primary }]}>£{(parseFloat(amount || '0')).toFixed(2)}</Text>
-            </View>
-
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewSectionTitle}>To</Text>
-              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Recipient</Text><Text style={styles.reviewVal}>{recipientName || '—'}</Text></View>
-              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Sort code</Text><Text style={styles.reviewVal}>{sortCode || '—'}</Text></View>
-              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Account number</Text><Text style={styles.reviewVal}>{recipientAccount || '—'}</Text></View>
-              {bankLookupResult?.bankName && (
-                <View style={styles.reviewRow}><Text style={styles.reviewKey}>Bank</Text><Text style={styles.reviewVal}>{bankLookupResult.bankName}</Text></View>
-              )}
-              {!!description && (
-                <View style={styles.reviewRow}><Text style={styles.reviewKey}>Reference</Text><Text style={styles.reviewVal}>{description}</Text></View>
-              )}
-            </View>
-
-            <View style={styles.reviewCard}>
-              <Text style={styles.reviewSectionTitle}>From</Text>
-              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Account</Text><Text style={styles.reviewVal}>{selectedAccount ? `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}` : '—'}</Text></View>
-              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Available balance</Text><Text style={styles.reviewVal}>£{(selectedAccount?.balance || 0).toFixed(2)}</Text></View>
-            </View>
-
-            <View style={styles.reviewNotice}>
-              <Ionicons name="shield-checkmark-outline" size={18} color={customColors.accent} />
-              <Text style={styles.reviewNoticeText}>This payment is protected by your bank's secure authentication.</Text>
-            </View>
-          </ScrollView>
-
-          <View style={styles.reviewFooter}>
-            <TouchableOpacity
-              style={[styles.confirmBtn, { backgroundColor: customColors.primary }, isProcessing && { opacity: 0.7 }]}
-              onPress={handleConfirmAndSend}
-              disabled={isProcessing}
-            >
-              {isProcessing ? (
-                <View style={styles.processingContainer}>
-                  <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.confirmBtnText}>Processing… {processingProgress}%</Text>
-                </View>
-              ) : (
-                <Text style={styles.confirmBtnText}>Confirm &amp; Send</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() => !isProcessing && setShowReview(false)}
-              disabled={isProcessing}
-            >
-              <Text style={styles.editBtnText}>Edit details</Text>
-            </TouchableOpacity>
-          </View>
-        </SafeAreaView>
-      </Modal>
-
-      <authGate.Render />
     </SafeAreaView>
   );
 }
