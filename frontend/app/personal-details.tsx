@@ -1,34 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { api, accountsApi, cardsApi, Account, Card } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 
-const C = { white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5' };
+const C = {
+  white: '#FFFFFF',
+  bg: '#F6F7F9',
+  cardBg: '#FFFFFF',
+  inputBg: '#EDF0F4',
+  lightBorder: '#E8EBEE',
+  divider: '#EEF0F3',
+  gray: '#8893A3',
+  midGray: '#5E6A7A',
+  darkText: '#0B1424',
+  black: '#000000',
+  brandBlue: '#1574EE',
+  success: '#00847F',
+};
 
 export default function PersonalDetailsScreen() {
   const router = useRouter();
   const { colors: cc } = useCustomization();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Profile fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
-  const [editSortCode, setEditSortCode] = useState('');
-  const [editAccountNumber, setEditAccountNumber] = useState('');
-  // Cards
-  const [cards, setCards] = useState<Card[]>([]);
-  const [editingCardId, setEditingCardId] = useState<string | null>(null);
-  const [editCardName, setEditCardName] = useState('');
-  const [editCardNumber, setEditCardNumber] = useState('');
-  const [editCardExpiry, setEditCardExpiry] = useState('');
 
-  useEffect(() => { load(); }, []);
+  // Bank accounts + cards
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [cards, setCards] = useState<Card[]>([]);
+
+  // Track which field row is being edited (inline)
+  const [editingField, setEditingField] = useState<string | null>(null);
+  // Editable bank fields per account (keyed by account.id)
+  const [acctEdits, setAcctEdits] = useState<Record<string, { sort_code: string; account_number: string }>>({});
+  // Editable card fields per card.id
+  const [cardEdits, setCardEdits] = useState<Record<string, { card_name: string; card_number: string; expiry_date: string }>>({});
+
+  useEffect(() => {
+    load();
+  }, []);
 
   const load = async () => {
     try {
@@ -44,342 +73,485 @@ export default function PersonalDetailsScreen() {
       setAddress(p.address || '');
       setAccounts(accountsRes.data);
       setCards(cardsRes.data);
-    } catch (e) { console.error(e); }
-    finally { setIsLoading(false); }
-  };
 
-  const handleSaveProfile = async () => {
-    if (!name.trim()) { Alert.alert('Error', 'Name is required'); return; }
-    setIsSaving(true);
-    try {
-      await api.put('/profile', { name: name.trim(), email: email.trim(), phone: phone.trim(), address: address.trim() });
-      Alert.alert('Saved', 'Personal details updated successfully');
-    } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed to save'); }
-    finally { setIsSaving(false); }
-  };
-
-  const startEditAccount = (acc: Account) => {
-    setEditingAccountId(acc.id);
-    setEditSortCode(acc.sort_code || '');
-    setEditAccountNumber(acc.account_number || '');
-  };
-
-  const handleSaveAccountDetails = async () => {
-    if (!editingAccountId) return;
-    if (!editSortCode.trim() || !editAccountNumber.trim()) {
-      Alert.alert('Error', 'Sort code and account number are required');
-      return;
-    }
-    setIsSaving(true);
-    try {
-      await api.put('/accounts/details', {
-        account_id: editingAccountId,
-        sort_code: editSortCode.trim(),
-        account_number: editAccountNumber.trim(),
+      // Seed edit maps
+      const aMap: Record<string, any> = {};
+      accountsRes.data.forEach((a) => {
+        aMap[a.id] = { sort_code: a.sort_code || '', account_number: a.account_number || '' };
       });
-      Alert.alert('Saved', 'Account details updated');
-      setEditingAccountId(null);
-      load();
-    } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed to save'); }
-    finally { setIsSaving(false); }
+      setAcctEdits(aMap);
+      const cMap: Record<string, any> = {};
+      cardsRes.data.forEach((c) => {
+        cMap[c.id] = {
+          card_name: c.card_name || '',
+          card_number: c.card_number || '',
+          expiry_date: c.expiry_date || '',
+        };
+      });
+      setCardEdits(cMap);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const startEditCard = (card: Card) => {
-    setEditingCardId(card.id);
-    setEditCardName(card.card_name || '');
-    setEditCardNumber(card.card_number || '');
-    setEditCardExpiry(card.expiry_date || '');
-  };
-
-  const formatCardNumber = (text: string) => {
-    const digits = text.replace(/\D/g, '').slice(0, 19);
-    return digits.replace(/(.{4})/g, '$1 ').trim();
-  };
-
+  const formatCardNumber = (text: string) => text.replace(/\D/g, '').slice(0, 19).replace(/(.{4})/g, '$1 ').trim();
   const formatExpiry = (text: string) => {
-    const digits = text.replace(/\D/g, '').slice(0, 4);
-    if (digits.length <= 2) return digits;
-    return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    const d = text.replace(/\D/g, '').slice(0, 4);
+    return d.length <= 2 ? d : `${d.slice(0, 2)}/${d.slice(2)}`;
   };
 
-  const handleSaveCardDetails = async () => {
-    if (!editingCardId) return;
-    if (!editCardName.trim() || !editCardNumber.trim() || !editCardExpiry.trim()) {
-      Alert.alert('Error', 'All card fields are required');
-      return;
-    }
-    const cleanNumber = editCardNumber.replace(/\s/g, '');
-    if (cleanNumber.length < 12) {
-      Alert.alert('Error', 'Card number must be at least 12 digits');
+  const saveAll = useCallback(async () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Full name is required');
       return;
     }
     setIsSaving(true);
+    let savedAny = false;
     try {
-      await cardsApi.update(editingCardId, {
-        card_name: editCardName.trim(),
-        card_number: cleanNumber,
-        expiry_date: editCardExpiry.trim(),
+      // 1. Profile
+      await api.put('/profile', {
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        address: address.trim(),
       });
-      Alert.alert('Saved', 'Card details updated');
-      setEditingCardId(null);
-      load();
-    } catch (e: any) { Alert.alert('Error', e.response?.data?.detail || 'Failed to save'); }
-    finally { setIsSaving(false); }
-  };
+      savedAny = true;
 
-  if (isLoading) return <SafeAreaView style={s.loading}><ActivityIndicator size="large" color={cc.primary} /></SafeAreaView>;
+      // 2. Accounts (only changed)
+      for (const acc of accounts) {
+        const edit = acctEdits[acc.id];
+        if (!edit) continue;
+        if (
+          (edit.sort_code && edit.sort_code !== acc.sort_code) ||
+          (edit.account_number && edit.account_number !== acc.account_number)
+        ) {
+          await api.put('/accounts/details', {
+            account_id: acc.id,
+            sort_code: edit.sort_code,
+            account_number: edit.account_number,
+          });
+          savedAny = true;
+        }
+      }
+
+      // 3. Cards (only changed)
+      for (const card of cards) {
+        const edit = cardEdits[card.id];
+        if (!edit) continue;
+        const cleanNum = edit.card_number.replace(/\s/g, '');
+        const changed =
+          (edit.card_name && edit.card_name !== card.card_name) ||
+          (cleanNum && cleanNum !== card.card_number) ||
+          (edit.expiry_date && edit.expiry_date !== card.expiry_date);
+        if (changed) {
+          if (cleanNum && cleanNum.length < 12) {
+            throw new Error('Card number must be at least 12 digits');
+          }
+          await cardsApi.update(card.id, {
+            card_name: edit.card_name,
+            card_number: cleanNum,
+            expiry_date: edit.expiry_date,
+          });
+          savedAny = true;
+        }
+      }
+
+      Alert.alert('Saved', savedAny ? 'Your details have been updated.' : 'No changes to save.');
+      setEditingField(null);
+      load();
+    } catch (e: any) {
+      Alert.alert('Save Failed', e.response?.data?.detail || e.message || 'Could not save changes');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [name, email, phone, address, accounts, cards, acctEdits, cardEdits]);
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={s.loading} edges={['top']}>
+        <ActivityIndicator size="large" color={cc.primary} />
+      </SafeAreaView>
+    );
+  }
+
+  const initials = (name || 'O').trim().split(/\s+/).map((n) => n[0]).slice(0, 2).join('').toUpperCase();
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      <View style={[s.header, { backgroundColor: cc.primary }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn">
-          <Ionicons name="arrow-back" size={24} color={C.white} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Personal Details</Text>
+      {/* Top brand bar */}
+      <View style={s.brandBar}>
+        <View style={s.brandLeft}>
+          <View style={[s.brandLogo, { backgroundColor: cc.primary }]} />
+          <Text style={s.brandText}>
+            HSBC <Text style={s.brandTextLight}>UK</Text>
+          </Text>
+        </View>
+        <View style={[s.brandLogoBox, { borderColor: cc.primary }]}>
+          <View style={[s.brandLogoInner, { backgroundColor: cc.primary }]} />
+        </View>
       </View>
 
+      {/* Title row */}
+      <View style={s.titleBar}>
+        <TouchableOpacity onPress={() => router.back()} style={s.iconBtn} testID="back-btn" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="arrow-back" size={24} color={C.darkText} />
+        </TouchableOpacity>
+        <Text style={s.titleText}>Personal details</Text>
+        <TouchableOpacity
+          onPress={saveAll}
+          disabled={isSaving}
+          style={s.iconBtn}
+          testID="save-profile-btn"
+          accessibilityLabel="Save personal details"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          {isSaving ? (
+            <ActivityIndicator color={C.brandBlue} />
+          ) : (
+            <Ionicons name="information-circle-outline" size={28} color={C.brandBlue} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={s.headerDivider} />
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-        <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Personal Info */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Personal Information</Text>
-            <View style={s.card}>
-              <View style={s.field}>
-                <Text style={s.label}>Full Name</Text>
-                <TextInput style={s.input} value={name} onChangeText={setName} placeholder="Enter your name" placeholderTextColor={C.gray} testID="name-input" />
-              </View>
-              <View style={s.divider} />
-              <View style={s.field}>
-                <Text style={s.label}>Email Address</Text>
-                <TextInput style={s.input} value={email} onChangeText={setEmail} placeholder="Enter your email" placeholderTextColor={C.gray} keyboardType="email-address" autoCapitalize="none" testID="email-input" />
-              </View>
-              <View style={s.divider} />
-              <View style={s.field}>
-                <Text style={s.label}>Phone Number</Text>
-                <TextInput style={s.input} value={phone} onChangeText={setPhone} placeholder="Enter phone number" placeholderTextColor={C.gray} keyboardType="phone-pad" testID="phone-input" />
-              </View>
-              <View style={s.divider} />
-              <View style={s.field}>
-                <Text style={s.label}>Address</Text>
-                <TextInput style={[s.input, s.multilineInput]} value={address} onChangeText={setAddress} placeholder="Enter your address" placeholderTextColor={C.gray} multiline numberOfLines={3} testID="address-input" />
-              </View>
-            </View>
-            <TouchableOpacity
-              style={[s.iconSaveBtn, { backgroundColor: cc.primary }, isSaving && { opacity: 0.7 }]}
-              onPress={handleSaveProfile}
-              disabled={isSaving}
-              testID="save-profile-btn"
-              accessibilityLabel="Save personal information"
-            >
-              {isSaving ? (
-                <ActivityIndicator color={C.white} />
-              ) : (
-                <Ionicons name="information-circle" size={28} color={C.white} />
-              )}
-            </TouchableOpacity>
-            <Text style={s.iconSaveHint}>Tap to save</Text>
-          </View>
-
-          {/* Account Details */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Account Details</Text>
-            {accounts.map((acc) => (
-              <View key={acc.id} style={s.card}>
-                <View style={s.accHeader}>
-                  <View style={s.accHeaderLeft}>
-                    <View style={[s.accDot, { backgroundColor: acc.account_type === 'checking' ? cc.primary : C.success }]} />
-                    <Text style={s.accTitle}>{acc.account_type === 'checking' ? 'Current Account' : 'Savings Account'}</Text>
-                  </View>
-                  {editingAccountId !== acc.id && (
-                    <TouchableOpacity onPress={() => startEditAccount(acc)} testID={`edit-account-${acc.account_type}`}>
-                      <Ionicons name="create-outline" size={20} color={cc.primary} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                {editingAccountId === acc.id ? (
-                  /* Edit Mode */
-                  <View style={s.editSection}>
-                    <View style={s.field}>
-                      <Text style={s.label}>Sort Code</Text>
-                      <TextInput style={s.input} value={editSortCode} onChangeText={setEditSortCode} placeholder="XX-XX-XX" placeholderTextColor={C.gray} testID={`sort-code-edit-${acc.account_type}`} />
-                    </View>
-                    <View style={s.field}>
-                      <Text style={s.label}>Account Number</Text>
-                      <TextInput style={s.input} value={editAccountNumber} onChangeText={setEditAccountNumber} placeholder="12345678" placeholderTextColor={C.gray} keyboardType="numeric" testID={`acc-num-edit-${acc.account_type}`} />
-                    </View>
-                    <View style={s.editBtns}>
-                      <TouchableOpacity style={s.cancelBtn} onPress={() => setEditingAccountId(null)}>
-                        <Text style={s.cancelBtnText}>Cancel</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[s.iconSaveBtnSmall, { backgroundColor: cc.primary }]}
-                        onPress={handleSaveAccountDetails}
-                        disabled={isSaving}
-                        testID={`save-account-${acc.account_type}`}
-                        accessibilityLabel="Save account details"
-                      >
-                        {isSaving ? (
-                          <ActivityIndicator color={C.white} size="small" />
-                        ) : (
-                          <Ionicons name="information-circle" size={24} color={C.white} />
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={s.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Profile Photo Card */}
+          <View style={s.profileCard}>
+            <View style={s.avatarRing}>
+              <View style={s.avatarInner}>
+                {initials ? (
+                  <Text style={[s.avatarInitials, { color: cc.primary }]}>{initials}</Text>
                 ) : (
-                  /* Display Mode */
-                  <View style={s.accDisplay}>
-                    <View style={s.accRow}>
-                      <Text style={s.accLabel}>Sort Code</Text>
-                      <Text style={s.accValue}>{acc.sort_code || 'Not set'}</Text>
-                    </View>
-                    <View style={s.accRow}>
-                      <Text style={s.accLabel}>Account Number</Text>
-                      <Text style={s.accValue}>{acc.account_number || 'Not set'}</Text>
-                    </View>
-                  </View>
+                  <Ionicons name="person" size={48} color="#A4B0BE" />
                 )}
               </View>
-            ))}
+            </View>
+            <View style={s.profileCardText}>
+              <Text style={s.profileCardTitle}>Profile Photo</Text>
+              <Text style={s.profileCardSubtitle}>Your profile picture</Text>
+            </View>
           </View>
 
-          {/* Bank Cards */}
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Bank Cards</Text>
-            {cards.length === 0 ? (
-              <View style={s.card}>
-                <Text style={s.accLabel}>No cards on file</Text>
-              </View>
-            ) : (
-              cards.map((card) => (
-                <View key={card.id} style={s.card}>
-                  <View style={s.accHeader}>
-                    <View style={s.accHeaderLeft}>
-                      <Ionicons name="card" size={20} color={cc.primary} style={{ marginRight: 8 }} />
-                      <Text style={s.accTitle}>{card.card_name || (card.card_type === 'credit' ? 'Credit Card' : 'Debit Card')}</Text>
-                    </View>
-                    {editingCardId !== card.id && (
-                      <TouchableOpacity onPress={() => startEditCard(card)} testID={`edit-card-${card.id}`}>
-                        <Ionicons name="create-outline" size={20} color={cc.primary} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
+          {/* PERSONAL INFORMATION */}
+          <Text style={s.sectionLabel}>PERSONAL INFORMATION</Text>
+          <View style={s.detailsCard}>
+            <DetailField
+              label="Full Name"
+              value={name}
+              onChangeText={setName}
+              fieldKey="name"
+              editingField={editingField}
+              setEditingField={setEditingField}
+              isLast={false}
+            />
+            <DetailField
+              label="Email Address"
+              value={email}
+              onChangeText={setEmail}
+              fieldKey="email"
+              editingField={editingField}
+              setEditingField={setEditingField}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              isLast={false}
+            />
+            <DetailField
+              label="Phone Number"
+              value={phone}
+              onChangeText={setPhone}
+              fieldKey="phone"
+              editingField={editingField}
+              setEditingField={setEditingField}
+              keyboardType="phone-pad"
+              isLast={false}
+            />
+            <DetailField
+              label="Address"
+              value={address}
+              onChangeText={setAddress}
+              fieldKey="address"
+              editingField={editingField}
+              setEditingField={setEditingField}
+              multiline
+              isLast={true}
+            />
+          </View>
 
-                  {editingCardId === card.id ? (
-                    <View style={s.editSection}>
-                      <View style={s.field}>
-                        <Text style={s.label}>Cardholder Name</Text>
-                        <TextInput style={s.input} value={editCardName} onChangeText={setEditCardName} placeholder="OLIVER SMITH" placeholderTextColor={C.gray} autoCapitalize="characters" testID={`card-name-edit-${card.id}`} />
-                      </View>
-                      <View style={s.field}>
-                        <Text style={s.label}>Card Number</Text>
-                        <TextInput
-                          style={s.input}
-                          value={editCardNumber}
-                          onChangeText={(t) => setEditCardNumber(formatCardNumber(t))}
-                          placeholder="1234 5678 9012 3456"
-                          placeholderTextColor={C.gray}
-                          keyboardType="numeric"
-                          maxLength={23}
-                          testID={`card-number-edit-${card.id}`}
-                        />
-                      </View>
-                      <View style={s.field}>
-                        <Text style={s.label}>Expiry Date</Text>
-                        <TextInput
-                          style={s.input}
-                          value={editCardExpiry}
-                          onChangeText={(t) => setEditCardExpiry(formatExpiry(t))}
-                          placeholder="MM/YY"
-                          placeholderTextColor={C.gray}
-                          keyboardType="numeric"
-                          maxLength={5}
-                          testID={`card-expiry-edit-${card.id}`}
-                        />
-                      </View>
-                      <View style={s.editBtns}>
-                        <TouchableOpacity style={s.cancelBtn} onPress={() => setEditingCardId(null)}>
-                          <Text style={s.cancelBtnText}>Cancel</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[s.iconSaveBtnSmall, { backgroundColor: cc.primary }]}
-                          onPress={handleSaveCardDetails}
-                          disabled={isSaving}
-                          testID={`save-card-${card.id}`}
-                          accessibilityLabel="Save card details"
-                        >
-                          {isSaving ? (
-                            <ActivityIndicator color={C.white} size="small" />
-                          ) : (
-                            <Ionicons name="information-circle" size={24} color={C.white} />
-                          )}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  ) : (
-                    <View style={s.accDisplay}>
-                      <View style={s.accRow}>
-                        <Text style={s.accLabel}>Cardholder</Text>
-                        <Text style={s.accValue}>{card.card_name || '—'}</Text>
-                      </View>
-                      <View style={s.accRow}>
-                        <Text style={s.accLabel}>Card Number</Text>
-                        <Text style={s.accValue}>{card.card_number_masked || '—'}</Text>
-                      </View>
-                      <View style={s.accRow}>
-                        <Text style={s.accLabel}>Expires</Text>
-                        <Text style={s.accValue}>{card.expiry_date || '—'}</Text>
-                      </View>
-                    </View>
-                  )}
+          {/* BANK DETAILS */}
+          <Text style={s.sectionLabel}>BANK DETAILS</Text>
+          {accounts.map((acc) => {
+            const e = acctEdits[acc.id] || { sort_code: '', account_number: '' };
+            const label = acc.account_type === 'checking' ? 'Current Account' : 'Savings Account';
+            return (
+              <View key={acc.id} style={s.detailsCard}>
+                <View style={s.bankHeader}>
+                  <View style={[s.bankDot, { backgroundColor: acc.account_type === 'checking' ? cc.primary : C.success }]} />
+                  <Text style={s.bankTitle}>{label}</Text>
                 </View>
-              ))
-            )}
-          </View>
+                <View style={s.divider} />
+                <DetailField
+                  label="Sort Code"
+                  value={e.sort_code}
+                  onChangeText={(v) => setAcctEdits((p) => ({ ...p, [acc.id]: { ...p[acc.id], sort_code: v } }))}
+                  fieldKey={`sort-${acc.id}`}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  isLast={false}
+                />
+                <DetailField
+                  label="Account Number"
+                  value={e.account_number}
+                  onChangeText={(v) => setAcctEdits((p) => ({ ...p, [acc.id]: { ...p[acc.id], account_number: v } }))}
+                  fieldKey={`acc-${acc.id}`}
+                  editingField={editingField}
+                  setEditingField={setEditingField}
+                  keyboardType="numeric"
+                  isLast={true}
+                />
+              </View>
+            );
+          })}
 
-          <View style={{ height: 40 }} />
+          {/* CARD DETAILS */}
+          {cards.length > 0 && (
+            <>
+              <Text style={s.sectionLabel}>CARD DETAILS</Text>
+              {cards.map((card) => {
+                const e = cardEdits[card.id] || { card_name: '', card_number: '', expiry_date: '' };
+                const display = card.card_number_masked || '';
+                return (
+                  <View key={card.id} style={s.detailsCard}>
+                    <View style={s.bankHeader}>
+                      <Ionicons name="card" size={18} color={cc.primary} style={{ marginRight: 10 }} />
+                      <Text style={s.bankTitle}>{card.card_type === 'credit' ? 'Credit Card' : 'Debit Card'}</Text>
+                    </View>
+                    <View style={s.divider} />
+                    <DetailField
+                      label="Cardholder Name"
+                      value={e.card_name}
+                      onChangeText={(v) => setCardEdits((p) => ({ ...p, [card.id]: { ...p[card.id], card_name: v.toUpperCase() } }))}
+                      fieldKey={`cn-${card.id}`}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      autoCapitalize="characters"
+                      isLast={false}
+                    />
+                    <DetailField
+                      label="Card Number"
+                      value={editingField === `num-${card.id}` ? formatCardNumber(e.card_number) : (display || formatCardNumber(e.card_number))}
+                      onChangeText={(v) => setCardEdits((p) => ({ ...p, [card.id]: { ...p[card.id], card_number: v.replace(/\s/g, '') } }))}
+                      fieldKey={`num-${card.id}`}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      keyboardType="numeric"
+                      maxLength={23}
+                      isLast={false}
+                    />
+                    <DetailField
+                      label="Expiry Date"
+                      value={editingField === `exp-${card.id}` ? formatExpiry(e.expiry_date) : e.expiry_date}
+                      onChangeText={(v) => setCardEdits((p) => ({ ...p, [card.id]: { ...p[card.id], expiry_date: formatExpiry(v) } }))}
+                      fieldKey={`exp-${card.id}`}
+                      editingField={editingField}
+                      setEditingField={setEditingField}
+                      keyboardType="numeric"
+                      maxLength={5}
+                      isLast={true}
+                    />
+                  </View>
+                );
+              })}
+            </>
+          )}
+
+          <View style={{ height: 50 }} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+// =============== Inline-Editable Field Row ===============
+interface DetailFieldProps {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  fieldKey: string;
+  editingField: string | null;
+  setEditingField: (k: string | null) => void;
+  keyboardType?: any;
+  autoCapitalize?: any;
+  multiline?: boolean;
+  isLast?: boolean;
+  maxLength?: number;
+}
+
+function DetailField({
+  label,
+  value,
+  onChangeText,
+  fieldKey,
+  editingField,
+  setEditingField,
+  keyboardType,
+  autoCapitalize,
+  multiline,
+  isLast,
+  maxLength,
+}: DetailFieldProps) {
+  const isEditing = editingField === fieldKey;
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => setEditingField(fieldKey)}
+      style={[s.fieldRow, !isLast && s.fieldRowBorder]}
+      testID={`field-${fieldKey}`}
+    >
+      <Text style={s.fieldLabel}>{label}</Text>
+      {isEditing ? (
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          style={[s.fieldInput, multiline && s.fieldInputMulti]}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          multiline={multiline}
+          autoFocus
+          maxLength={maxLength}
+          onBlur={() => setEditingField(null)}
+          placeholder="Enter value"
+          placeholderTextColor={C.gray}
+        />
+      ) : (
+        <Text style={[s.fieldValue, !value && s.fieldValueEmpty]} numberOfLines={multiline ? 3 : 1}>
+          {value || 'Tap to add'}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
-  header: { paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center' },
-  backBtn: { marginRight: 16 },
-  headerTitle: { fontSize: 20, fontWeight: '600', color: C.white },
+
+  // Brand bar
+  brandBar: {
+    backgroundColor: C.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+  },
+  brandLeft: { flexDirection: 'row', alignItems: 'center' },
+  brandLogo: { width: 24, height: 24, marginRight: 8 },
+  brandText: { fontSize: 18, fontWeight: '700', color: C.darkText, letterSpacing: 0.3 },
+  brandTextLight: { fontWeight: '500', color: C.darkText },
+  brandLogoBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandLogoInner: { width: 18, height: 18 },
+
+  // Title bar
+  titleBar: {
+    backgroundColor: C.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 16,
+  },
+  iconBtn: { padding: 4 },
+  titleText: { fontSize: 22, fontWeight: '700', color: C.darkText, letterSpacing: -0.2 },
+  headerDivider: { height: 1, backgroundColor: C.lightBorder },
+
   scroll: { flex: 1 },
-  section: { marginHorizontal: 16, marginTop: 20 },
-  sectionTitle: { fontSize: 17, fontWeight: '600', color: C.darkGray, marginBottom: 12 },
-  card: { backgroundColor: C.white, borderRadius: 8, padding: 16, marginBottom: 12 },
-  field: { marginBottom: 12 },
-  label: { fontSize: 13, fontWeight: '600', color: C.gray, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: { backgroundColor: C.lightGray, borderRadius: 6, paddingHorizontal: 14, height: 48, fontSize: 16, color: C.black, borderWidth: 1, borderColor: '#E0E0E0' },
-  multilineInput: { height: 80, paddingTop: 12, textAlignVertical: 'top' },
-  divider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 12 },
-  saveBtn: { height: 48, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  saveBtnText: { color: C.white, fontSize: 16, fontWeight: '600', marginLeft: 8 },
-  saveBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  iconSaveBtn: { alignSelf: 'center', width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 4 },
-  iconSaveBtnSmall: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
-  iconSaveHint: { fontSize: 12, color: C.gray, textAlign: 'center', marginTop: 6, fontWeight: '500' },
-  // Account details
-  accHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  accHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
-  accDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
-  accTitle: { fontSize: 16, fontWeight: '600', color: C.darkGray },
-  accDisplay: { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12 },
-  accRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8 },
-  accLabel: { fontSize: 14, color: C.gray },
-  accValue: { fontSize: 16, fontWeight: '600', color: C.darkGray, letterSpacing: 0.5 },
-  // Edit mode
-  editSection: { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12 },
-  editBtns: { flexDirection: 'row', marginTop: 4, gap: 10, alignItems: 'center', justifyContent: 'flex-end' },
-  cancelBtn: { flex: 1, height: 44, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: C.lightGray },
-  cancelBtnText: { fontSize: 15, fontWeight: '600', color: C.darkGray },
-  confirmBtn: { flex: 1, height: 44, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  confirmBtnText: { fontSize: 15, fontWeight: '600', color: C.white, marginLeft: 6 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 24 },
+
+  // Profile photo card
+  profileCard: {
+    backgroundColor: '#EEF1F4',
+    borderRadius: 14,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarRing: {
+    width: 78,
+    height: 78,
+    borderRadius: 39,
+    borderWidth: 1,
+    borderColor: '#D8DEE6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.white,
+  },
+  avatarInner: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#E5EAF1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: { fontSize: 26, fontWeight: '700' },
+  profileCardText: { marginLeft: 18, flex: 1 },
+  profileCardTitle: { fontSize: 19, fontWeight: '700', color: C.darkText },
+  profileCardSubtitle: { fontSize: 14, color: C.midGray, marginTop: 2 },
+
+  // Section label
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8893A3',
+    letterSpacing: 1.2,
+    marginTop: 26,
+    marginBottom: 10,
+    marginLeft: 4,
+  },
+
+  // Details card
+  detailsCard: {
+    backgroundColor: C.cardBg,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: C.lightBorder,
+    overflow: 'hidden',
+  },
+  fieldRow: { paddingHorizontal: 18, paddingVertical: 14 },
+  fieldRowBorder: { borderBottomWidth: 1, borderBottomColor: C.divider },
+  fieldLabel: { fontSize: 13, color: C.midGray, fontWeight: '400', marginBottom: 4 },
+  fieldValue: { fontSize: 19, fontWeight: '700', color: C.darkText, letterSpacing: -0.2 },
+  fieldValueEmpty: { color: C.gray, fontWeight: '500' },
+  fieldInput: {
+    fontSize: 19,
+    fontWeight: '700',
+    color: C.darkText,
+    padding: 0,
+    margin: 0,
+    minHeight: 24,
+  },
+  fieldInputMulti: { minHeight: 50, textAlignVertical: 'top' },
+
+  // Bank header inside card
+  bankHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 10 },
+  bankDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
+  bankTitle: { fontSize: 15, fontWeight: '700', color: C.darkText },
+  divider: { height: 1, backgroundColor: C.divider },
 });
