@@ -1,4 +1,5 @@
 import axios from 'axios';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
 
@@ -7,6 +8,23 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Always attach the latest token from AsyncStorage, even if AuthContext hasn't hydrated yet
+api.interceptors.request.use(async (config) => {
+  try {
+    // Prefer the in-memory header (set after login), fall back to AsyncStorage
+    if (!config.headers?.Authorization) {
+      const stored = await AsyncStorage.getItem('auth_token');
+      if (stored) {
+        config.headers = config.headers || {};
+        (config.headers as any).Authorization = `Bearer ${stored}`;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return config;
 });
 
 // Account types
