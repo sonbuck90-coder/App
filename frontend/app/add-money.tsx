@@ -95,7 +95,7 @@ export default function AddMoneyScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="back-btn">
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>

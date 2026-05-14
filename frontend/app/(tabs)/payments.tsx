@@ -151,7 +151,7 @@ export default function PaymentsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header }]}>
         <Text style={styles.headerTitle}>Services</Text>
       </View>
 

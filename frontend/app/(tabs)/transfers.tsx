@@ -244,7 +244,7 @@ export default function TransfersScreen() {
   if (showReceipt && receiptData) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+        <View style={[styles.header, { backgroundColor: customColors.header }]}>
           <Text style={styles.headerTitle}>Transfer Complete</Text>
         </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.receiptScroll}>
@@ -364,7 +364,7 @@ export default function TransfersScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header }]}>
         <Text style={styles.headerTitle}>Pay & Transfer</Text>
       </View>
 

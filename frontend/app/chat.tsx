@@ -223,7 +223,7 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: cc.primary }]}>
+      <View style={[styles.header, { backgroundColor: cc.header }]}>
         <View style={styles.headerLeft}>
           <View style={[styles.aiAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
             <Ionicons name="chatbubbles" size={18} color={C.white} />

@@ -96,7 +96,7 @@ export default function CustomizationScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: '#F5F5F5' }]} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+      <View style={[styles.header, { backgroundColor: colors.header }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="back-btn">
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
@@ -107,7 +107,7 @@ export default function CustomizationScreen() {
         {/* Preview */}
         <View style={styles.previewCard}>
           <Text style={styles.previewLabel}>Live Preview</Text>
-          <View style={[styles.previewBar, { backgroundColor: colors.primary }]}>
+          <View style={[styles.previewBar, { backgroundColor: colors.header }]}>
             <AppLogo variant="header" tint="#FFFFFF" />
             <Text style={styles.previewTitle}>HSBC Mobile Banking</Text>
           </View>
@@ -236,6 +236,46 @@ export default function CustomizationScreen() {
           </View>
         </View>
 
+        {/* Header Color */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Header Color</Text>
+          <Text style={styles.sectionHint}>Background colour of the top app bar on every screen.</Text>
+          <View style={styles.card}>
+            <View style={styles.colorGrid}>
+              {PRESET_COLORS.map((c) => (
+                <TouchableOpacity
+                  key={c.value}
+                  style={[styles.colorSwatch, { backgroundColor: c.value }, colors.header === c.value && styles.colorSwatchActive]}
+                  onPress={() => updateColors({ header: c.value })}
+                  testID={`header-color-${c.value}`}
+                >
+                  {colors.header === c.value && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View style={styles.customColorRow}>
+              <Text style={styles.fieldLabel}>Custom Hex</Text>
+              <TextInput
+                style={[styles.hexInput, { borderColor: colors.header }]}
+                value={colors.header}
+                onChangeText={(t) => { if (/^#[0-9A-Fa-f]{0,6}$/.test(t)) updateColors({ header: t }); }}
+                placeholder="#DB0011"
+                maxLength={7}
+                testID="header-hex-input"
+              />
+              <View style={[styles.hexPreview, { backgroundColor: colors.header }]} />
+            </View>
+            <TouchableOpacity
+              style={styles.matchPrimaryBtn}
+              onPress={() => updateColors({ header: colors.primary })}
+              testID="match-primary-btn"
+            >
+              <Ionicons name="link-outline" size={16} color={colors.primary} />
+              <Text style={[styles.matchPrimaryText, { color: colors.primary }]}>Match Primary Color</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Accent Color */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Accent Color</Text>
@@ -287,6 +327,9 @@ const styles = StyleSheet.create({
   previewAccentText: { fontSize: 13, fontWeight: '600' },
   section: { marginHorizontal: 16, marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333333', marginBottom: 10 },
+  sectionHint: { fontSize: 12, color: '#767676', marginBottom: 10, marginTop: -6, lineHeight: 16 },
+  matchPrimaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12, paddingVertical: 8 },
+  matchPrimaryText: { fontSize: 13, fontWeight: '600', marginLeft: 6 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16 },
   galleryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginTop: 8, marginBottom: 6 },
   galleryBtnText: { fontSize: 14, fontWeight: '600', marginLeft: 10 },

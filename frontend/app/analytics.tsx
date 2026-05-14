@@ -71,7 +71,7 @@ export default function AnalyticsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={[styles.header, { backgroundColor: cc.primary }]}>
+      <View style={[styles.header, { backgroundColor: cc.header }]}>
         <Text style={styles.headerTitle}>Spending Insights</Text>
       </View>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

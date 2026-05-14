@@ -82,7 +82,7 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header }]}>
         <Text style={styles.headerTitle}>More</Text>
       </View>
 

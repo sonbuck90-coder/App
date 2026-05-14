@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export interface CustomColors {
   primary: string;
   accent: string;
+  header: string;
   gradientStart: string;
   gradientEnd: string;
 }
@@ -22,6 +23,7 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   colors: {
     primary: '#DB0011',
     accent: '#00847F',
+    header: '#DB0011',
     gradientStart: '#DB0011',
     gradientEnd: '#8B0000',
   },
@@ -31,7 +33,7 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   },
 };
 
-const LOGO_SIZES = { small: 28, medium: 40, large: 64, xlarge: 80 };
+const LOGO_SIZES = { small: 44, medium: 72, large: 110, xlarge: 160 };
 
 interface CustomizationContextType {
   settings: CustomizationSettings;

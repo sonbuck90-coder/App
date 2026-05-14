@@ -74,7 +74,7 @@ export default function CardDetailsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: cc.primary }]}>
+      <View style={[styles.header, { backgroundColor: cc.header }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="back-btn">
           <Ionicons name="arrow-back" size={24} color={C.white} />
         </TouchableOpacity>

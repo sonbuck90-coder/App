@@ -65,7 +65,7 @@ export default function SchedulesScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      <View style={[s.header, { backgroundColor: cc.primary }]}>
+      <View style={[s.header, { backgroundColor: cc.header }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn"><Ionicons name="arrow-back" size={24} color={C.white} /></TouchableOpacity>
         <Text style={s.headerTitle}>Scheduled Deposits</Text>
       </View>

@@ -108,7 +108,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.primary }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header }]}>
         <View style={styles.headerTop}>
           <AppLogo variant="header" tint="#FFFFFF" />
           <View style={styles.headerRight}>

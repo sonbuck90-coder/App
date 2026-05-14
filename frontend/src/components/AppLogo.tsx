@@ -10,21 +10,26 @@ interface Props {
 export default function AppLogo({ variant = 'default', tint }: Props) {
   const { settings, colors, logoSize } = useCustomization();
 
+  // Resolve effective size based on variant + customization
+  let effectiveSize = logoSize;
+  if (variant === 'small') effectiveSize = Math.min(logoSize, 28);
+  // header variant follows the customized size but is capped so the top bar stays usable
+  else if (variant === 'header') effectiveSize = Math.min(logoSize, 80);
+
   // If custom logo URL is set, show image
   if (settings.logo.url) {
-    const size = variant === 'header' ? 30 : variant === 'small' ? 24 : logoSize;
     return (
       <Image
         source={{ uri: settings.logo.url }}
-        style={{ width: size, height: size, borderRadius: size / 4 }}
+        style={{ width: effectiveSize, height: effectiveSize, borderRadius: effectiveSize / 6 }}
         resizeMode="contain"
         testID="custom-logo"
       />
     );
   }
 
-  // Default HSBC hexagon grid
-  const baseSize = variant === 'header' ? 14 : variant === 'small' ? 10 : logoSize / 3;
+  // Default HSBC hexagon grid — hexagons sized as half of the effective size each (2x2 grid)
+  const baseSize = Math.max(8, Math.floor(effectiveSize / 2.4));
   const color = tint || colors.primary;
 
   return (
