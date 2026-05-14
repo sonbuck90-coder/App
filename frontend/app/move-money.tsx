@@ -11,7 +11,7 @@ const QUICK = [100, 250, 500, 1000];
 
 export default function MoveMoneyScreen() {
   const router = useRouter();
-  const { colors: cc } = useCustomization();
+  const { colors: cc, headerTextColor } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [fromIdx, setFromIdx] = useState(0);
   const [amount, setAmount] = useState('');
@@ -68,8 +68,8 @@ export default function MoveMoneyScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={[s.header, { backgroundColor: cc.header }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn"><Ionicons name="arrow-back" size={24} color={C.white} /></TouchableOpacity>
-        <Text style={s.headerTitle}>Move Money</Text>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn"><Ionicons name="arrow-back" size={24} color={headerTextColor} /></TouchableOpacity>
+        <Text style={[s.headerTitle, { color: headerTextColor }]}>Move Money</Text>
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">

@@ -30,7 +30,7 @@ const COLORS = {
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { colors: customColors } = useCustomization();
+  const { colors: customColors, headerTextColor } = useCustomization();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -110,13 +110,13 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: customColors.header }]}>
         <View style={styles.headerTop}>
-          <AppLogo variant="header" tint="#FFFFFF" />
+          <AppLogo variant="header" />
           <View style={styles.headerRight}>
             <TouchableOpacity style={styles.headerIcon}>
-              <Ionicons name="search" size={22} color={COLORS.white} />
+              <Ionicons name="search" size={22} color={headerTextColor} />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')} testID="notification-bell">
-              <Ionicons name="notifications-outline" size={22} color={COLORS.white} />
+              <Ionicons name="notifications-outline" size={22} color={headerTextColor} />
               {unreadCount > 0 && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
@@ -125,8 +125,8 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </View>
-        <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
-        <Text style={styles.lastLogin}>Last logged in: Today at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
+        <Text style={[styles.greeting, { color: headerTextColor }]}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
+        <Text style={[styles.lastLogin, { color: headerTextColor, opacity: 0.7 }]}>Last logged in: Today at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
       </View>
 
       <ScrollView

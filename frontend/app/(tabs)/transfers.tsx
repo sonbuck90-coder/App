@@ -31,7 +31,7 @@ const COLORS = {
 };
 
 export default function TransfersScreen() {
-  const { colors: customColors } = useCustomization();
+  const { colors: customColors, headerTextColor } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
@@ -245,7 +245,7 @@ export default function TransfersScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={[styles.header, { backgroundColor: customColors.header }]}>
-          <Text style={styles.headerTitle}>Transfer Complete</Text>
+          <Text style={[styles.headerTitle, { color: headerTextColor }]}>Transfer Complete</Text>
         </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.receiptScroll}>
           {/* Success Icon */}
@@ -365,7 +365,7 @@ export default function TransfersScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: customColors.header }]}>
-        <Text style={styles.headerTitle}>Pay & Transfer</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Pay & Transfer</Text>
       </View>
 
       <KeyboardAvoidingView

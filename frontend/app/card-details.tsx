@@ -12,7 +12,7 @@ const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '
 export default function CardDetailsScreen() {
   const router = useRouter();
   const { cardId } = useLocalSearchParams<{ cardId: string }>();
-  const { colors: cc } = useCustomization();
+  const { colors: cc, headerTextColor } = useCustomization();
   const { user } = useAuth();
   const [card, setCard] = useState<Card | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -78,7 +78,7 @@ export default function CardDetailsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="back-btn">
           <Ionicons name="arrow-back" size={24} color={C.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Card Details</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Card Details</Text>
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>

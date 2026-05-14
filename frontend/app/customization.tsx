@@ -18,6 +18,19 @@ const PRESET_COLORS = [
   { label: 'Navy', value: '#003366' },
 ];
 
+// Header presets include light options (White / Black) since the header
+// background needs neutral choices to make the HSBC logo pop.
+const HEADER_PRESETS = [
+  { label: 'White', value: '#FFFFFF' },
+  { label: 'Black', value: '#000000' },
+  { label: 'HSBC Red', value: '#DB0011' },
+  { label: 'Royal Blue', value: '#1A3C8F' },
+  { label: 'Emerald', value: '#00847F' },
+  { label: 'Midnight', value: '#1A1A2E' },
+  { label: 'Navy', value: '#003366' },
+  { label: 'Ivory', value: '#F8F4E3' },
+];
+
 const ACCENT_COLORS = [
   { label: 'Teal', value: '#00847F' },
   { label: 'Gold', value: '#C4A86C' },
@@ -36,7 +49,7 @@ const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' |
 
 export default function CustomizationScreen() {
   const router = useRouter();
-  const { settings, colors, updateColors, updateLogo, resetToDefaults, isCustomized } = useCustomization();
+  const { settings, colors, headerTextColor, updateColors, updateLogo, resetToDefaults, isCustomized } = useCustomization();
   const [logoUrl, setLogoUrl] = useState(settings.logo.url);
 
   const handleLogoUrlSave = () => {
@@ -98,9 +111,9 @@ export default function CustomizationScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: '#F5F5F5' }]} edges={['top']}>
       <View style={[styles.header, { backgroundColor: colors.header }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="back-btn">
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+          <Ionicons name="arrow-back" size={24} color={headerTextColor} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Customization</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Customization</Text>
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -109,7 +122,7 @@ export default function CustomizationScreen() {
           <Text style={styles.previewLabel}>Live Preview</Text>
           <View style={[styles.previewBar, { backgroundColor: colors.header }]}>
             <AppLogo variant="header" tint="#FFFFFF" />
-            <Text style={styles.previewTitle}>HSBC Mobile Banking</Text>
+            <Text style={[styles.previewTitle, { color: headerTextColor }]}>HSBC Mobile Banking</Text>
           </View>
           <View style={styles.previewContent}>
             <View style={[styles.previewBtn, { backgroundColor: colors.primary }]}>
@@ -242,14 +255,14 @@ export default function CustomizationScreen() {
           <Text style={styles.sectionHint}>Background colour of the top app bar on every screen.</Text>
           <View style={styles.card}>
             <View style={styles.colorGrid}>
-              {PRESET_COLORS.map((c) => (
+              {HEADER_PRESETS.map((c) => (
                 <TouchableOpacity
                   key={c.value}
-                  style={[styles.colorSwatch, { backgroundColor: c.value }, colors.header === c.value && styles.colorSwatchActive]}
+                  style={[styles.colorSwatch, { backgroundColor: c.value }, colors.header === c.value && styles.colorSwatchActive, (c.value === '#FFFFFF' || c.value === '#F8F4E3') && { borderWidth: 1, borderColor: '#D0D0D0' }]}
                   onPress={() => updateColors({ header: c.value })}
                   testID={`header-color-${c.value}`}
                 >
-                  {colors.header === c.value && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
+                  {colors.header === c.value && <Ionicons name="checkmark" size={18} color={c.value === '#FFFFFF' || c.value === '#F8F4E3' ? '#000000' : '#FFFFFF'} />}
                 </TouchableOpacity>
               ))}
             </View>

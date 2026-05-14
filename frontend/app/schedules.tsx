@@ -10,7 +10,7 @@ const C = { white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '
 
 export default function SchedulesScreen() {
   const router = useRouter();
-  const { colors: cc } = useCustomization();
+  const { colors: cc, headerTextColor } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,8 +66,8 @@ export default function SchedulesScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={[s.header, { backgroundColor: cc.header }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn"><Ionicons name="arrow-back" size={24} color={C.white} /></TouchableOpacity>
-        <Text style={s.headerTitle}>Scheduled Deposits</Text>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn"><Ionicons name="arrow-back" size={24} color={headerTextColor} /></TouchableOpacity>
+        <Text style={[s.headerTitle, { color: headerTextColor }]}>Scheduled Deposits</Text>
       </View>
 
       <ScrollView style={s.scroll} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={cc.primary} />} showsVerticalScrollIndicator={false}>

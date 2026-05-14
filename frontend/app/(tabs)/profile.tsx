@@ -28,7 +28,7 @@ const COLORS = {
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
-  const { colors: customColors } = useCustomization();
+  const { colors: customColors, headerTextColor } = useCustomization();
   const router = useRouter();
 
   const handleLogout = () => {
@@ -83,7 +83,7 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: customColors.header }]}>
-        <Text style={styles.headerTitle}>More</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>More</Text>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

@@ -398,10 +398,53 @@ metadata:
         comment: "✅ TESTED: POST /api/transfers with sort_code='55-55-55' and to_account_number='99887766' persisted recipient_sort_code='55-55-55', recipient_account_number='99887766', and recipient_bank_name='UK Bank' (fallback applied because sort code does not match an HSBC internal account). Confirmed via GET /api/transactions/{returned.id} that the fields persist in MongoDB."
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Login screen — Account switcher + per-profile login"
+    - "Header Color — White & Black swatches with auto-contrast"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+frontend_review_v2:
+  - task: "Login screen — Account switcher + per-profile login"
+    implemented: true
+    working: false
+    file: "/app/frontend/app/(auth)/login.tsx, /app/frontend/app/(tabs)/home.tsx"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "PARTIAL PASS — UI is fully wired but a name-propagation bug breaks the end-to-end Home greeting. PASS items: (a) blue circular ⓘ icon (testID=account-switcher-btn) renders top-right of the passcode login screen; small 'Oliver' active-profile chip renders top-center; 'Welcome, Oliver' title appears above the keypad (screenshot 'login screen'). (b) Tapping ⓘ opens a bottom-sheet modal titled 'Select Account' with hint 'All accounts use passcode 0503.' and a single 'Oliver / customer@hsbc.co.uk' row showing the red checkmark + pencil-edit + trash-delete icons; 'Add new account' CTA with red + icon at the bottom (screenshot 'switcher modal'). (c) 'Add new account' opens an editor modal — filled Name='James Bond', Email='james@hsbc.co.uk', Phone='+44 7001 007007', Address='MI6, London' and tapped Save → switcher reopened with the new James Bond row active (checkmark moved) and the login title flipped to 'Welcome, James'. (d) Entering passcode 0503 successfully logged in (route changed to /home). (e) Wrong passcode (1234) shows 'Invalid passcode' visual and does not navigate (verified separately). ❌ FAIL: After logging in as the new James Bond profile, the Home screen greeting still reads 'Hello, OLIVER' (verified textually in the Home body — see screenshot 'home_james'). Login.tsx line 164-178 does fire PUT /api/profile with the active profile fields, but either (i) the PUT lands AFTER Home has already loaded the cached profile from /api/profile, OR (ii) home.tsx reads the user name from a stale source (e.g. AuthContext user.name set at passcode-login time) rather than re-fetching after the PUT. Either way, the contracted behaviour 'Home greeting reflects active profile = James' is NOT met. Recommend awaiting the PUT before navigation in login.tsx OR re-triggering a profile refetch on the Home mount once the PUT resolves. (f) Switching back to Oliver flow could not be completed in this run because the Profile/Logout entry point is reached via the 'More' tab (not a 'Profile' tab) and the selector lookup timed out before logout — so 'switch back to Oliver, get Hello, Oliver' could not be re-verified in this UI pass, but the switcher UI itself (selecting an existing row → checkmark moves → title updates) was verified during step (c) when the active profile moved from Oliver→James."
+
+  - task: "Header Color — White & Black presets with auto-contrast text"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/customization.tsx, /app/frontend/src/context/CustomizationContext.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "VERIFIED via code + UI: customization.tsx lines 21-26 declare HEADER_PRESETS with White (#FFFFFF) and Black (#000000) as the FIRST TWO entries followed by the existing 6 brand colors. Both swatches render (testID=header-color-#FFFFFF and header-color-#000000 both present on the page). White swatch is rendered with a 1px #D0D0D0 outline so it stays visible against the white card (line 261: `(c.value === '#FFFFFF' || c.value === '#F8F4E3') && { borderWidth: 1, borderColor: '#D0D0D0' }`). The checkmark icon flips colour based on swatch — white swatch gets a black ✓, all dark swatches get white ✓ (line 265). Auto-contrast is provided by useCustomization()'s headerTextColor (consumed at line 116 for the customization screen's own header title, and at line 125 for the Live Preview 'HSBC Mobile Banking' label). After tapping Black, the Customization screen's own top header turned black, the Live Preview bar turned black, and the 'HSBC Mobile Banking' text rendered in white (auto-contrast). After tapping White, the same preview bar turned white with the text rendered in black. The same headerTextColor flows into the Home tab header via the shared context, so Home with Black selected renders 'Hello, Oliver' in white on black, and with White selected renders 'Hello, Oliver' in dark on white (this was verified in code path but not re-screenshotted at Home due to budget). All 3 acceptance items for Header Color PASS."
+
+  - task: "Passcode 0503 valid for any profile / 1234 rejected"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(auth)/login.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "VERIFIED: With the James Bond profile active, entering 0503 navigated to /home (login successful). The switcher hint 'All accounts use passcode 0503' confirms the design intent. With 1234 attempted, the 'Invalid passcode' visual flash was observed and the user remained on the login screen — wrong codes correctly rejected. Same passcode is enforced regardless of active profile because the backend /api/auth/passcode is a single-tenant check; the multi-profile switcher only changes the displayed name + later PUT /api/profile payload."
+
+agent_communication:
+  - agent: "testing"
+    message: "✅/❌ MIXED RESULT on the 3 review items. PASS: (1) Login account-switcher ⓘ icon, switcher modal w/ 'Select Account' + 'All accounts use passcode 0503', Oliver row with checkmark+pencil+trash, 'Add new account' editor, James Bond creation, 'Welcome, James' chip change, passcode 0503 login success. (2) Header Color section now lists White + Black as first two swatches with a thin grey outline for visibility on White; auto-contrast works in Live Preview (white → black text, black → white text). (3) Passcode 0503 works, 1234 rejected. ❌ CRITICAL BUG: After login as the newly-created James Bond profile, the Home greeting still reads 'Hello, OLIVER' — the login-time PUT /api/profile either fires after Home has rendered, or Home reads the user name from a cached source (AuthContext user state) instead of refetching after the PUT resolves. Recommend: in /app/frontend/app/(auth)/login.tsx, AWAIT the PUT /api/profile completion BEFORE calling router.replace('/(tabs)/home'), AND/OR in /app/frontend/app/(tabs)/home.tsx force a fresh GET /api/profile on screen focus (useFocusEffect) so the greeting reflects the active profile's name. Screenshots captured: a_login_with_info.png, b_switcher_modal.png, c_home_james.png (shows 'Hello, OLIVER' — the bug), and customization Header Color view. Note: Profile→Logout to test 'switch back to Oliver' could not be exercised because the logout entry is under the 'More' tab (not 'Profile'), and tab text-lookup timed out; recommend main agent verify the switch-back manually after fixing the name-propagation bug."
 
 frontend_review:
   - task: "AI Chat (Ellie) modern look — header, typing dots, avatar, timestamps, rich formatting"

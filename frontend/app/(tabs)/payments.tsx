@@ -30,7 +30,7 @@ const COLORS = {
 };
 
 export default function PaymentsScreen() {
-  const { colors: customColors } = useCustomization();
+  const { colors: customColors, headerTextColor } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [billers, setBillers] = useState<Biller[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -152,7 +152,7 @@ export default function PaymentsScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: customColors.header }]}>
-        <Text style={styles.headerTitle}>Services</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Services</Text>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

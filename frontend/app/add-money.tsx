@@ -18,7 +18,7 @@ const SOURCES = [
 
 export default function AddMoneyScreen() {
   const router = useRouter();
-  const { colors: customColors } = useCustomization();
+  const { colors: customColors, headerTextColor } = useCustomization();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
@@ -99,7 +99,7 @@ export default function AddMoneyScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} testID="back-btn">
           <Ionicons name="arrow-back" size={24} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Money</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Add Money</Text>
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>

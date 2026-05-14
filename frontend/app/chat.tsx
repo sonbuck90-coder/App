@@ -23,7 +23,7 @@ const QUICK_ACTIONS = [
 ];
 
 export default function ChatScreen() {
-  const { colors: cc } = useCustomization();
+  const { colors: cc, headerTextColor } = useCustomization();
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -229,8 +229,8 @@ export default function ChatScreen() {
             <Ionicons name="chatbubbles" size={18} color={C.white} />
           </View>
           <View>
-            <Text style={styles.headerTitle}>Ellie</Text>
-            <Text style={styles.headerSubtitle}>Your AI Banking Assistant</Text>
+            <Text style={[styles.headerTitle, { color: headerTextColor }]}>Ellie</Text>
+            <Text style={[styles.headerSubtitle, { color: headerTextColor, opacity: 0.75 }]}>Your AI Banking Assistant</Text>
           </View>
         </View>
       </View>

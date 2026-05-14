@@ -40,7 +40,7 @@ const pieStyles = StyleSheet.create({
 });
 
 export default function AnalyticsScreen() {
-  const { colors: cc } = useCustomization();
+  const { colors: cc, headerTextColor } = useCustomization();
   const [data, setData] = useState<SpendingAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -72,7 +72,7 @@ export default function AnalyticsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={[styles.header, { backgroundColor: cc.header }]}>
-        <Text style={styles.headerTitle}>Spending Insights</Text>
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Spending Insights</Text>
       </View>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Summary Card */}

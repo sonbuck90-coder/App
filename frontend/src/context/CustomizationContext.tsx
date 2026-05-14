@@ -23,22 +23,34 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   colors: {
     primary: '#DB0011',
     accent: '#00847F',
-    header: '#DB0011',
+    header: '#FFFFFF',
     gradientStart: '#DB0011',
     gradientEnd: '#8B0000',
   },
   logo: {
     url: '',
-    size: 'medium',
+    size: 'large',
   },
 };
 
 const LOGO_SIZES = { small: 44, medium: 72, large: 110, xlarge: 160 };
 
+// Compute a readable text colour for the given background hex
+function computeHeaderTextColor(hex: string): string {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return '#FFFFFF';
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance > 0.6 ? '#0B1424' : '#FFFFFF';
+}
+
 interface CustomizationContextType {
   settings: CustomizationSettings;
   colors: CustomColors;
   logoSize: number;
+  headerTextColor: string;
   updateColors: (colors: Partial<CustomColors>) => void;
   updateLogo: (logo: Partial<LogoSettings>) => void;
   resetToDefaults: () => void;
@@ -101,6 +113,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         settings,
         colors: settings.colors,
         logoSize: LOGO_SIZES[settings.logo.size],
+        headerTextColor: computeHeaderTextColor(settings.colors.header),
         updateColors,
         updateLogo,
         resetToDefaults,

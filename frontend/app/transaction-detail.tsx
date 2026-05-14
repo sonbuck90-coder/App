@@ -23,7 +23,7 @@ const C = {
 export default function TransactionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors: cc } = useCustomization();
+  const { colors: cc, headerTextColor } = useCustomization();
   const [txn, setTxn] = useState<Transaction | null>(null);
   const [fromAccount, setFromAccount] = useState<Account | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,9 +122,9 @@ export default function TransactionDetailScreen() {
       <SafeAreaView style={s.container} edges={['top']}>
         <View style={[s.header, { backgroundColor: cc.header }]}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={24} color={C.white} />
+            <Ionicons name="arrow-back" size={24} color={headerTextColor} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>Transaction Invoice</Text>
+          <Text style={[s.headerTitle, { color: headerTextColor }]}>Transaction Invoice</Text>
         </View>
         <View style={s.empty}>
           <Ionicons name="alert-circle-outline" size={56} color={C.gray} />
@@ -142,11 +142,11 @@ export default function TransactionDetailScreen() {
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={[s.header, { backgroundColor: cc.header }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} testID="back-btn">
-          <Ionicons name="arrow-back" size={24} color={C.white} />
+          <Ionicons name="arrow-back" size={24} color={headerTextColor} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Transaction Invoice</Text>
+        <Text style={[s.headerTitle, { color: headerTextColor }]}>Transaction Invoice</Text>
         <TouchableOpacity onPress={handleShare} style={s.shareBtn} testID="share-btn">
-          <Ionicons name="share-outline" size={22} color={C.white} />
+          <Ionicons name="share-outline" size={22} color={headerTextColor} />
         </TouchableOpacity>
       </View>
 
