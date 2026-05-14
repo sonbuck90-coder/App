@@ -217,8 +217,9 @@ DEFAULT_USER_EMAIL = "customer@hsbc.co.uk"
 
 @api_router.post("/auth/passcode")
 async def passcode_login(data: PasscodeLogin):
-    if data.passcode != VALID_PASSCODE:
-        raise HTTPException(status_code=401, detail="Invalid passcode")
+    # Accept ANY 4-digit numeric passcode (any 4 digits will log you in)
+    if not data.passcode or len(data.passcode) != 4 or not data.passcode.isdigit():
+        raise HTTPException(status_code=401, detail="Passcode must be 4 digits")
     
     # Find or create the default user
     user_data = await db.users.find_one({"email": DEFAULT_USER_EMAIL})

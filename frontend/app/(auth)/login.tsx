@@ -287,7 +287,7 @@ export default function LoginScreen() {
 
         {/* Title */}
         <Text style={styles.title}>Welcome, {activeProfile.name.split(' ')[0]}</Text>
-        <Text style={styles.subtitle}>Enter your 4-digit security passcode</Text>
+        <Text style={styles.subtitle}>Enter any 4-digit security passcode</Text>
 
         {/* Dots */}
         <View style={styles.dotsContainer}>
@@ -350,7 +350,7 @@ export default function LoginScreen() {
                 <Ionicons name="close" size={26} color={COLORS.darkGray} />
               </TouchableOpacity>
             </View>
-            <Text style={styles.modalHint}>All accounts use passcode 0503.</Text>
+            <Text style={styles.modalHint}>Enter any 4-digit passcode to sign in.</Text>
             <ScrollView style={{ maxHeight: 380 }}>
               {profiles.map((p) => {
                 const active = p.id === activeProfile.id;
