@@ -408,11 +408,17 @@ test_plan:
 frontend_review_v2:
   - task: "Login screen — Account switcher + per-profile login"
     implemented: true
-    working: false
+    working: true
     file: "/app/frontend/app/(auth)/login.tsx, /app/frontend/app/(tabs)/home.tsx"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ RE-TEST PASS (HSBC app, passcode 0503, mobile 390x844, 2026-05-14). All 3 review-request steps verified end-to-end. STEP 1 — Passcode 0503 on-screen keypad: On mount, document.activeElement is BODY (NOT INPUT/TEXTAREA) — confirms the hidden TextInput no longer autoFocuses, so the system keyboard does not pop up. Tapping keys 0,5,0,3 in sequence filled the dots and navigated to /home; greeting reads 'Hello, Oliver' ✅. STEP 2 — Add new account full flow: From login, ⓘ → bottom-sheet 'Select Account' with the Oliver row + 'Add new account' CTA. Tapped Add → editor sheet slides up from the bottom with title 'New Account', X close button (testID=editor-close) top-right, scrollable ScrollView containing Name*/Email/Phone/Address inputs, and bottom action row with Cancel + red 'Create Account' button (testID=save-draft, label = 'Create Account' for new mode). Filled Name='Test User 2', Email='test2@hsbc.co.uk', Phone='+44 7000 000002', Address='221B Baker Street' and tapped Create Account → editor closed, the Account Switcher modal REOPENED automatically (still visible with 'Select Account' header), the new 'Test User 2 / test2@hsbc.co.uk' row appeared at the bottom of the list with the RED CHECKMARK-CIRCLE on it (now the active profile — confirmed via screenshot b_switcher_with_new_profile.png), AND the login title above the keypad flipped to 'Welcome, Test'. Closed the switcher and entered passcode 0503 → /home greeting reads 'Hello, Test' (first-name extraction from 'Test User 2') ✅. STEP 3 — Edit existing account: Logged out via clearing auth_token from AsyncStorage, returned to /login (Oliver active), ⓘ → tapped pencil-edit on Oliver row → editor opens with title 'Edit Account' and save button labelled 'Save Changes'. Replaced email with 'oliver.updated@hsbc.co.uk' and tapped Save Changes → editor closed. Tapped ⓘ to reopen the switcher: the Oliver row's sub-text now reads 'oliver.updated@hsbc.co.uk' ✅ (persisted in AsyncStorage). All steps PASS. Screenshots captured: a_editor_bottomsheet.png (bottom-sheet editor with X close, all 4 fields, Cancel + Create Account buttons reachable above the page bottom), b_switcher_with_new_profile.png (switcher list showing Oliver + new Test User 2 active with red checkmark). The previously-reported name-propagation bug is RESOLVED — Home greeting now correctly reflects the active profile."
+      - working: false
+        agent: "testing"
     status_history:
       - working: false
         agent: "testing"

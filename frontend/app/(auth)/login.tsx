@@ -207,14 +207,16 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.content}>
-        {/* Hidden input — lets users type the passcode on a physical keyboard */}
+        {/* Hidden input — lets users type the passcode on a physical keyboard.
+            We do NOT autoFocus on mount because that would summon the on-screen
+            keyboard on mobile and cover the keypad. Tapping the keypad still
+            works directly via the on-screen buttons below. */}
         <TextInput
           ref={hiddenInputRef}
           value={passcode}
           onChangeText={handleTypedInput}
           keyboardType="number-pad"
           maxLength={PASSCODE_LENGTH}
-          autoFocus
           caretHidden
           style={styles.hiddenInput}
           editable={!isLoading}
@@ -331,29 +333,36 @@ export default function LoginScreen() {
       </Modal>
 
       {/* Editor Modal */}
-      <Modal visible={editorOpen} transparent animationType="fade" onRequestClose={() => setEditorOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+      <Modal visible={editorOpen} transparent animationType="slide" onRequestClose={() => setEditorOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.editorOverlay}>
           <View style={styles.editorCard}>
-            <Text style={styles.modalTitle}>{editingProfile ? 'Edit Account' : 'New Account'}</Text>
+            <View style={styles.editorHeader}>
+              <Text style={styles.modalTitle}>{editingProfile ? 'Edit Account' : 'New Account'}</Text>
+              <TouchableOpacity onPress={() => setEditorOpen(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} testID="editor-close">
+                <Ionicons name="close" size={24} color={COLORS.darkGray} />
+              </TouchableOpacity>
+            </View>
 
-            <Text style={styles.fieldLabel}>Name *</Text>
-            <TextInput style={styles.fieldInput} value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} placeholder="Oliver Smith" placeholderTextColor={COLORS.gray} testID="draft-name" />
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
+              <Text style={styles.fieldLabel}>Name *</Text>
+              <TextInput style={styles.fieldInput} value={draft.name} onChangeText={(v) => setDraft({ ...draft, name: v })} placeholder="Oliver Smith" placeholderTextColor={COLORS.gray} testID="draft-name" returnKeyType="next" />
 
-            <Text style={styles.fieldLabel}>Email</Text>
-            <TextInput style={styles.fieldInput} value={draft.email} onChangeText={(v) => setDraft({ ...draft, email: v })} placeholder="oliver@example.com" placeholderTextColor={COLORS.gray} keyboardType="email-address" autoCapitalize="none" testID="draft-email" />
+              <Text style={styles.fieldLabel}>Email</Text>
+              <TextInput style={styles.fieldInput} value={draft.email} onChangeText={(v) => setDraft({ ...draft, email: v })} placeholder="oliver@example.com" placeholderTextColor={COLORS.gray} keyboardType="email-address" autoCapitalize="none" testID="draft-email" returnKeyType="next" />
 
-            <Text style={styles.fieldLabel}>Phone</Text>
-            <TextInput style={styles.fieldInput} value={draft.phone} onChangeText={(v) => setDraft({ ...draft, phone: v })} placeholder="+44 7700 900000" placeholderTextColor={COLORS.gray} keyboardType="phone-pad" testID="draft-phone" />
+              <Text style={styles.fieldLabel}>Phone</Text>
+              <TextInput style={styles.fieldInput} value={draft.phone} onChangeText={(v) => setDraft({ ...draft, phone: v })} placeholder="+44 7700 900000" placeholderTextColor={COLORS.gray} keyboardType="phone-pad" testID="draft-phone" returnKeyType="next" />
 
-            <Text style={styles.fieldLabel}>Address</Text>
-            <TextInput style={styles.fieldInput} value={draft.address} onChangeText={(v) => setDraft({ ...draft, address: v })} placeholder="8 Canada Square, London" placeholderTextColor={COLORS.gray} testID="draft-address" />
+              <Text style={styles.fieldLabel}>Address</Text>
+              <TextInput style={styles.fieldInput} value={draft.address} onChangeText={(v) => setDraft({ ...draft, address: v })} placeholder="8 Canada Square, London" placeholderTextColor={COLORS.gray} testID="draft-address" returnKeyType="done" onSubmitEditing={handleSaveDraft} />
+            </ScrollView>
 
             <View style={styles.editorBtns}>
               <TouchableOpacity style={styles.editorCancel} onPress={() => setEditorOpen(false)}>
                 <Text style={styles.editorCancelText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.editorSave} onPress={handleSaveDraft} testID="save-draft">
-                <Text style={styles.editorSaveText}>Save</Text>
+                <Text style={styles.editorSaveText}>{editingProfile ? 'Save Changes' : 'Create Account'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -411,7 +420,9 @@ const styles = StyleSheet.create({
   addBtnText: { fontSize: 15, color: COLORS.primary, fontWeight: '600', marginLeft: 8 },
 
   // Editor
-  editorCard: { backgroundColor: COLORS.white, marginHorizontal: 16, borderRadius: 16, padding: 20 },
+  editorOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  editorCard: { backgroundColor: COLORS.white, borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 20, paddingTop: 16, paddingBottom: 24, maxHeight: '90%' },
+  editorHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   fieldLabel: { fontSize: 13, color: COLORS.gray, marginTop: 10, marginBottom: 4, fontWeight: '500' },
   fieldInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: COLORS.darkGray },
   editorBtns: { flexDirection: 'row', marginTop: 20, gap: 10 },
