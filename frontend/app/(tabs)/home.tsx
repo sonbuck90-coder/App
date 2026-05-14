@@ -29,7 +29,7 @@ const COLORS = {
 };
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { colors: customColors, headerTextColor } = useCustomization();
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -59,6 +59,9 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
+      // Always refresh the user (name, email) so any change made in Personal
+      // Details is reflected in the header greeting immediately.
+      refreshUser();
     }, [])
   );
 

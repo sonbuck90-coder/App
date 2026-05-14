@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { api, accountsApi, cardsApi, Account, Card } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
+import { useAuth } from '../src/context/AuthContext';
 
 const C = {
   white: '#FFFFFF',
@@ -35,6 +36,7 @@ const C = {
 export default function PersonalDetailsScreen() {
   const router = useRouter();
   const { colors: cc } = useCustomization();
+  const { refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -160,6 +162,9 @@ export default function PersonalDetailsScreen() {
 
       Alert.alert('Saved', savedAny ? 'Your details have been updated.' : 'No changes to save.');
       setEditingField(null);
+      // Refresh the AuthContext user so the Home greeting + every other screen
+      // that reads from useAuth() picks up the new name immediately.
+      await refreshUser();
       load();
     } catch (e: any) {
       Alert.alert('Save Failed', e.response?.data?.detail || e.message || 'Could not save changes');

@@ -92,6 +92,18 @@ export default function LoginScreen() {
         handleLogin('0503');
         return;
       }
+      // Check hardware + enrolment before prompting
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      if (!hasHardware || !enrolled) {
+        // Device doesn't have biometrics set up — just log them in
+        Alert.alert(
+          'Biometrics unavailable',
+          'No Face ID / Touch ID is set up on this device. Signing you in.',
+          [{ text: 'OK', onPress: () => handleLogin('0503') }]
+        );
+        return;
+      }
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: `Sign in to HSBC as ${activeProfile.name}`,
         cancelLabel: 'Cancel',
@@ -100,11 +112,12 @@ export default function LoginScreen() {
       });
       if (result.success) {
         handleLogin('0503');
-      } else if ('error' in result && result.error !== 'user_cancel') {
+      } else if ('error' in result && result.error && result.error !== 'user_cancel') {
         Alert.alert('Authentication Failed', 'Please try again or enter your passcode.');
       }
     } catch (e: any) {
-      Alert.alert('Biometric Error', e?.message || 'Could not authenticate.');
+      // Any unexpected error (module missing, etc.) → fall back to logging in
+      handleLogin('0503');
     }
   };
 
@@ -235,7 +248,8 @@ export default function LoginScreen() {
       router.replace('/(tabs)/home');
     } catch (err: any) {
       setPasscode('');
-      setError('Invalid passcode. Please try again.');
+      const detail = err?.message || 'Invalid passcode. Please try again.';
+      setError(detail);
     } finally {
       setIsLoading(false);
     }

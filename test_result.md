@@ -399,11 +399,51 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Login screen — Account switcher + per-profile login"
-    - "Header Color — White & Black swatches with auto-contrast"
+    - "Any 4-digit passcode logs in"
+    - "Biometric (Face/Touch ID) auto-login on web"
+    - "Name change propagates: Personal Details → More → Home"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+frontend_review_v3:
+  - task: "Any 4-digit passcode logs in"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py, /app/frontend/app/(auth)/login.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS (HSBC app, mobile 390x844, 2026-05-14). Tested 1234, 9999, 0000 sequentially — every random 4-digit passcode succeeded: dots filled red on tap, NO 'Invalid passcode' visual flash, and the app navigated to /home with 'Hello, Oliver' greeting after each (verified via document.body.innerText — all three runs showed 'Hello, Oliver'). 3-digit '123' kept the user on /login (no navigation, no backend call — login auto-submits only on the 4th digit; this is acceptable behaviour, no error is shown but the contract 'doesn't log in' is met). Backend /api/auth/passcode now accepts any 4-digit numeric value as documented in /app/memory/test_credentials.md."
+  - task: "Biometric (Face/Touch ID) auto-login on web"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(auth)/login.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS. From the login screen tapped the testID=biometric-login link ('Use Touch ID / Use Face ID'). On web the handler short-circuits — successfully navigated to /home and the dashboard rendered with the proper greeting. No error/alert flashed, no hardware prompt required. Graceful fallback path is wired (auto-login with 0503)."
+  - task: "Name change propagates: Personal Details → More → Home"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/home.tsx, /app/frontend/app/(tabs)/profile.tsx, /app/frontend/app/personal-details.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS end-to-end. Logged in with passcode 1234. Initial Home greeting = 'Hello, Oliver'. Navigated More → Personal Details, tapped Full Name row → cleared → typed 'Sarah Mitchell' → tapped the blue circular ⓘ save-profile-btn top-right → PUT /api/profile fired. Pressed back to the More tab → the user card at the top of More immediately read 'Sarah Mitchell / customer@hsbc.co.uk' (refreshUser() on focus works). Tapped the bottom Accounts (Home) tab → greeting now reads 'Hello, Sarah' (first-name extraction from 'Sarah Mitchell') — confirmed by parsing body innerText: 'Has Sarah: True / Has Oliver: False'. Screenshot captured: b_home_after_sarah.png clearly shows 'Hello, Sarah' under the HSBC UK header. The useFocusEffect → refreshUser() addition on both home.tsx and profile.tsx is functioning correctly."
+
+agent_communication:
+  - agent: "testing"
+    message: "✅ ALL 3 REVIEW ITEMS PASS (HSBC app, mobile 390x844, 2026-05-14). (1) Any 4-digit passcode logs in — verified 1234, 9999, 0000 all navigate to /home with 'Hello, Oliver'; 3-digit '123' does NOT navigate (auto-submit only fires on 4th digit, no error shown but contract met). (2) Biometric link (testID=biometric-login) auto-logs in on web → /home. (3) Name-change propagation: Sarah Mitchell saved via Personal Details blue ⓘ → More tab card updates to 'Sarah Mitchell' on focus → Home tab greeting updates to 'Hello, Sarah' on focus (refreshUser() in useFocusEffect verified). Screenshots: a_home_after_1234.png (Hello, Oliver after random non-0503 login) and b_home_after_sarah.png (Hello, Sarah after name change). No code modifications made. No major issues — ready to finish."
 
 frontend_review_v2:
   - task: "Login screen — Account switcher + per-profile login"

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCustomization } from '../../src/context/CustomizationContext';
 
@@ -27,7 +27,15 @@ const COLORS = {
 };
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
+
+  // Refresh the user on every focus so any change made in Personal Details
+  // (name / email) propagates back to this screen automatically.
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [])
+  );
   const { colors: customColors, headerTextColor } = useCustomization();
   const router = useRouter();
 
