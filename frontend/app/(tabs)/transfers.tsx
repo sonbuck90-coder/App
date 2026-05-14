@@ -18,6 +18,7 @@ import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import { useAuthGate } from '../../src/components/AuthGate';
+import { checkPayee, CopResponse } from '../../src/services/cop';
 
 // Static colors (non-primary)
 const COLORS = {
@@ -52,6 +53,11 @@ export default function TransfersScreen() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [showReview, setShowReview] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+
+  // Confirmation of Payee (CoP) — runs every time the user opens the review.
+  const [copStatus, setCopStatus] = useState<'idle' | 'checking' | 'done'>('idle');
+  const [copResponse, setCopResponse] = useState<CopResponse | null>(null);
+  const [proceedDespiteMismatch, setProceedDespiteMismatch] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     amount: number;
     recipient: string;
@@ -172,7 +178,20 @@ export default function TransfersScreen() {
       Alert.alert('Insufficient Funds', 'You do not have enough balance for this transfer');
       return;
     }
+    // Reset CoP state and trigger verification in the background
+    setProceedDespiteMismatch(false);
+    setCopResponse(null);
+    setCopStatus('checking');
     setShowReview(true);
+    checkPayee(recipientName, sortCode, recipientAccount)
+      .then((res) => {
+        setCopResponse(res);
+        setCopStatus('done');
+      })
+      .catch(() => {
+        setCopResponse({ result: 'unchecked', message: 'Unable to verify the recipient right now. You can still continue.' });
+        setCopStatus('done');
+      });
   };
 
   // Second step: user has confirmed the review → run the simulated processing
@@ -257,6 +276,64 @@ export default function TransfersScreen() {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
           <Text style={styles.reviewIntro}>Please check the details below. Once you tap &quot;Confirm &amp; Send&quot; the payment will be processed.</Text>
 
+          {/* Confirmation of Payee (CoP) — verifies the recipient name
+              against the account holder reported by their bank. */}
+          {copStatus === 'checking' && (
+            <View style={[styles.copCard, { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' }]}>
+              <ActivityIndicator size="small" color="#1D4ED8" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.copTitle, { color: '#1E3A8A' }]}>Verifying account…</Text>
+                <Text style={styles.copBody}>Checking the recipient name with their bank.</Text>
+              </View>
+            </View>
+          )}
+          {copStatus === 'done' && copResponse?.result === 'match' && (
+            <View style={[styles.copCard, { backgroundColor: '#E8F5F2', borderColor: '#00847F' }]}>
+              <Ionicons name="shield-checkmark" size={22} color="#00847F" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.copTitle, { color: '#0B5C56' }]}>Account verified</Text>
+                <Text style={styles.copBody}>{copResponse.message}</Text>
+              </View>
+            </View>
+          )}
+          {copStatus === 'done' && copResponse?.result === 'close_match' && (
+            <View style={[styles.copCard, { backgroundColor: '#FFF8E6', borderColor: '#E67E22' }]}>
+              <Ionicons name="warning" size={22} color="#B45309" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.copTitle, { color: '#92400E' }]}>Close match — double check</Text>
+                <Text style={styles.copBody}>
+                  {copResponse.message}
+                  {copResponse.actualName ? `\n\nAccount holder on record: ${copResponse.actualName}` : ''}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.copToggle, proceedDespiteMismatch && { backgroundColor: '#B45309' }]}
+                  onPress={() => setProceedDespiteMismatch(!proceedDespiteMismatch)}
+                  testID="proceed-toggle"
+                >
+                  <Ionicons name={proceedDespiteMismatch ? 'checkbox' : 'square-outline'} size={18} color={proceedDespiteMismatch ? '#fff' : '#B45309'} />
+                  <Text style={[styles.copToggleText, proceedDespiteMismatch && { color: '#fff' }]}>I&apos;ve checked, continue anyway</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+          {copStatus === 'done' && copResponse?.result === 'no_match' && (
+            <View style={[styles.copCard, { backgroundColor: '#FEE2E2', borderColor: '#DC2626' }]}>
+              <Ionicons name="alert-circle" size={22} color="#DC2626" />
+              <View style={{ flex: 1, marginLeft: 12 }}>
+                <Text style={[styles.copTitle, { color: '#991B1B' }]}>No match — high risk</Text>
+                <Text style={styles.copBody}>{copResponse.message}</Text>
+                <TouchableOpacity
+                  style={[styles.copToggle, { borderColor: '#DC2626' }, proceedDespiteMismatch && { backgroundColor: '#DC2626' }]}
+                  onPress={() => setProceedDespiteMismatch(!proceedDespiteMismatch)}
+                  testID="proceed-toggle"
+                >
+                  <Ionicons name={proceedDespiteMismatch ? 'checkbox' : 'square-outline'} size={18} color={proceedDespiteMismatch ? '#fff' : '#DC2626'} />
+                  <Text style={[styles.copToggleText, { color: '#991B1B' }, proceedDespiteMismatch && { color: '#fff' }]}>I accept the risk &amp; want to continue</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           <View style={styles.reviewCard}>
             <Text style={styles.reviewAmountLabel}>Amount</Text>
             <Text style={[styles.reviewAmount, { color: customColors.primary }]}>£{(parseFloat(amount || '0')).toFixed(2)}</Text>
@@ -288,21 +365,39 @@ export default function TransfersScreen() {
         </ScrollView>
 
         <View style={styles.reviewFooter}>
-          <TouchableOpacity
-            style={[styles.confirmBtn, { backgroundColor: customColors.primary }, isProcessing && { opacity: 0.7 }]}
-            onPress={handleConfirmAndSend}
-            disabled={isProcessing}
-            testID="confirm-send-btn"
-          >
-            {isProcessing ? (
-              <View style={styles.processingContainer}>
-                <ActivityIndicator color="#fff" size="small" />
-                <Text style={styles.confirmBtnText}>Processing… {processingProgress}%</Text>
-              </View>
-            ) : (
-              <Text style={styles.confirmBtnText}>Confirm &amp; Send</Text>
-            )}
-          </TouchableOpacity>
+          {(() => {
+            const cop = copResponse?.result;
+            const checking = copStatus === 'checking';
+            const needsAck = cop === 'close_match' || cop === 'no_match';
+            const blocked = isProcessing || checking || (needsAck && !proceedDespiteMismatch);
+            const buttonLabel = checking
+              ? 'Verifying account…'
+              : needsAck && !proceedDespiteMismatch
+                ? (cop === 'no_match' ? 'Tick the box above to continue' : 'Tick the box to continue')
+                : 'Confirm & Send';
+            return (
+              <TouchableOpacity
+                style={[styles.confirmBtn, { backgroundColor: customColors.primary }, blocked && { opacity: 0.5 }]}
+                onPress={handleConfirmAndSend}
+                disabled={blocked}
+                testID="confirm-send-btn"
+              >
+                {isProcessing ? (
+                  <View style={styles.processingContainer}>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={styles.confirmBtnText}>Processing… {processingProgress}%</Text>
+                  </View>
+                ) : checking ? (
+                  <View style={styles.processingContainer}>
+                    <ActivityIndicator color="#fff" size="small" />
+                    <Text style={styles.confirmBtnText}>{buttonLabel}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.confirmBtnText}>{buttonLabel}</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })()}
           <TouchableOpacity
             style={styles.editBtn}
             onPress={() => !isProcessing && setShowReview(false)}
@@ -1154,4 +1249,9 @@ const styles = StyleSheet.create({
   confirmBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   editBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
   editBtnText: { color: '#5E6A7A', fontSize: 14, fontWeight: '600' },
+  copCard: { flexDirection: 'row', alignItems: 'flex-start', padding: 14, borderRadius: 10, borderWidth: 1, marginBottom: 14 },
+  copTitle: { fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  copBody: { fontSize: 12.5, color: '#4B5563', lineHeight: 18 },
+  copToggle: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderColor: '#B45309', borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6, marginTop: 10 },
+  copToggleText: { fontSize: 12, fontWeight: '700', color: '#B45309', marginLeft: 6 },
 });
