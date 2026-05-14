@@ -53,6 +53,7 @@ interface CustomizationContextType {
   headerTextColor: string;
   updateColors: (colors: Partial<CustomColors>) => void;
   updateLogo: (logo: Partial<LogoSettings>) => void;
+  updateBankPhone: (phone: string) => void;
   resetToDefaults: () => void;
   isCustomized: boolean;
 }
@@ -100,6 +101,12 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     saveSettings(updated);
   };
 
+  const updateBankPhone = (phone: string) => {
+    const updated = { ...settings, bankPhone: phone };
+    setSettings(updated);
+    saveSettings(updated);
+  };
+
   const resetToDefaults = () => {
     setSettings(HSBC_DEFAULTS);
     saveSettings(HSBC_DEFAULTS);
@@ -116,6 +123,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         headerTextColor: computeHeaderTextColor(settings.colors.header),
         updateColors,
         updateLogo,
+        updateBankPhone,
         resetToDefaults,
         isCustomized,
       }}
@@ -132,3 +140,4 @@ export function useCustomization() {
 }
 
 export { HSBC_DEFAULTS, LOGO_SIZES };
+ZES };

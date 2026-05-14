@@ -110,35 +110,35 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.header }]}>
-        <View style={styles.headerTop}>
-          <AppLogo variant="header" />
-          <View style={styles.headerRight}>
-            <TouchableOpacity style={styles.headerIcon}>
-              <Ionicons name="search" size={22} color={headerTextColor} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')} testID="notification-bell">
-              <Ionicons name="notifications-outline" size={22} color={headerTextColor} />
-              {unreadCount > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-        <Text style={[styles.greeting, { color: headerTextColor }]}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
-        <Text style={[styles.lastLogin, { color: headerTextColor, opacity: 0.7 }]}>Last logged in: Today at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
-      </View>
-
       <ScrollView
         style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
         }
         showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[]}
       >
+        {/* Header — now scrolls with content */}
+        <View style={[styles.header, { backgroundColor: customColors.header }]}>
+          <View style={styles.headerTop}>
+            <AppLogo variant="header" />
+            <View style={styles.headerRight}>
+              <TouchableOpacity style={styles.headerIcon}>
+                <Ionicons name="search" size={22} color={headerTextColor} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')} testID="notification-bell">
+                <Ionicons name="notifications-outline" size={22} color={headerTextColor} />
+                {unreadCount > 0 && (
+                  <View style={styles.notifBadge}>
+                    <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+          <Text style={[styles.greeting, { color: headerTextColor }]}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
+          <Text style={[styles.lastLogin, { color: headerTextColor, opacity: 0.7 }]}>Last logged in: Today at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
+        </View>
         {/* Total Balance Card */}
         <View style={[styles.totalBalanceCard, { borderLeftColor: customColors.primary }]}>
           <View style={styles.totalBalanceHeader}>

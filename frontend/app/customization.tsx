@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image, ActivityIndicator, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -52,9 +52,26 @@ const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' |
 
 export default function CustomizationScreen() {
   const router = useRouter();
-  const { settings, colors, headerTextColor, updateColors, updateLogo, resetToDefaults, isCustomized } = useCustomization();
+  const { settings, colors, headerTextColor, updateColors, updateLogo, updateBankPhone, resetToDefaults, isCustomized } = useCustomization();
   const { logout } = useAuth();
   const [logoUrl, setLogoUrl] = useState(settings.logo.url);
+  const [bankPhone, setBankPhone] = useState(settings.bankPhone);
+
+  const callBank = () => {
+    const num = settings.bankPhone.replace(/\s/g, '');
+    const url = `tel:${num}`;
+    if (Platform.OS === 'web') {
+      window.open(url, '_self');
+    } else {
+      Linking.openURL(url).catch(() => Alert.alert('Cannot call', 'Calling is not available on this device.'));
+    }
+  };
+
+  const saveBankPhone = () => {
+    if (!bankPhone.trim()) { Alert.alert('Phone required'); return; }
+    updateBankPhone(bankPhone.trim());
+    Alert.alert('Saved', 'Bank phone number updated.');
+  };
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -324,6 +341,34 @@ export default function CustomizationScreen() {
                   {colors.accent === c.value && <Ionicons name="checkmark" size={18} color="#FFFFFF" />}
                 </TouchableOpacity>
               ))}
+            </View>
+          </View>
+        </View>
+
+        {/* Bank Phone Number */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Customer Service Number</Text>
+          <Text style={styles.sectionHint}>This number is used everywhere the bank's helpline is shown. Tapping it from More → Call Bank will start a phone call.</Text>
+          <View style={styles.card}>
+            <Text style={styles.fieldLabel}>Phone Number</Text>
+            <TextInput
+              value={bankPhone}
+              onChangeText={setBankPhone}
+              placeholder="03457 404 404"
+              placeholderTextColor="#999"
+              keyboardType="phone-pad"
+              style={[styles.hexInput, { borderColor: colors.primary, flex: 0, marginRight: 0 }]}
+              testID="bank-phone-input"
+            />
+            <View style={{ flexDirection: 'row', marginTop: 10, gap: 10 }}>
+              <TouchableOpacity style={[styles.matchPrimaryBtn, { flex: 1, borderWidth: 1, borderColor: colors.primary, borderRadius: 8, paddingVertical: 12 }]} onPress={callBank} testID="call-bank-btn">
+                <Ionicons name="call" size={16} color={colors.primary} />
+                <Text style={[styles.matchPrimaryText, { color: colors.primary }]}>Call Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.matchPrimaryBtn, { flex: 1, backgroundColor: colors.primary, borderRadius: 8, paddingVertical: 12 }]} onPress={saveBankPhone} testID="save-bank-phone-btn">
+                <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+                <Text style={[styles.matchPrimaryText, { color: '#FFFFFF' }]}>Save</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
