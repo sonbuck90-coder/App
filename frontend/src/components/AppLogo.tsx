@@ -23,7 +23,7 @@ export default function AppLogo({ variant = 'default' }: Props) {
     // Header bars: cap height so the bar stays usable but honour user's size choice
     height = Math.min(Math.max(28, Math.floor(logoSize * 0.45)), 56);
   } else if (variant === 'small') {
-    height = Math.min(logoSize, 28);
+    height = Math.min(logoSize, 36);
   } else {
     height = logoSize;
   }

@@ -171,7 +171,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* App Version */}
-        <Text style={styles.versionText}>HSBC Mobile Banking v1.0.0</Text>
+        <Text style={styles.versionText}>HSBC Mobile Banking v2.04.6</Text>
 
         <View style={styles.bottomPadding} />
       </ScrollView>

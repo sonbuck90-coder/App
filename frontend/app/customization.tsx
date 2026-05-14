@@ -5,7 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCustomization, HSBC_DEFAULTS, LOGO_SIZES } from '../src/context/CustomizationContext';
+import { useAuth } from '../src/context/AuthContext';
 import AppLogo from '../src/components/AppLogo';
+
+const APP_VERSION = '2.04.6';
 
 const PRESET_COLORS = [
   { label: 'HSBC Red', value: '#DB0011' },
@@ -50,7 +53,22 @@ const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' |
 export default function CustomizationScreen() {
   const router = useRouter();
   const { settings, colors, headerTextColor, updateColors, updateLogo, resetToDefaults, isCustomized } = useCustomization();
+  const { logout } = useAuth();
   const [logoUrl, setLogoUrl] = useState(settings.logo.url);
+
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
+  };
 
   const handleLogoUrlSave = () => {
     updateLogo({ url: logoUrl.trim() });
@@ -121,8 +139,10 @@ export default function CustomizationScreen() {
         <View style={styles.previewCard}>
           <Text style={styles.previewLabel}>Live Preview</Text>
           <View style={[styles.previewBar, { backgroundColor: colors.header }]}>
-            <AppLogo variant="header" tint="#FFFFFF" />
-            <Text style={[styles.previewTitle, { color: headerTextColor }]}>HSBC Mobile Banking</Text>
+            <AppLogo variant="header" />
+            {(colors.header === '#FFFFFF' || colors.header === '#F8F4E3') ? null : (
+              <Text style={[styles.previewTitle, { color: headerTextColor }]}>HSBC Mobile Banking</Text>
+            )}
           </View>
           <View style={styles.previewContent}>
             <View style={[styles.previewBtn, { backgroundColor: colors.primary }]}>
@@ -316,7 +336,20 @@ export default function CustomizationScreen() {
           </TouchableOpacity>
         )}
 
-        <View style={{ height: 40 }} />
+        {/* Logout */}
+        <TouchableOpacity style={[styles.logoutBtn, { backgroundColor: colors.primary }]} onPress={handleLogout} testID="logout-btn">
+          <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.logoutBtnText}>Log Out</Text>
+        </TouchableOpacity>
+
+        {/* App version footer */}
+        <View style={styles.versionFooter}>
+          <AppLogo variant="small" />
+          <Text style={styles.versionText}>HSBC Mobile Banking</Text>
+          <Text style={styles.versionNumber}>Version {APP_VERSION}</Text>
+        </View>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -330,7 +363,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   previewCard: { backgroundColor: '#FFFFFF', margin: 16, borderRadius: 12, overflow: 'hidden' },
   previewLabel: { fontSize: 12, fontWeight: '600', color: '#767676', padding: 12, paddingBottom: 0 },
-  previewBar: { flexDirection: 'row', alignItems: 'center', padding: 14, marginTop: 8 },
+  previewBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 18, marginTop: 8, minHeight: 70 },
   previewTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '600', marginLeft: 12 },
   previewContent: { padding: 12, flexDirection: 'row', alignItems: 'center' },
   previewBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 6, marginRight: 12 },
