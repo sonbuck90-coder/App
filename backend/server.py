@@ -698,6 +698,10 @@ async def fx_currencies(current_user: User = Depends(get_current_user)):
 async def download_monthly_statement(year: int, month: int, current_user: User = Depends(get_current_user)):
     if month < 1 or month > 12:
         raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+    from fastapi.responses import Response
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet
     from calendar import monthrange
     start = datetime(year, month, 1)
     last_day = monthrange(year, month)[1]

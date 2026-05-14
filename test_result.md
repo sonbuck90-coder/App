@@ -456,15 +456,18 @@ backend_review_v4:
         comment: "✅ PASS. Created a domestic transfer (POST /api/transfers, sort_code=20-30-40, to=11223344, £12.50) → got txn id. DELETE /api/transactions/{id} → 200 with {message:'Transaction deleted', id:<same>}. Subsequent GET /api/transactions/{id} → 404 'Transaction not found'. DELETE /api/transactions/doesnotexist → 404 as expected."
   - task: "GET /api/statements/monthly"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: false
         agent: "testing"
         comment: "❌ FAIL — 500 Internal Server Error on /api/statements/monthly?year=2025&month=11. Backend traceback: 'File /app/backend/server.py, line 715, in download_monthly_statement / doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=40, bottomMargin=40) / NameError: name SimpleDocTemplate is not defined'. ROOT CAUSE: The function at server.py lines 697–772 uses `SimpleDocTemplate`, `letter`, `getSampleStyleSheet`, `Paragraph`, `Spacer`, AND `Response` (fastapi.responses) but NONE of these are imported either at module top or inside the function. The neighbouring `download_pdf_statement` (line 806) and `download_csv_statement` (line 775) do their reportlab imports INSIDE the function body — that pattern needs to be mirrored here. Fix (≤6 lines): inside `download_monthly_statement`, add: `from fastapi.responses import Response`, `from reportlab.lib.pagesizes import letter`, `from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer`, `from reportlab.lib.styles import getSampleStyleSheet` (the Table / TableStyle / colors imports inside the `if transactions` branch are already present). The month-validation branch DOES work: month=13 → 400 with detail 'Month must be between 1 and 12' (validated before reaching the broken imports)."
+      - working: true
+        agent: "testing"
+        comment: "✅ RETEST PASS (3/3) after main agent added the 4 imports inside download_monthly_statement (lines 701-704: `from fastapi.responses import Response`, `from reportlab.lib.pagesizes import letter`, `from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer`, `from reportlab.lib.styles import getSampleStyleSheet`). Authenticated via POST /api/auth/passcode {passcode:'1234'} → Bearer token. (1) GET /api/statements/monthly?year=2025&month=11 → 200, Content-Type='application/pdf', Content-Disposition='attachment; filename=\"HSBC_Statement_2025_11.pdf\"', body[:8]=b'%PDF-1.4' (valid PDF magic bytes), body length=2019 bytes. (2) GET /api/statements/monthly?year=2024&month=12 → 200, Content-Type='application/pdf', Content-Disposition='attachment; filename=\"HSBC_Statement_2024_12.pdf\"', body[:8]=b'%PDF-1.4', body length=2020 bytes — valid PDF generated even though no transactions exist in that period (the `if not transactions` branch renders 'No transactions in this period.' text and still builds the PDF). (3) GET /api/statements/monthly?year=2025&month=13 → 400 with body `{\"detail\":\"Month must be between 1 and 12\"}`. ALL acceptance criteria satisfied."
 
 frontend_review_v3:
   - task: "Any 4-digit passcode logs in"
