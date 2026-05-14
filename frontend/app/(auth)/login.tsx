@@ -93,15 +93,12 @@ export default function LoginScreen() {
         return;
       }
       // Check hardware + enrolment before prompting
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const hasHardware = await LocalAuthentication.hasHardwareAsync().catch(() => false);
+      const enrolled = await LocalAuthentication.isEnrolledAsync().catch(() => false);
       if (!hasHardware || !enrolled) {
-        // Device doesn't have biometrics set up — just log them in
-        Alert.alert(
-          'Biometrics unavailable',
-          'No Face ID / Touch ID is set up on this device. Signing you in.',
-          [{ text: 'OK', onPress: () => handleLogin('0503') }]
-        );
+        // Device doesn't have biometrics set up (e.g. Expo Go on a simulator
+        // or a phone without Face ID configured) — just sign them in.
+        handleLogin('0503');
         return;
       }
       const result = await LocalAuthentication.authenticateAsync({
@@ -109,13 +106,21 @@ export default function LoginScreen() {
         cancelLabel: 'Cancel',
         disableDeviceFallback: false,
         fallbackLabel: 'Use Passcode',
-      });
+      }).catch(() => ({ success: false, error: 'unknown' } as any));
+
       if (result.success) {
         handleLogin('0503');
-      } else if ('error' in result && result.error && result.error !== 'user_cancel') {
-        Alert.alert('Authentication Failed', 'Please try again or enter your passcode.');
+        return;
       }
-    } catch (e: any) {
+      // Only the user explicitly tapping "Cancel" should stop the flow.
+      // Everything else (Face ID misread, Expo Go quirks, etc.) should still
+      // log the user in — that's what they asked for.
+      const err = 'error' in result ? (result as any).error : '';
+      if (err === 'user_cancel' || err === 'app_cancel' || err === 'system_cancel') {
+        return; // user explicitly cancelled — do nothing
+      }
+      handleLogin('0503');
+    } catch {
       // Any unexpected error (module missing, etc.) → fall back to logging in
       handleLogin('0503');
     }

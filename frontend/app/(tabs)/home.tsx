@@ -15,6 +15,9 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import AppLogo from '../../src/components/AppLogo';
 import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../../src/services/api';
+import { getLayoutFor } from '../../src/context/BankThemes';
+import HomeModern from '../../src/screens/HomeModern';
+import HomeMinimal from '../../src/screens/HomeMinimal';
 
 // HSBC Colors
 const COLORS = {
@@ -28,7 +31,19 @@ const COLORS = {
   background: '#F5F5F5',
 };
 
-export default function HomeScreen() {
+/**
+ * Home layout chooser — picks Classic / Modern / Minimal based on the
+ * active bank theme. Each layout is an entirely different visual design.
+ */
+export default function Home() {
+  const { bankThemeId } = useCustomization();
+  const layout = getLayoutFor(bankThemeId);
+  if (layout === 'modern') return <HomeModern />;
+  if (layout === 'minimal') return <HomeMinimal />;
+  return <HomeClassic />;
+}
+
+function HomeClassic() {
   const { user, refreshUser } = useAuth();
   const { colors: customColors, headerTextColor } = useCustomization();
   const router = useRouter();
