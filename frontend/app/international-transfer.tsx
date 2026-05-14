@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { api, accountsApi, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
+import { useAuthGate } from '../src/components/AuthGate';
 
 const C = { white: '#FFFFFF', bg: '#F5F6F8', card: '#FFFFFF', border: '#E5E8EC', gray: '#8893A3', mid: '#5E6A7A', dark: '#0B1424', success: '#00847F', warn: '#E67E22' };
 
@@ -16,6 +17,7 @@ interface Currency { code: string; name: string; symbol: string; flag: string }
 export default function InternationalTransferScreen() {
   const router = useRouter();
   const { colors: cc, headerTextColor } = useCustomization();
+  const authGate = useAuthGate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [fromAccountId, setFromAccountId] = useState('');
@@ -73,6 +75,11 @@ export default function InternationalTransferScreen() {
     if (!iban.trim() || iban.length < 8) { Alert.alert('Valid IBAN required'); return; }
     if (!swift.trim() || swift.length < 8) { Alert.alert('SWIFT/BIC required (8 or 11 chars)'); return; }
     if (numericAmount <= 0) { Alert.alert('Amount must be greater than 0'); return; }
+    const authed = await authGate.confirm({
+      title: 'Confirm international transfer',
+      subtitle: `Authorise ${symbolOf(sourceCcy)}${numericAmount.toFixed(2)} to ${recipientName} · ${iban.replace(/\s/g, '').toUpperCase()}`,
+    });
+    if (!authed) return;
     setIsSubmitting(true);
     try {
       const res = await api.post('/transfers/international', {
@@ -269,6 +276,7 @@ export default function InternationalTransferScreen() {
           </View>
         </View>
       </Modal>
+      <authGate.Render />
     </SafeAreaView>
   );
 }

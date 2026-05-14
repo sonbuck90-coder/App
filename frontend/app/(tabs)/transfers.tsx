@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
 import { useCustomization } from '../../src/context/CustomizationContext';
+import { useAuthGate } from '../../src/components/AuthGate';
 
 // Static colors (non-primary)
 const COLORS = {
@@ -32,6 +33,7 @@ const COLORS = {
 
 export default function TransfersScreen() {
   const { colors: customColors, headerTextColor } = useCustomization();
+  const authGate = useAuthGate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
@@ -100,20 +102,11 @@ export default function TransfersScreen() {
     setSortCodeError('');
 
     const digits = text.replace(/\D/g, '');
-    if (digits.length === 0) {
-      setBankLookupResult(null);
-    } else if (digits.length >= 2) {
-      if (digits.length < 6) {
-        const partialResult = lookupBank(digits.slice(0, 2) + '0000');
-        if (partialResult.found) {
-          setBankLookupResult({ ...partialResult, error: undefined });
-        } else {
-          setBankLookupResult(null);
-        }
-      } else {
-        const result = lookupBank(digits.slice(0, 6));
-        setBankLookupResult(result);
-      }
+    // Only run the bank lookup once the user has finished typing all 6 digits.
+    // While they are still typing we silently hide the bank-name / warning
+    // banner so they don't see flashing partial messages.
+    if (digits.length === 6) {
+      setBankLookupResult(lookupBank(digits));
     } else {
       setBankLookupResult(null);
     }
@@ -181,6 +174,15 @@ export default function TransfersScreen() {
       Alert.alert('Insufficient Funds', 'You do not have enough balance for this transfer');
       return;
     }
+
+    // Require authentication before kicking off the transfer. This runs on
+    // every payment so Face ID / Touch ID / passcode protects the action even
+    // if the user stayed signed in.
+    const authed = await authGate.confirm({
+      title: 'Confirm payment',
+      subtitle: `Authorise £${transferAmount.toFixed(2)} to ${recipientName} · ${sortCode} ${recipientAccount}`,
+    });
+    if (!authed) return;
 
     setIsLoading(true);
     setIsProcessing(true);
@@ -357,6 +359,7 @@ export default function TransfersScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+        <authGate.Render />
       </SafeAreaView>
     );
   }
@@ -613,6 +616,7 @@ export default function TransfersScreen() {
           <View style={styles.bottomPadding} />
         </ScrollView>
       </KeyboardAvoidingView>
+      <authGate.Render />
     </SafeAreaView>
   );
 }
