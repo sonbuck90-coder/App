@@ -152,6 +152,15 @@ export default function LoginScreen() {
     if (newPasscode.length === PASSCODE_LENGTH) handleLogin(newPasscode);
   };
 
+  // Hidden input handler for physical-keyboard / paste support
+  const handleTypedInput = (text: string) => {
+    // Keep only digits and cap at 4 chars
+    const digits = text.replace(/\D/g, '').slice(0, PASSCODE_LENGTH);
+    setPasscode(digits);
+    setError('');
+    if (digits.length === PASSCODE_LENGTH) handleLogin(digits);
+  };
+
   const handleDelete2 = () => {
     setPasscode((prev) => prev.slice(0, -1));
     setError('');
@@ -198,6 +207,19 @@ export default function LoginScreen() {
       </View>
 
       <View style={styles.content}>
+        {/* Hidden input — lets users type the passcode on a physical keyboard */}
+        <TextInput
+          ref={hiddenInputRef}
+          value={passcode}
+          onChangeText={handleTypedInput}
+          keyboardType="number-pad"
+          maxLength={PASSCODE_LENGTH}
+          autoFocus
+          caretHidden
+          style={styles.hiddenInput}
+          editable={!isLoading}
+          testID="hidden-passcode-input"
+        />
         {/* Logo */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
@@ -369,6 +391,7 @@ const styles = StyleSheet.create({
   keyText: { fontSize: 28, fontWeight: '500', color: COLORS.darkGray },
   biometricHint: { flexDirection: 'row', alignItems: 'center', marginTop: 16 },
   biometricText: { fontSize: 14, color: COLORS.primary, fontWeight: '500', marginLeft: 8 },
+  hiddenInput: { position: 'absolute', opacity: 0, width: 1, height: 1, top: 0, left: 0 },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
