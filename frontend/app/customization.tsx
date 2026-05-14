@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCustomization, HSBC_DEFAULTS, LOGO_SIZES } from '../src/context/CustomizationContext';
+import { BANK_THEMES } from '../src/context/BankThemes';
 import { useAuth } from '../src/context/AuthContext';
 import AppLogo from '../src/components/AppLogo';
 
@@ -52,7 +53,7 @@ const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' |
 
 export default function CustomizationScreen() {
   const router = useRouter();
-  const { settings, colors, headerTextColor, updateColors, updateLogo, updateBankPhone, resetToDefaults, isCustomized } = useCustomization();
+  const { settings, colors, headerTextColor, updateColors, updateLogo, updateBankPhone, applyBankTheme, resetToDefaults, isCustomized, bankThemeId } = useCustomization();
   const { logout } = useAuth();
   const [logoUrl, setLogoUrl] = useState(settings.logo.url);
   const [bankPhone, setBankPhone] = useState(settings.bankPhone);
@@ -169,6 +170,43 @@ export default function CustomizationScreen() {
               <View style={[styles.previewAccentDot, { backgroundColor: colors.accent }]} />
               <Text style={[styles.previewAccentText, { color: colors.accent }]}>Accent Color</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Bank Themes */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Bank Themes</Text>
+          <Text style={styles.helpText}>Tap a UK bank to apply its colour palette instantly.</Text>
+          <View style={styles.bankGrid}>
+            {BANK_THEMES.map((theme) => {
+              const active = theme.id === bankThemeId;
+              const isLightHeader = theme.colors.header === '#FFFFFF' || theme.colors.header === '#F8F4E3';
+              return (
+                <TouchableOpacity
+                  key={theme.id}
+                  style={[styles.bankCard, active && { borderColor: theme.colors.primary, borderWidth: 2 }]}
+                  onPress={() => applyBankTheme(theme.id, theme.colors)}
+                  testID={`bank-theme-${theme.id}`}
+                >
+                  <View style={[styles.bankPreview, { backgroundColor: theme.colors.header }]}>
+                    <View style={[styles.bankInitialsWrap, { backgroundColor: isLightHeader ? theme.colors.primary : 'rgba(255,255,255,0.18)' }]}>
+                      <Text style={[styles.bankInitials, { color: isLightHeader ? '#FFFFFF' : '#FFFFFF' }]}>{theme.initials}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.bankSwatchRow}>
+                    <View style={[styles.bankSwatch, { backgroundColor: theme.colors.primary }]} />
+                    <View style={[styles.bankSwatch, { backgroundColor: theme.colors.accent }]} />
+                    <View style={[styles.bankSwatch, { backgroundColor: theme.colors.header, borderWidth: 1, borderColor: '#E5E8EC' }]} />
+                  </View>
+                  <Text style={styles.bankName} numberOfLines={1}>{theme.name}</Text>
+                  {active && (
+                    <View style={[styles.bankActiveBadge, { backgroundColor: theme.colors.primary }]}>
+                      <Ionicons name="checkmark" size={12} color="#FFFFFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -373,6 +411,16 @@ export default function CustomizationScreen() {
           </View>
         </View>
 
+        {/* Save All */}
+        <TouchableOpacity
+          style={[styles.saveAllBtn, { backgroundColor: colors.primary }]}
+          onPress={() => Alert.alert('Saved', 'All customisation changes have been saved on this device.')}
+          testID="save-all-btn"
+        >
+          <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+          <Text style={styles.saveAllBtnText}>Save All Changes</Text>
+        </TouchableOpacity>
+
         {/* Reset */}
         {isCustomized && (
           <TouchableOpacity style={styles.resetBtn} onPress={handleReset} testID="reset-defaults-btn">
@@ -451,4 +499,16 @@ const styles = StyleSheet.create({
   hexPreview: { width: 36, height: 36, borderRadius: 18 },
   resetBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', marginHorizontal: 16, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: '#DB0011' },
   resetBtnText: { fontSize: 16, fontWeight: '600', color: '#DB0011', marginLeft: 8 },
+  saveAllBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginHorizontal: 16, padding: 16, borderRadius: 10, marginBottom: 12 },
+  saveAllBtnText: { fontSize: 16, fontWeight: '700', color: '#FFFFFF', marginLeft: 8, letterSpacing: 0.3 },
+  helpText: { fontSize: 12, color: '#5E6A7A', marginTop: -4, marginBottom: 12, lineHeight: 17 },
+  bankGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  bankCard: { width: '48%', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EFF1F4', position: 'relative' },
+  bankPreview: { height: 56, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  bankInitialsWrap: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  bankInitials: { fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
+  bankSwatchRow: { flexDirection: 'row', marginBottom: 8 },
+  bankSwatch: { width: 16, height: 16, borderRadius: 8, marginRight: 6 },
+  bankName: { fontSize: 13, fontWeight: '700', color: '#0B1424' },
+  bankActiveBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
 });
