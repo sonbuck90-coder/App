@@ -42,7 +42,7 @@ const DEFAULT_PROFILE: UserProfile = {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { loginWithPasscode } = useAuth();
+  const { loginWithPasscode, refreshUser } = useAuth();
   const [passcode, setPasscode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -170,6 +170,8 @@ export default function LoginScreen() {
           phone: activeProfile.phone || '',
           address: activeProfile.address || '',
         });
+        // Pull the fresh profile back so AuthContext user reflects the new name
+        await refreshUser();
       } catch {
         // non-fatal: continue
       }
