@@ -1,0 +1,246 @@
+/**
+ * Offline statement, receipt, and transactions export.
+ *
+ * Generates HSBC-styled HTML/CSV documents fully on-device. On web the file
+ * is downloaded via a Blob URL. On native it's written to the documents
+ * directory and shared via expo-sharing.
+ */
+import { Platform } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { getDb, Transaction } from './offline-store';
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+function fmtGBP(v: number) {
+  return `£${v.toFixed(2)}`;
+}
+
+function fmtDate(ts: string) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function fmtDateTime(ts: string) {
+  const d = new Date(ts);
+  return d.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+// -----------------------------------------------------------------------------
+// HSBC styled HTML helpers
+// -----------------------------------------------------------------------------
+const HEADER_HTML = `
+  <div class="hsbc-bar">
+    <div class="hex"></div>
+    <div class="brand">HSBC UK</div>
+  </div>
+`;
+
+const STYLES = `
+<style>
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0B1424; margin: 0; padding: 0; background: #ffffff; }
+  .page { max-width: 720px; margin: 0 auto; padding: 36px 40px; }
+  .hsbc-bar { display: flex; align-items: center; border-bottom: 3px solid #DB0011; padding-bottom: 12px; margin-bottom: 24px; }
+  .hex { width: 28px; height: 28px; background: #DB0011; clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); margin-right: 12px; }
+  .brand { font-size: 22px; font-weight: 800; color: #DB0011; letter-spacing: 1.5px; }
+  h1 { font-size: 24px; margin: 0 0 4px; color: #0B1424; }
+  .sub { font-size: 13px; color: #5E6A7A; margin-bottom: 24px; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .meta .label { font-size: 11px; color: #8893A3; text-transform: uppercase; letter-spacing: 0.7px; }
+  .meta .val { font-size: 14px; font-weight: 600; color: #0B1424; margin-top: 2px; }
+  .summary { background: #F5F6F8; border-radius: 8px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .summary .lbl { font-size: 11px; color: #5E6A7A; text-transform: uppercase; letter-spacing: 0.7px; }
+  .summary .amt { font-size: 22px; font-weight: 800; color: #DB0011; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; padding: 10px 6px; font-size: 11px; color: #8893A3; text-transform: uppercase; border-bottom: 1px solid #E5E8EC; letter-spacing: 0.6px; }
+  td { padding: 10px 6px; border-bottom: 1px solid #EFF1F4; vertical-align: top; }
+  td.right { text-align: right; }
+  .pos { color: #00847F; font-weight: 600; }
+  .neg { color: #0B1424; font-weight: 600; }
+  .footer { margin-top: 28px; font-size: 10.5px; color: #8893A3; line-height: 1.5; }
+  .footer strong { color: #5E6A7A; }
+  .receipt-card { border: 1px solid #E5E8EC; border-radius: 10px; padding: 22px 24px; margin-bottom: 18px; }
+  .receipt-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #EFF1F4; }
+  .receipt-row:last-child { border-bottom: none; }
+  .receipt-row .k { font-size: 12px; color: #5E6A7A; }
+  .receipt-row .v { font-size: 13.5px; font-weight: 600; color: #0B1424; }
+  .receipt-amt { font-size: 30px; font-weight: 800; color: #DB0011; text-align: center; padding: 14px 0; }
+</style>
+`;
+
+// -----------------------------------------------------------------------------
+// Statement HTML
+// -----------------------------------------------------------------------------
+async function buildStatementHtml(year: number, monthIdx1: number): Promise<string> {
+  const db = await getDb();
+  const first = new Date(year, monthIdx1 - 1, 1);
+  const last = new Date(year, monthIdx1, 0);
+
+  const txns = db.transactions
+    .filter((t) => {
+      const ts = new Date(t.timestamp);
+      return ts >= first && ts <= new Date(year, monthIdx1, 0, 23, 59, 59);
+    })
+    .sort((a, b) => (a.timestamp < b.timestamp ? -1 : 1));
+
+  const credits = txns.filter((t) => t.transaction_type === 'deposit');
+  const debits = txns.filter((t) => t.transaction_type !== 'deposit');
+  const totalCredits = credits.reduce((s, t) => s + t.amount, 0);
+  const totalDebits = debits.reduce((s, t) => s + t.amount, 0);
+
+  const checking = db.accounts.find((a) => a.account_type === 'checking');
+  const periodLabel = `${MONTHS[monthIdx1 - 1]} ${year}`;
+
+  const rows = txns
+    .map((t) => {
+      const isDeposit = t.transaction_type === 'deposit';
+      return `<tr>
+        <td>${fmtDate(t.timestamp)}</td>
+        <td>${escapeHtml(t.description)}<div style="color:#8893A3;font-size:11px;margin-top:2px">${escapeHtml(t.recipient_name || '')}${t.reference ? ` · Ref ${escapeHtml(t.reference)}` : ''}</div></td>
+        <td class="right ${isDeposit ? 'pos' : 'neg'}">${isDeposit ? '+' : '−'} ${fmtGBP(t.amount)}</td>
+      </tr>`;
+    })
+    .join('');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>HSBC Statement — ${periodLabel}</title>${STYLES}</head>
+  <body><div class="page">
+    ${HEADER_HTML}
+    <h1>Monthly Statement</h1>
+    <div class="sub">${periodLabel} · Account ${checking?.sort_code || '--'} ${checking?.account_number || '--'}</div>
+    <div class="meta">
+      <div><div class="label">Account holder</div><div class="val">${escapeHtml(db.profile.name)}</div></div>
+      <div><div class="label">Address</div><div class="val">${escapeHtml(db.profile.address)}</div></div>
+      <div><div class="label">Statement period</div><div class="val">${fmtDate(first.toISOString())} – ${fmtDate(last.toISOString())}</div></div>
+      <div><div class="label">Currency</div><div class="val">GBP (£)</div></div>
+    </div>
+    <div class="summary">
+      <div><div class="lbl">Money in</div><div class="amt" style="color:#00847F">${fmtGBP(totalCredits)}</div></div>
+      <div><div class="lbl">Money out</div><div class="amt">${fmtGBP(totalDebits)}</div></div>
+      <div><div class="lbl">Closing balance</div><div class="amt">${fmtGBP(checking?.balance || 0)}</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Date</th><th>Description</th><th class="right">Amount</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="3" style="text-align:center;color:#8893A3;padding:24px 0">No transactions in this period</td></tr>'}</tbody>
+    </table>
+    <div class="footer">
+      <strong>HSBC UK Bank plc.</strong> Registered in England and Wales, number 09928412. Registered Office: 1 Centenary Square, Birmingham B1 1HQ.<br/>
+      HSBC UK Bank plc is authorised by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation Authority.<br/>
+      This is an electronic copy of your statement, generated on ${fmtDateTime(new Date().toISOString())}.
+    </div>
+  </div></body></html>`;
+}
+
+// -----------------------------------------------------------------------------
+// Receipt HTML
+// -----------------------------------------------------------------------------
+function buildReceiptHtml(t: Transaction, holderName: string): string {
+  const isDeposit = t.transaction_type === 'deposit';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt</title>${STYLES}</head>
+  <body><div class="page">
+    ${HEADER_HTML}
+    <h1>Transaction Receipt</h1>
+    <div class="sub">Generated ${fmtDateTime(new Date().toISOString())}</div>
+    <div class="receipt-card">
+      <div class="receipt-amt">${isDeposit ? '+' : '−'} ${fmtGBP(t.amount)}</div>
+      <div class="receipt-row"><span class="k">Status</span><span class="v" style="color:#00847F">${escapeHtml(t.status)}</span></div>
+      <div class="receipt-row"><span class="k">Description</span><span class="v">${escapeHtml(t.description)}</span></div>
+      <div class="receipt-row"><span class="k">${isDeposit ? 'From' : 'To'}</span><span class="v">${escapeHtml(t.recipient_name || '—')}</span></div>
+      ${t.recipient_sort_code ? `<div class="receipt-row"><span class="k">Sort code</span><span class="v">${escapeHtml(t.recipient_sort_code)}</span></div>` : ''}
+      ${t.recipient_account_number ? `<div class="receipt-row"><span class="k">Account</span><span class="v">${escapeHtml(t.recipient_account_number)}</span></div>` : ''}
+      <div class="receipt-row"><span class="k">Date</span><span class="v">${fmtDateTime(t.timestamp)}</span></div>
+      ${t.reference ? `<div class="receipt-row"><span class="k">Reference</span><span class="v">${escapeHtml(t.reference)}</span></div>` : ''}
+      ${t.trn ? `<div class="receipt-row"><span class="k">TRN</span><span class="v">${escapeHtml(t.trn)}</span></div>` : ''}
+      ${t.fpid ? `<div class="receipt-row"><span class="k">FPID</span><span class="v">${escapeHtml(t.fpid)}</span></div>` : ''}
+      <div class="receipt-row"><span class="k">Holder</span><span class="v">${escapeHtml(holderName)}</span></div>
+    </div>
+    <div class="footer">HSBC UK Bank plc · Digital receipt. Please retain for your records.</div>
+  </div></body></html>`;
+}
+
+// -----------------------------------------------------------------------------
+// CSV
+// -----------------------------------------------------------------------------
+function buildCsv(txns: Transaction[]): string {
+  const rows = [['Date', 'Description', 'Counterparty', 'Reference', 'Type', 'Amount (GBP)']];
+  txns.forEach((t) => {
+    rows.push([
+      fmtDate(t.timestamp),
+      t.description,
+      t.recipient_name || '',
+      t.reference || '',
+      t.transaction_type,
+      `${t.transaction_type === 'deposit' ? '+' : '-'}${t.amount.toFixed(2)}`,
+    ]);
+  });
+  return rows
+    .map((r) => r.map((c) => `"${(c || '').toString().replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+}
+
+function escapeHtml(s: string) {
+  return (s || '').replace(/[&<>"']/g, (c) =>
+    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&#39;',
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Public exports (download / share helpers)
+// -----------------------------------------------------------------------------
+async function deliver(filename: string, mime: string, content: string) {
+  if (Platform.OS === 'web') {
+    const blob = new Blob([content], { type: mime });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return;
+  }
+  const uri = `${FileSystem.documentDirectory}${filename}`;
+  await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: filename });
+  }
+}
+
+export async function downloadMonthlyStatement(year: number, monthIdx1: number) {
+  const html = await buildStatementHtml(year, monthIdx1);
+  await deliver(
+    `HSBC_Statement_${year}_${String(monthIdx1).padStart(2, '0')}.html`,
+    'text/html',
+    html,
+  );
+}
+
+export async function downloadReceipt(txn: Transaction) {
+  const db = await getDb();
+  const html = buildReceiptHtml(txn, db.profile.name);
+  await deliver(`HSBC_Receipt_${txn.id}.html`, 'text/html', html);
+}
+
+export async function downloadTransactionsExport(format: 'csv' | 'pdf' | 'html') {
+  const db = await getDb();
+  const txns = [...db.transactions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
+  if (format === 'csv') {
+    await deliver(`HSBC_Transactions_${Date.now()}.csv`, 'text/csv', buildCsv(txns));
+    return;
+  }
+  // pdf or html → deliver styled HTML (browser/native both treat it as a doc)
+  const html = await buildStatementHtml(new Date().getFullYear(), new Date().getMonth() + 1);
+  await deliver(
+    `HSBC_Transactions_${Date.now()}.html`,
+    'text/html',
+    html,
+  );
+}

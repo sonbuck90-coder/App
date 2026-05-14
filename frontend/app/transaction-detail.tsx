@@ -64,23 +64,8 @@ export default function TransactionDetailScreen() {
     if (!txn) return;
     setIsDownloading(true);
     try {
-      const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
-      const token = api.defaults.headers.common['Authorization'];
-      const url = `${BACKEND_URL}/api/receipts/${txn.id}`;
-
-      if (Platform.OS === 'web') {
-        const tokenStr = typeof token === 'string' ? token.replace('Bearer ', '') : '';
-        window.open(`${url}?token=${tokenStr}`, '_blank');
-      } else {
-        const fileUri = `${FileSystem.documentDirectory}HSBC_Receipt_${txn.id.slice(0, 8)}.pdf`;
-        const tokenStr = typeof token === 'string' ? token : '';
-        const dl = await FileSystem.downloadAsync(url, fileUri, { headers: { Authorization: tokenStr } });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(dl.uri);
-        } else {
-          Alert.alert('Success', `Saved to ${dl.uri}`);
-        }
-      }
+      const { downloadReceipt } = await import('../src/services/offline-docs');
+      await downloadReceipt(txn as any);
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to download receipt.');

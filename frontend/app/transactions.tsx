@@ -81,31 +81,8 @@ export default function TransactionsScreen() {
   const downloadStatement = async (format: 'csv' | 'pdf') => {
     setIsDownloading(true);
     try {
-      const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
-      const { api } = require('../src/services/api');
-      const token = api.defaults.headers.common['Authorization'];
-      
-      if (Platform.OS === 'web') {
-        // Web: open in new tab
-        const url = `${BACKEND_URL}/api/statements/${format}`;
-        const tokenStr = typeof token === 'string' ? token.replace('Bearer ', '') : '';
-        window.open(`${url}?token=${tokenStr}`, '_blank');
-      } else {
-        // Mobile: download and share
-        const url = `${BACKEND_URL}/api/statements/${format}`;
-        const fileUri = `${FileSystem.documentDirectory}HSBC_Statement.${format}`;
-        const tokenStr = typeof token === 'string' ? token : '';
-        
-        const download = await FileSystem.downloadAsync(url, fileUri, {
-          headers: { Authorization: tokenStr },
-        });
-        
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(download.uri);
-        } else {
-          Alert.alert('Success', `Statement saved to ${download.uri}`);
-        }
-      }
+      const { downloadTransactionsExport } = await import('../src/services/offline-docs');
+      await downloadTransactionsExport(format);
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to download statement. Please try again.');

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { offlineAdapter } from './offline-adapter';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
 
@@ -8,6 +9,9 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  // Route every request through the offline adapter — the app works fully
+  // offline. The base URL above is kept only for cosmetic logging.
+  adapter: offlineAdapter,
 });
 
 // Always attach the latest token from AsyncStorage, even if AuthContext hasn't hydrated yet

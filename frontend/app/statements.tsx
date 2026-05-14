@@ -3,10 +3,8 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { api } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { downloadMonthlyStatement } from '../src/services/offline-docs';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
@@ -14,8 +12,6 @@ export default function StatementsScreen() {
   const router = useRouter();
   const { colors: cc, headerTextColor } = useCustomization();
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
 
   // Build a list of the last 12 months
@@ -29,30 +25,7 @@ export default function StatementsScreen() {
     const key = `${y}-${m}`;
     setDownloadingKey(key);
     try {
-      const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || '';
-      const token = api.defaults.headers.common['Authorization'];
-      const tokenStr = typeof token === 'string' ? token : '';
-      const url = `${BACKEND}/api/statements/monthly?year=${y}&month=${m}`;
-      if (Platform.OS === 'web') {
-        // For web, fetch as blob and trigger browser download
-        const resp = await fetch(url, { headers: { Authorization: tokenStr } });
-        if (!resp.ok) throw new Error('Failed to download');
-        const blob = await resp.blob();
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `HSBC_Statement_${y}_${String(m).padStart(2, '0')}.pdf`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-      } else {
-        const fileUri = `${FileSystem.documentDirectory}HSBC_Statement_${y}_${String(m).padStart(2, '0')}.pdf`;
-        const dl = await FileSystem.downloadAsync(url, fileUri, { headers: { Authorization: tokenStr } });
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(dl.uri);
-        } else {
-          Alert.alert('Saved', `PDF saved to ${dl.uri}`);
-        }
-      }
+      await downloadMonthlyStatement(y, m);
     } catch (e: any) {
       Alert.alert('Download Failed', e.message || 'Could not download statement');
     } finally {
