@@ -64,19 +64,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginWithPasscode = async (passcode: string) => {
-    try {
-      const response = await api.post('/auth/passcode', { passcode });
-      const { access_token, user: userData } = response.data;
-      
-      await AsyncStorage.setItem('auth_token', access_token);
-      await AsyncStorage.setItem('auth_user', JSON.stringify(userData));
-      
-      api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
-      setToken(access_token);
-      setUser(userData);
-    } catch (error: any) {
-      throw new Error(error.response?.data?.detail || 'Invalid passcode');
+    // Try the API up to 2 times with a generous timeout. Network blips in
+    // Expo Go / tunneled previews can otherwise look like "wrong passcode".
+    const attempt = async () => {
+      return api.post('/auth/passcode', { passcode }, { timeout: 12000 });
+    };
+    let lastError: any = null;
+    for (let i = 0; i < 2; i++) {
+      try {
+        const response = await attempt();
+        const { access_token, user: userData } = response.data;
+
+        await AsyncStorage.setItem('auth_token', access_token);
+        await AsyncStorage.setItem('auth_user', JSON.stringify(userData));
+
+        api.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+        setToken(access_token);
+        setUser(userData);
+        return;
+      } catch (error: any) {
+        lastError = error;
+        // If the server explicitly rejected the passcode (4xx), don't retry.
+        const status = error?.response?.status;
+        if (status && status >= 400 && status < 500) break;
+        // network / timeout / 5xx — small pause then retry
+        await new Promise((r) => setTimeout(r, 500));
+      }
     }
+    const status = lastError?.response?.status;
+    if (status === 401) {
+      throw new Error('Invalid passcode. Please enter any 4 digits.');
+    }
+    if (lastError?.code === 'ECONNABORTED' || lastError?.message === 'Network Error') {
+      throw new Error('Cannot reach the bank servers. Check your connection and try again.');
+    }
+    throw new Error(lastError?.response?.data?.detail || 'Login failed. Please try again.');
   };
 
   const register = async (email: string, password: string, name: string) => {

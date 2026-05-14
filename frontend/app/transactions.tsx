@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { transactionsApi, Transaction } from '../src/services/api';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import BackButton from '../src/components/BackButton';
 
 const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5', warning: '#E67E22' };
 
@@ -126,6 +127,7 @@ export default function TransactionsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <BackButton color={COLORS.white} />
         <Text style={styles.headerTitle}>Transaction History</Text>
       </View>
 
@@ -240,7 +242,7 @@ export default function TransactionsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   loading: { flex: 1, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
-  header: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 16 },
+  header: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center' },
   headerTitle: { fontSize: 20, fontWeight: '600', color: COLORS.white },
   filterContainer: { flexDirection: 'row', backgroundColor: COLORS.white, margin: 16, borderRadius: 8, padding: 4 },
   filterTab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 6 },

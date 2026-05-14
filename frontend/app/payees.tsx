@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { payeesApi, Payee } from '../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode } from '../src/services/bank-lookup';
+import BackButton from '../src/components/BackButton';
 
 const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5' };
 
@@ -87,6 +88,7 @@ export default function PayeesScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
+        <BackButton color={COLORS.white} />
         <Text style={styles.headerTitle}>Manage Payees</Text>
       </View>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -162,7 +164,7 @@ export default function PayeesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   loading: { flex: 1, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
-  header: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 16 },
+  header: { backgroundColor: COLORS.primary, paddingHorizontal: 20, paddingVertical: 16, flexDirection: 'row', alignItems: 'center' },
   headerTitle: { fontSize: 20, fontWeight: '600', color: COLORS.white },
   scrollView: { flex: 1 },
   addButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white, margin: 16, padding: 16, borderRadius: 8, borderWidth: 1, borderColor: COLORS.primary, borderStyle: 'dashed' },

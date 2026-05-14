@@ -7,6 +7,7 @@ import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuth } from '../src/context/AuthContext';
 import RichMessage from '../src/components/RichMessage';
 import TypingDots from '../src/components/TypingDots';
+import BackButton from '../src/components/BackButton';
 
 const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5', bubbleBg: '#FFFFFF', userBubbleText: '#FFFFFF' };
 
@@ -225,6 +226,7 @@ export default function ChatScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={[styles.header, { backgroundColor: cc.header }]}>
         <View style={styles.headerLeft}>
+          <BackButton color={headerTextColor} />
           <View style={[styles.aiAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
             <Ionicons name="chatbubbles" size={18} color={C.white} />
           </View>
