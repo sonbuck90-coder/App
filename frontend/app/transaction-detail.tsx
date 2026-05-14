@@ -174,6 +174,8 @@ export default function TransactionDetailScreen() {
           <View style={s.invoiceDivider} />
 
           <InvoiceRow label="Reference" value={reference} mono />
+          {txn.trn && <InvoiceRow label="TRN" value={txn.trn} mono />}
+          {txn.fpid && <InvoiceRow label="FPID" value={txn.fpid} mono />}
           <InvoiceRow label="Date & Time" value={formatDateTime(txn.timestamp)} />
           <InvoiceRow label="Transaction Type" value={txn.transaction_type.charAt(0).toUpperCase() + txn.transaction_type.slice(1)} />
           <InvoiceRow label="Status" value={txn.status.charAt(0).toUpperCase() + txn.status.slice(1)} valueColor={txn.status === 'completed' ? C.success : C.warning} />

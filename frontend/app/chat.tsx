@@ -70,11 +70,16 @@ export default function ChatScreen() {
         `\n` +
         `**Amount:** ${txn.transaction_type === 'deposit' ? '+' : '-'}${fmt(txn.amount)}\n` +
         `**To:** ${txn.recipient_name || 'N/A'}\n` +
+        (txn.recipient_sort_code ? `**Sort Code:** ${txn.recipient_sort_code}\n` : '') +
+        (txn.recipient_account_number ? `**Account No.:** ${txn.recipient_account_number}\n` : '') +
+        (txn.recipient_bank_name ? `**Bank:** ${txn.recipient_bank_name}\n` : '') +
         `**Description:** ${txn.description}\n` +
         `**Date:** ${fmtDate(txn.timestamp)}\n` +
         `**Time:** ${fmtTime(txn.timestamp)}\n` +
         `**Status:** ✅ ${txn.status.charAt(0).toUpperCase() + txn.status.slice(1)}\n` +
         `**Reference:** ${txn.id.slice(0, 12).toUpperCase()}\n` +
+        (txn.trn ? `**TRN:** ${txn.trn}\n` : '') +
+        (txn.fpid ? `**FPID:** ${txn.fpid}\n` : '') +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
         `HSBC UK | Secure Banking`;
@@ -203,8 +208,8 @@ export default function ChatScreen() {
     // Refresh data for accurate responses
     await loadData();
 
-    // Realistic short typing delay (1.2-2s based on response length)
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Realistic typing delay (7s as configured for production-feel responses)
+    await new Promise(resolve => setTimeout(resolve, 7000));
 
     const response = getScriptedResponse(text.trim());
     const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };

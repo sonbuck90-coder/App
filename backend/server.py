@@ -95,8 +95,32 @@ class Transaction(BaseModel):
     recipient_account_number: Optional[str] = None
     recipient_bank_name: Optional[str] = None
     reference: Optional[str] = None
+    trn: Optional[str] = None  # Transaction Reference Number (sender-assigned)
+    fpid: Optional[str] = None  # Faster Payment ID
     status: str = "completed"  # pending, completed, failed
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+
+def generate_trn(seed: str) -> str:
+    """Generate a 16-char alphanumeric Transaction Reference Number (uppercase)."""
+    import hashlib
+    h = hashlib.sha256(seed.encode()).hexdigest().upper()
+    # Convert hex to alphanumeric-ish, take 16 chars
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    out = []
+    for i in range(0, 32, 2):
+        n = int(h[i:i+2], 16)
+        out.append(alphabet[n % len(alphabet)])
+    return "TRN" + "".join(out[:13])  # e.g. TRN + 13 chars = 16 total
+
+
+def generate_fpid(seed: str) -> str:
+    """Generate an 18-digit Faster Payment ID prefixed with FP (e.g. FP180527420019823017)."""
+    import hashlib
+    h = hashlib.sha256(("fpid:" + seed).encode()).hexdigest()
+    # Take first 18 hex chars, convert to int, mod to fit 18 digits
+    n = int(h[:16], 16) % (10 ** 18)
+    return f"FP{n:018d}"
 
 class TransferRequest(BaseModel):
     from_account_id: str
@@ -479,13 +503,24 @@ async def get_transactions(
         query["transaction_type"] = "deposit"
     
     transactions = await db.transactions.find(query).sort("timestamp", -1).to_list(limit)
-    return [Transaction(**txn) for txn in transactions]
+    result = []
+    for txn in transactions:
+        if not txn.get("trn"):
+            txn["trn"] = generate_trn(txn.get("id", ""))
+        if not txn.get("fpid"):
+            txn["fpid"] = generate_fpid(txn.get("id", ""))
+        result.append(Transaction(**txn))
+    return result
 
 @api_router.get("/transactions/{transaction_id}", response_model=Transaction)
 async def get_transaction(transaction_id: str, current_user: User = Depends(get_current_user)):
     txn = await db.transactions.find_one({"id": transaction_id, "user_id": current_user.id})
     if not txn:
         raise HTTPException(status_code=404, detail="Transaction not found")
+    if not txn.get("trn"):
+        txn["trn"] = generate_trn(transaction_id)
+    if not txn.get("fpid"):
+        txn["fpid"] = generate_fpid(transaction_id)
     return Transaction(**txn)
 
 @api_router.get("/statements/csv")
@@ -684,6 +719,9 @@ async def create_transfer(transfer: TransferRequest, current_user: User = Depend
         recipient_bank_name=recipient_bank_name,
         reference=transfer.description or None,
     )
+    # Assign TRN and FPID based on the transaction id (deterministic)
+    transaction.trn = generate_trn(transaction.id)
+    transaction.fpid = generate_fpid(transaction.id)
     await db.transactions.insert_one(transaction.dict())
     
     # Save/update payee for recent payees feature

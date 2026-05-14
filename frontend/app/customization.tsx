@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useCustomization, HSBC_DEFAULTS, LOGO_SIZES } from '../src/context/CustomizationContext';
 import AppLogo from '../src/components/AppLogo';
 
@@ -47,6 +48,45 @@ export default function CustomizationScreen() {
     }
   };
 
+  const [isPicking, setIsPicking] = useState(false);
+
+  const handlePickFromGallery = async () => {
+    try {
+      setIsPicking(true);
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission needed', 'Please allow photo library access to choose a logo.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.6,
+        base64: true,
+      });
+      if (result.canceled) return;
+      const asset = result.assets[0];
+      const dataUri = asset.base64
+        ? `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+        : asset.uri;
+      // Persist as logo url (works for both data URIs and remote URIs)
+      updateLogo({ url: dataUri });
+      setLogoUrl(dataUri);
+      Alert.alert('Logo Updated', 'Your gallery photo is now the app logo.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Could not load image');
+    } finally {
+      setIsPicking(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    updateLogo({ url: '' });
+    setLogoUrl('');
+    Alert.alert('Logo Removed', 'Default HSBC logo restored.');
+  };
+
   const handleReset = () => {
     Alert.alert('Reset to Defaults', 'This will restore all colors and logo to HSBC defaults.', [
       { text: 'Cancel', style: 'cancel' },
@@ -86,6 +126,44 @@ export default function CustomizationScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Logo</Text>
           <View style={styles.card}>
+            {/* Gallery Picker */}
+            <Text style={styles.fieldLabel}>Custom Logo from Gallery</Text>
+            <TouchableOpacity
+              style={[styles.galleryBtn, { borderColor: colors.primary }]}
+              onPress={handlePickFromGallery}
+              disabled={isPicking}
+              testID="pick-gallery-btn"
+            >
+              {isPicking ? (
+                <ActivityIndicator color={colors.primary} />
+              ) : (
+                <>
+                  <Ionicons name="images-outline" size={22} color={colors.primary} />
+                  <Text style={[styles.galleryBtnText, { color: colors.primary }]}>
+                    {settings.logo.url ? 'Choose another photo' : 'Pick photo from gallery'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {settings.logo.url ? (
+              <View style={styles.currentLogoRow}>
+                <Image source={{ uri: settings.logo.url }} style={styles.currentLogoImg} resizeMode="cover" />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.currentLogoText}>Active logo</Text>
+                  <TouchableOpacity onPress={handleRemoveLogo} testID="remove-logo-btn">
+                    <Text style={[styles.removeLogoText, { color: colors.primary }]}>Remove & restore default</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.orDivider}>
+              <View style={styles.orLine} />
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.orLine} />
+            </View>
+
             <Text style={styles.fieldLabel}>Custom Logo URL</Text>
             <View style={styles.logoInputRow}>
               <TextInput
@@ -210,6 +288,15 @@ const styles = StyleSheet.create({
   section: { marginHorizontal: 16, marginBottom: 20 },
   sectionTitle: { fontSize: 16, fontWeight: '600', color: '#333333', marginBottom: 10 },
   card: { backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16 },
+  galleryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderStyle: 'dashed', borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginTop: 8, marginBottom: 6 },
+  galleryBtnText: { fontSize: 14, fontWeight: '600', marginLeft: 10 },
+  currentLogoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: '#F5F5F5', padding: 12, borderRadius: 8 },
+  currentLogoImg: { width: 48, height: 48, borderRadius: 8 },
+  currentLogoText: { fontSize: 13, fontWeight: '600', color: '#333333' },
+  removeLogoText: { fontSize: 12, fontWeight: '500', marginTop: 4 },
+  orDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
+  orLine: { flex: 1, height: 1, backgroundColor: '#E0E0E0' },
+  orText: { fontSize: 11, color: '#999', fontWeight: '600', marginHorizontal: 10, letterSpacing: 1 },
   fieldLabel: { fontSize: 13, fontWeight: '500', color: '#767676', marginBottom: 8 },
   logoInputRow: { flexDirection: 'row', alignItems: 'center' },
   input: { flex: 1, backgroundColor: '#F5F5F5', borderRadius: 6, paddingHorizontal: 14, height: 44, fontSize: 14, color: '#333', borderWidth: 1, borderColor: '#E0E0E0', marginRight: 8 },

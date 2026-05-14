@@ -52,6 +52,8 @@ export interface Transaction {
   recipient_account_number?: string;
   recipient_bank_name?: string;
   reference?: string;
+  trn?: string;
+  fpid?: string;
   status: string;
   timestamp: string;
 }
