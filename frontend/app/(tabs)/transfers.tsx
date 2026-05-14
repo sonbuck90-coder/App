@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -49,6 +50,7 @@ export default function TransfersScreen() {
   const [sortCodeError, setSortCodeError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingProgress, setProcessingProgress] = useState(0);
+  const [showReview, setShowReview] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [receiptData, setReceiptData] = useState<{
     amount: number;
@@ -143,71 +145,71 @@ export default function TransfersScreen() {
     return true;
   };
 
-  const handleTransfer = async () => {
+  // First step: validate the form and show the review screen. This separates
+  // the form-filling state from the auth & processing state, which prevents
+  // the screen from appearing to freeze (the previous flow showed the
+  // password keypad over a still-active form and a 5-second progress bar).
+  const handleReviewOpen = () => {
     if (!selectedAccount) {
       Alert.alert('Error', 'Please select an account');
       return;
     }
-
     if (!recipientName.trim()) {
       Alert.alert('Error', 'Please enter recipient name');
       return;
     }
-
-    // Sort code validation
-    if (!validateSortCode()) {
-      return;
-    }
-
+    if (!validateSortCode()) return;
     if (!recipientAccount) {
       Alert.alert('Error', 'Please enter recipient account number');
       return;
     }
-
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
       return;
     }
-
     const transferAmount = parseFloat(amount);
     if (transferAmount > selectedAccount.balance) {
       Alert.alert('Insufficient Funds', 'You do not have enough balance for this transfer');
       return;
     }
+    setShowReview(true);
+  };
 
-    // Require authentication before kicking off the transfer. This runs on
-    // every payment so Face ID / Touch ID / passcode protects the action even
-    // if the user stayed signed in.
+  // Second step: user has confirmed the review → authenticate, run the
+  // simulated processing screen (3 s), and create the transfer.
+  const handleConfirmAndSend = async () => {
+    if (!selectedAccount || isProcessing) return;
+
     const authed = await authGate.confirm({
       title: 'Confirm payment',
-      subtitle: `Authorise £${transferAmount.toFixed(2)} to ${recipientName} · ${sortCode} ${recipientAccount}`,
+      subtitle: `Authorise £${parseFloat(amount).toFixed(2)} to ${recipientName} · ${sortCode} ${recipientAccount}`,
     });
     if (!authed) return;
 
-    setIsLoading(true);
+    const transferAmount = parseFloat(amount);
     setIsProcessing(true);
     setProcessingProgress(0);
-    
-    // 5-second processing delay with progress
-    const progressInterval = setInterval(() => {
-      setProcessingProgress(prev => Math.min(prev + 20, 100));
-    }, 1000);
-    
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    clearInterval(progressInterval);
-    setProcessingProgress(100);
-    
-    try {
-      const result = await transfersApi.create({
-        from_account_id: selectedAccount.id,
-        to_account_number: recipientAccount,
-        amount: transferAmount,
-        description: description || `Transfer to ${recipientName || recipientAccount}`,
-        recipient_name: recipientName,
-        sort_code: sortCode,
-      });
 
-      // Show receipt
+    // Animate the progress bar over ~3 seconds.
+    const progressInterval = setInterval(() => {
+      setProcessingProgress((prev) => Math.min(prev + 20, 100));
+    }, 600);
+
+    try {
+      // Run the wait + API call in parallel so we never "freeze" longer
+      // than necessary.
+      const [_, result] = await Promise.all([
+        new Promise((resolve) => setTimeout(resolve, 3000)),
+        transfersApi.create({
+          from_account_id: selectedAccount.id,
+          to_account_number: recipientAccount,
+          amount: transferAmount,
+          description: description || `Transfer to ${recipientName || recipientAccount}`,
+          recipient_name: recipientName,
+          sort_code: sortCode,
+        }),
+      ]);
+
       setReceiptData({
         amount: transferAmount,
         recipient: recipientName,
@@ -215,16 +217,18 @@ export default function TransfersScreen() {
         accountNumber: recipientAccount,
         description: description || `Transfer to ${recipientName}`,
         date: new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' }),
-        reference: result.data.id.slice(0, 12).toUpperCase(),
+        reference: (result.data.id || '').slice(0, 12).toUpperCase() || `REF${Math.floor(Math.random() * 1e6)}`,
         fromAccount: `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}`,
       });
+      setShowReview(false);
       setShowReceipt(true);
+      // Refresh in the background — never block the receipt rendering.
       fetchAccounts();
       fetchRecentPayees();
     } catch (error: any) {
-      Alert.alert('Transfer Failed', error.response?.data?.detail || 'Unable to complete transfer');
+      Alert.alert('Transfer Failed', error?.response?.data?.detail || 'Unable to complete transfer');
     } finally {
-      setIsLoading(false);
+      clearInterval(progressInterval);
       setIsProcessing(false);
       setProcessingProgress(0);
     }
@@ -596,26 +600,89 @@ export default function TransfersScreen() {
             />
           </View>
 
-          {/* Transfer Button */}
+          {/* Transfer Button — opens the Review screen first */}
           <TouchableOpacity
-            style={[styles.transferButton, (isLoading || isProcessing) && styles.transferButtonDisabled, { backgroundColor: customColors.primary }]}
-            onPress={handleTransfer}
-            disabled={isLoading || isProcessing}
+            style={[styles.transferButton, { backgroundColor: customColors.primary }]}
+            onPress={handleReviewOpen}
             testID="transfer-now-button"
           >
-            {isProcessing ? (
-              <View style={styles.processingContainer}>
-                <ActivityIndicator color={COLORS.white} size="small" />
-                <Text style={styles.processingText}>Processing... {processingProgress}%</Text>
-              </View>
-            ) : (
-              <Text style={styles.transferButtonText}>Transfer Now</Text>
-            )}
+            <Text style={styles.transferButtonText}>Review &amp; Continue</Text>
           </TouchableOpacity>
 
           <View style={styles.bottomPadding} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Review / Confirmation modal */}
+      <Modal visible={showReview} transparent={false} animationType="slide" onRequestClose={() => !isProcessing && setShowReview(false)}>
+        <SafeAreaView style={styles.reviewContainer} edges={['top']}>
+          <View style={[styles.reviewHeader, { backgroundColor: customColors.header }]}>
+            <TouchableOpacity onPress={() => !isProcessing && setShowReview(false)} disabled={isProcessing} style={styles.reviewBackBtn}>
+              <Ionicons name="chevron-back" size={26} color={headerTextColor} />
+            </TouchableOpacity>
+            <Text style={[styles.reviewHeaderTitle, { color: headerTextColor }]}>Review payment</Text>
+            <View style={{ width: 26 }} />
+          </View>
+
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20 }}>
+            <Text style={styles.reviewIntro}>Please check the details below. Once you tap "Confirm &amp; Send" the payment will be processed.</Text>
+
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewAmountLabel}>Amount</Text>
+              <Text style={[styles.reviewAmount, { color: customColors.primary }]}>£{(parseFloat(amount || '0')).toFixed(2)}</Text>
+            </View>
+
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewSectionTitle}>To</Text>
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Recipient</Text><Text style={styles.reviewVal}>{recipientName || '—'}</Text></View>
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Sort code</Text><Text style={styles.reviewVal}>{sortCode || '—'}</Text></View>
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Account number</Text><Text style={styles.reviewVal}>{recipientAccount || '—'}</Text></View>
+              {bankLookupResult?.bankName && (
+                <View style={styles.reviewRow}><Text style={styles.reviewKey}>Bank</Text><Text style={styles.reviewVal}>{bankLookupResult.bankName}</Text></View>
+              )}
+              {!!description && (
+                <View style={styles.reviewRow}><Text style={styles.reviewKey}>Reference</Text><Text style={styles.reviewVal}>{description}</Text></View>
+              )}
+            </View>
+
+            <View style={styles.reviewCard}>
+              <Text style={styles.reviewSectionTitle}>From</Text>
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Account</Text><Text style={styles.reviewVal}>{selectedAccount ? `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}` : '—'}</Text></View>
+              <View style={styles.reviewRow}><Text style={styles.reviewKey}>Available balance</Text><Text style={styles.reviewVal}>£{(selectedAccount?.balance || 0).toFixed(2)}</Text></View>
+            </View>
+
+            <View style={styles.reviewNotice}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={customColors.accent} />
+              <Text style={styles.reviewNoticeText}>This payment is protected by your bank's secure authentication.</Text>
+            </View>
+          </ScrollView>
+
+          <View style={styles.reviewFooter}>
+            <TouchableOpacity
+              style={[styles.confirmBtn, { backgroundColor: customColors.primary }, isProcessing && { opacity: 0.7 }]}
+              onPress={handleConfirmAndSend}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <View style={styles.processingContainer}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.confirmBtnText}>Processing… {processingProgress}%</Text>
+                </View>
+              ) : (
+                <Text style={styles.confirmBtnText}>Confirm &amp; Send</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => !isProcessing && setShowReview(false)}
+              disabled={isProcessing}
+            >
+              <Text style={styles.editBtnText}>Edit details</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       <authGate.Render />
     </SafeAreaView>
   );
@@ -1069,4 +1136,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+
+  // Review / confirmation screen
+  reviewContainer: { flex: 1, backgroundColor: '#F5F6F8' },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 14 },
+  reviewBackBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  reviewHeaderTitle: { fontSize: 18, fontWeight: '700' },
+  reviewIntro: { fontSize: 13, color: '#5E6A7A', lineHeight: 19, marginBottom: 16 },
+  reviewCard: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 18, marginBottom: 14 },
+  reviewSectionTitle: { fontSize: 11, color: '#8893A3', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12, fontWeight: '700' },
+  reviewAmountLabel: { fontSize: 12, color: '#8893A3', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  reviewAmount: { fontSize: 36, fontWeight: '800' },
+  reviewRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F0F2F5' },
+  reviewKey: { fontSize: 13, color: '#5E6A7A' },
+  reviewVal: { fontSize: 14, fontWeight: '600', color: '#0B1424', maxWidth: '60%', textAlign: 'right' },
+  reviewNotice: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F5F2', borderRadius: 8, padding: 12, marginTop: 4 },
+  reviewNoticeText: { fontSize: 12, color: '#0B5C56', marginLeft: 8, flex: 1, lineHeight: 17 },
+  reviewFooter: { padding: 16, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#EFF1F4' },
+  confirmBtn: { borderRadius: 10, paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  confirmBtnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+  editBtn: { alignItems: 'center', paddingVertical: 12, marginTop: 4 },
+  editBtnText: { color: '#5E6A7A', fontSize: 14, fontWeight: '600' },
 });

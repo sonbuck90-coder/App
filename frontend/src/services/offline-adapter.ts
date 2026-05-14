@@ -281,12 +281,13 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       timestamp: new Date().toISOString(),
     });
     await persist();
-    sendTransactionNotification({
+    // Fire-and-forget: never block the API response on notifications.
+    void sendTransactionNotification({
       title: 'Payment sent',
       body: `${formatGBP(amt)} to ${body.recipient_name || body.to_account_number}`,
       data: { txn_id: txn.id },
     });
-    await fireBudgetAlertsFor('transfer');
+    void fireBudgetAlertsFor('transfer');
     return ok(txn, config);
   }
 
@@ -319,12 +320,12 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       timestamp: new Date().toISOString(),
     });
     await persist();
-    sendTransactionNotification({
+    void sendTransactionNotification({
       title: 'International transfer sent',
       body: `${formatGBP(amt)} → ${body.target_currency} ${converted.toFixed(2)} to ${body.recipient_name}`,
       data: { txn_id: txn.id },
     });
-    await fireBudgetAlertsFor('transfer');
+    void fireBudgetAlertsFor('transfer');
     return ok({ ...txn, converted_amount: converted, rate }, config);
   }
 
@@ -489,12 +490,12 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       timestamp: new Date().toISOString(),
     });
     await persist();
-    sendTransactionNotification({
+    void sendTransactionNotification({
       title: 'Bill paid',
       body: `${formatGBP(amt)} paid to ${biller.name}`,
       data: { txn_id: txn.id },
     });
-    await fireBudgetAlertsFor('payment');
+    void fireBudgetAlertsFor('payment');
     return ok(txn, config);
   }
 
@@ -518,7 +519,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       timestamp: new Date().toISOString(),
     });
     await persist();
-    sendTransactionNotification({
+    void sendTransactionNotification({
       title: 'Money in',
       body: `${formatGBP(amt)} added to ${acct.account_type === 'checking' ? 'Current' : 'Savings'} Account`,
       data: { txn_id: txn.id },
@@ -552,7 +553,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       timestamp: new Date().toISOString(),
     });
     await persist();
-    sendTransactionNotification({
+    void sendTransactionNotification({
       title: 'Money moved',
       body: `${formatGBP(amt)} from ${from.account_type === 'checking' ? 'Current' : 'Savings'} → ${to.account_type === 'checking' ? 'Current' : 'Savings'}`,
       data: { txn_id: txn.id },
