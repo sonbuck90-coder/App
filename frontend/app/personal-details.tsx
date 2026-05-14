@@ -164,14 +164,20 @@ export default function PersonalDetailsScreen() {
                 <TextInput style={[s.input, s.multilineInput]} value={address} onChangeText={setAddress} placeholder="Enter your address" placeholderTextColor={C.gray} multiline numberOfLines={3} testID="address-input" />
               </View>
             </View>
-            <TouchableOpacity style={[s.saveBtn, { backgroundColor: cc.primary }, isSaving && { opacity: 0.7 }]} onPress={handleSaveProfile} disabled={isSaving} testID="save-profile-btn">
-              {isSaving ? <ActivityIndicator color={C.white} /> : (
-                <View style={s.saveBtnInner}>
-                  <Ionicons name="information-circle-outline" size={20} color={C.white} />
-                  <Text style={s.saveBtnText}>Save Changes</Text>
-                </View>
+            <TouchableOpacity
+              style={[s.iconSaveBtn, { backgroundColor: cc.primary }, isSaving && { opacity: 0.7 }]}
+              onPress={handleSaveProfile}
+              disabled={isSaving}
+              testID="save-profile-btn"
+              accessibilityLabel="Save personal information"
+            >
+              {isSaving ? (
+                <ActivityIndicator color={C.white} />
+              ) : (
+                <Ionicons name="information-circle" size={28} color={C.white} />
               )}
             </TouchableOpacity>
+            <Text style={s.iconSaveHint}>Tap to save</Text>
           </View>
 
           {/* Account Details */}
@@ -206,12 +212,17 @@ export default function PersonalDetailsScreen() {
                       <TouchableOpacity style={s.cancelBtn} onPress={() => setEditingAccountId(null)}>
                         <Text style={s.cancelBtnText}>Cancel</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[s.confirmBtn, { backgroundColor: cc.primary }]} onPress={handleSaveAccountDetails} disabled={isSaving} testID={`save-account-${acc.account_type}`}>
-                        {isSaving ? <ActivityIndicator color={C.white} size="small" /> : (
-                          <View style={s.saveBtnInner}>
-                            <Ionicons name="information-circle-outline" size={18} color={C.white} />
-                            <Text style={s.confirmBtnText}>Save</Text>
-                          </View>
+                      <TouchableOpacity
+                        style={[s.iconSaveBtnSmall, { backgroundColor: cc.primary }]}
+                        onPress={handleSaveAccountDetails}
+                        disabled={isSaving}
+                        testID={`save-account-${acc.account_type}`}
+                        accessibilityLabel="Save account details"
+                      >
+                        {isSaving ? (
+                          <ActivityIndicator color={C.white} size="small" />
+                        ) : (
+                          <Ionicons name="information-circle" size={24} color={C.white} />
                         )}
                       </TouchableOpacity>
                     </View>
@@ -291,12 +302,17 @@ export default function PersonalDetailsScreen() {
                         <TouchableOpacity style={s.cancelBtn} onPress={() => setEditingCardId(null)}>
                           <Text style={s.cancelBtnText}>Cancel</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity style={[s.confirmBtn, { backgroundColor: cc.primary }]} onPress={handleSaveCardDetails} disabled={isSaving} testID={`save-card-${card.id}`}>
-                          {isSaving ? <ActivityIndicator color={C.white} size="small" /> : (
-                            <View style={s.saveBtnInner}>
-                              <Ionicons name="information-circle-outline" size={18} color={C.white} />
-                              <Text style={s.confirmBtnText}>Save</Text>
-                            </View>
+                        <TouchableOpacity
+                          style={[s.iconSaveBtnSmall, { backgroundColor: cc.primary }]}
+                          onPress={handleSaveCardDetails}
+                          disabled={isSaving}
+                          testID={`save-card-${card.id}`}
+                          accessibilityLabel="Save card details"
+                        >
+                          {isSaving ? (
+                            <ActivityIndicator color={C.white} size="small" />
+                          ) : (
+                            <Ionicons name="information-circle" size={24} color={C.white} />
                           )}
                         </TouchableOpacity>
                       </View>
@@ -347,6 +363,9 @@ const s = StyleSheet.create({
   saveBtn: { height: 48, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   saveBtnText: { color: C.white, fontSize: 16, fontWeight: '600', marginLeft: 8 },
   saveBtnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  iconSaveBtn: { alignSelf: 'center', width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 4 },
+  iconSaveBtnSmall: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3, elevation: 3 },
+  iconSaveHint: { fontSize: 12, color: C.gray, textAlign: 'center', marginTop: 6, fontWeight: '500' },
   // Account details
   accHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   accHeaderLeft: { flexDirection: 'row', alignItems: 'center' },
@@ -358,7 +377,7 @@ const s = StyleSheet.create({
   accValue: { fontSize: 16, fontWeight: '600', color: C.darkGray, letterSpacing: 0.5 },
   // Edit mode
   editSection: { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12 },
-  editBtns: { flexDirection: 'row', marginTop: 4, gap: 10 },
+  editBtns: { flexDirection: 'row', marginTop: 4, gap: 10, alignItems: 'center', justifyContent: 'flex-end' },
   cancelBtn: { flex: 1, height: 44, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: C.lightGray },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: C.darkGray },
   confirmBtn: { flex: 1, height: 44, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },

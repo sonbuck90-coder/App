@@ -5,12 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { transactionsApi, accountsApi, Transaction, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuth } from '../src/context/AuthContext';
+import RichMessage from '../src/components/RichMessage';
+import TypingDots from '../src/components/TypingDots';
 
-const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5' };
+const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5', bubbleBg: '#FFFFFF', userBubbleText: '#FFFFFF' };
 
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  timestamp: Date;
 }
 
 const QUICK_ACTIONS = [
@@ -191,7 +194,7 @@ export default function ChatScreen() {
   const sendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
-    const userMsg: Message = { role: 'user', content: text.trim() };
+    const userMsg: Message = { role: 'user', content: text.trim(), timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
@@ -200,11 +203,11 @@ export default function ChatScreen() {
     // Refresh data for accurate responses
     await loadData();
 
-    // 3-second typing delay
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Realistic short typing delay (1.2-2s based on response length)
+    await new Promise(resolve => setTimeout(resolve, 1500));
 
     const response = getScriptedResponse(text.trim());
-    const aiMsg: Message = { role: 'assistant', content: response };
+    const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };
     setMessages(prev => [...prev, aiMsg]);
     setIsLoading(false);
   };
@@ -261,27 +264,37 @@ export default function ChatScreen() {
           )}
 
           {/* Messages */}
-          {messages.map((msg, i) => (
-            <View key={i} style={[styles.messageBubble, msg.role === 'user' ? styles.userBubble : styles.aiBubble]}>
-              {msg.role === 'assistant' && (
-                <View style={[styles.aiIcon, { backgroundColor: cc.primary }]}>
-                  <Ionicons name="chatbubbles" size={14} color={C.white} />
+          {messages.map((msg, i) => {
+            const isUser = msg.role === 'user';
+            const timeStr = msg.timestamp.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+            return (
+              <View key={i} style={[styles.messageBubble, isUser ? styles.userBubble : styles.aiBubble]}>
+                {!isUser && (
+                  <View style={[styles.aiIcon, { backgroundColor: cc.primary }]}>
+                    <Text style={styles.aiIconText}>E</Text>
+                  </View>
+                )}
+                <View style={styles.bubbleColumn}>
+                  <View style={[styles.messageContent, isUser ? [styles.userContent, { backgroundColor: cc.primary }] : styles.aiContent]}>
+                    {isUser ? (
+                      <Text style={[styles.messageText, styles.userText]}>{msg.content}</Text>
+                    ) : (
+                      <RichMessage content={msg.content} accentColor={cc.primary} />
+                    )}
+                  </View>
+                  <Text style={[styles.timestamp, isUser ? styles.timestampRight : styles.timestampLeft]}>{timeStr}</Text>
                 </View>
-              )}
-              <View style={[styles.messageContent, msg.role === 'user' ? [styles.userContent, { backgroundColor: cc.primary }] : styles.aiContent]}>
-                <Text style={[styles.messageText, msg.role === 'user' ? styles.userText : styles.aiText]}>{msg.content}</Text>
               </View>
-            </View>
-          ))}
+            );
+          })}
 
           {isLoading && (
             <View style={[styles.messageBubble, styles.aiBubble]}>
               <View style={[styles.aiIcon, { backgroundColor: cc.primary }]}>
-                <Ionicons name="chatbubbles" size={14} color={C.white} />
+                <Text style={styles.aiIconText}>E</Text>
               </View>
               <View style={[styles.messageContent, styles.aiContent, styles.typingContainer]}>
-                <ActivityIndicator size="small" color={cc.primary} />
-                <Text style={styles.typingText}>Ellie is typing...</Text>
+                <TypingDots color={cc.primary} />
               </View>
             </View>
           )}
@@ -331,34 +344,77 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   aiAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  headerTitle: { fontSize: 18, fontWeight: '600', color: C.white },
-  headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.8)' },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: C.white },
+  headerSubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 1 },
   chatArea: { flex: 1 },
-  chatContent: { paddingHorizontal: 16, paddingBottom: 16 },
+  chatContent: { paddingHorizontal: 14, paddingBottom: 16 },
   welcomeContainer: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 16 },
   welcomeAvatar: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
-  welcomeTitle: { fontSize: 20, fontWeight: '700', color: C.darkGray, marginBottom: 8, textAlign: 'center' },
-  welcomeText: { fontSize: 14, color: C.gray, textAlign: 'center', lineHeight: 20 },
+  welcomeTitle: { fontSize: 22, fontWeight: '700', color: C.darkGray, marginBottom: 8, textAlign: 'center' },
+  welcomeText: { fontSize: 14, color: C.gray, textAlign: 'center', lineHeight: 21 },
   quickActionsContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: 24, gap: 12 },
-  quickActionCard: { backgroundColor: C.white, borderRadius: 12, paddingVertical: 16, paddingHorizontal: 20, alignItems: 'center', width: '45%', minWidth: 140 },
+  quickActionCard: {
+    backgroundColor: C.white,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    width: '45%',
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
+  },
   quickActionLabel: { fontSize: 13, fontWeight: '600', color: C.darkGray, marginTop: 8, textAlign: 'center' },
-  messageBubble: { flexDirection: 'row', marginTop: 12, maxWidth: '85%' },
+  messageBubble: { flexDirection: 'row', marginTop: 14, maxWidth: '88%' },
   userBubble: { alignSelf: 'flex-end' },
   aiBubble: { alignSelf: 'flex-start' },
-  aiIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 2 },
-  messageContent: { borderRadius: 16, paddingHorizontal: 16, paddingVertical: 12, maxWidth: '90%' },
-  userContent: { borderBottomRightRadius: 4 },
-  aiContent: { backgroundColor: C.white, borderBottomLeftRadius: 4 },
+  bubbleColumn: { flexShrink: 1 },
+  aiIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+    marginTop: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  aiIconText: { color: C.white, fontWeight: '800', fontSize: 14 },
+  messageContent: {
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    maxWidth: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  userContent: { borderBottomRightRadius: 6 },
+  aiContent: { backgroundColor: C.bubbleBg, borderBottomLeftRadius: 6, borderWidth: 1, borderColor: '#EEEEEE' },
   messageText: { fontSize: 14, lineHeight: 21 },
-  userText: { color: C.white },
+  userText: { color: C.userBubbleText, fontSize: 15, lineHeight: 22 },
   aiText: { color: C.darkGray },
-  typingContainer: { flexDirection: 'row', alignItems: 'center' },
+  timestamp: { fontSize: 10, color: C.gray, marginTop: 4, paddingHorizontal: 4 },
+  timestampLeft: { alignSelf: 'flex-start' },
+  timestampRight: { alignSelf: 'flex-end' },
+  typingContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   typingText: { fontSize: 14, color: C.gray, marginLeft: 8 },
-  inlineQuickActions: { paddingTop: 12, paddingBottom: 4 },
-  inlineQuickAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: '#E0E0E0' },
-  inlineQuickActionText: { fontSize: 13, color: C.darkGray, fontWeight: '500', marginLeft: 6 },
-  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: C.white, borderTopWidth: 1, borderTopColor: '#E0E0E0' },
-  input: { flex: 1, backgroundColor: C.lightGray, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: C.black, maxHeight: 100, marginRight: 10 },
+  inlineQuickActions: { paddingTop: 14, paddingBottom: 4 },
+  inlineQuickAction: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.white, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: '#E5E5E5' },
+  inlineQuickActionText: { fontSize: 13, color: C.darkGray, fontWeight: '600', marginLeft: 6 },
+  inputContainer: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 14, paddingVertical: 10, backgroundColor: C.white, borderTopWidth: 1, borderTopColor: '#E8E8E8' },
+  input: { flex: 1, backgroundColor: C.lightGray, borderRadius: 22, paddingHorizontal: 16, paddingVertical: 10, fontSize: 15, color: C.black, maxHeight: 100, marginRight: 10 },
   sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   sendButtonDisabled: { opacity: 0.5 },
 });
