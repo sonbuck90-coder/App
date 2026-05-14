@@ -104,6 +104,7 @@ export const transactionsApi = {
     return api.get<Transaction[]>(`/transactions${qs ? `?${qs}` : ''}`);
   },
   getById: (id: string) => api.get<Transaction>(`/transactions/${id}`),
+  delete: (id: string) => api.delete(`/transactions/${id}`),
 };
 
 export const transfersApi = {

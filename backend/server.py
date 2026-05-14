@@ -524,6 +524,254 @@ async def get_transaction(transaction_id: str, current_user: User = Depends(get_
         txn["fpid"] = generate_fpid(transaction_id)
     return Transaction(**txn)
 
+@api_router.delete("/transactions/{transaction_id}")
+async def delete_transaction(transaction_id: str, current_user: User = Depends(get_current_user)):
+    txn = await db.transactions.find_one({"id": transaction_id, "user_id": current_user.id})
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    await db.transactions.delete_one({"id": transaction_id, "user_id": current_user.id})
+    return {"message": "Transaction deleted", "id": transaction_id}
+
+
+# ==================== INTERNATIONAL TRANSFER (SWIFT/IBAN) ====================
+class InternationalTransferRequest(BaseModel):
+    from_account_id: str
+    amount: float
+    source_currency: str = "GBP"
+    target_currency: str = "EUR"
+    recipient_name: str
+    iban: str
+    swift_bic: str
+    recipient_country: str = ""
+    recipient_address: str = ""
+    purpose: str = ""
+    charges_option: str = "SHA"  # OUR / BEN / SHA
+    is_business: bool = False
+    invoice_number: Optional[str] = None
+
+@api_router.post("/transfers/international")
+async def create_international_transfer(data: InternationalTransferRequest, current_user: User = Depends(get_current_user)):
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+    from_account = await db.accounts.find_one({"id": data.from_account_id, "user_id": current_user.id})
+    if not from_account:
+        raise HTTPException(status_code=404, detail="From account not found")
+    if from_account.get("balance", 0) < data.amount:
+        raise HTTPException(status_code=400, detail="Insufficient funds")
+
+    # Fetch live FX rate (server-side proxy) for amount in target currency
+    rate = await _fetch_fx_rate(data.source_currency, data.target_currency)
+    target_amount = round(data.amount * rate, 2)
+
+    # Deduct from source account
+    await db.accounts.update_one({"id": data.from_account_id}, {"$inc": {"balance": -data.amount}})
+
+    txn = Transaction(
+        user_id=current_user.id,
+        from_account_id=data.from_account_id,
+        amount=data.amount,
+        transaction_type="international",
+        description=data.purpose or f"International transfer to {data.recipient_name}",
+        recipient_name=data.recipient_name,
+        recipient_account_number=data.iban,
+        recipient_sort_code=data.swift_bic,
+        recipient_bank_name=f"SWIFT/{data.swift_bic[:8]}",
+        reference=data.invoice_number or data.purpose,
+    )
+    txn.trn = generate_trn(txn.id)
+    txn.fpid = generate_fpid(txn.id)
+    # Store extra fields
+    txn_dict = txn.dict()
+    txn_dict.update({
+        "is_international": True,
+        "source_currency": data.source_currency,
+        "target_currency": data.target_currency,
+        "fx_rate": rate,
+        "target_amount": target_amount,
+        "swift_bic": data.swift_bic,
+        "iban": data.iban,
+        "country": data.recipient_country,
+        "charges_option": data.charges_option,
+        "is_business": data.is_business,
+        "invoice_number": data.invoice_number,
+    })
+    await db.transactions.insert_one(txn_dict)
+    await create_notification(current_user.id, "International Transfer Sent", f"£{data.amount:.2f} sent ({data.target_currency} {target_amount:.2f}) to {data.recipient_name}", "transfer", {"transaction_id": txn.id})
+    return {
+        "transaction_id": txn.id,
+        "amount_sent": data.amount,
+        "source_currency": data.source_currency,
+        "amount_received": target_amount,
+        "target_currency": data.target_currency,
+        "fx_rate": rate,
+        "trn": txn.trn,
+        "fpid": txn.fpid,
+        "status": "completed",
+        "estimated_arrival": "1-3 business days",
+    }
+
+
+# ==================== FX RATES ====================
+import httpx as _httpx
+from typing import Any as _Any
+_FX_CACHE: dict = {"ts": 0, "data": None}
+
+# Fallback static rates (used if external API fails)
+_FX_FALLBACK = {
+    "USD": 1.0, "GBP": 0.79, "EUR": 0.92, "JPY": 151.5, "AUD": 1.51, "CAD": 1.36,
+    "CHF": 0.91, "CNY": 7.23, "INR": 83.5, "AED": 3.67, "SGD": 1.34, "HKD": 7.82,
+    "ZAR": 18.7, "BRL": 5.05, "MXN": 17.0, "NZD": 1.65, "TRY": 32.5, "SEK": 10.7,
+    "NOK": 10.8, "DKK": 6.9, "PLN": 4.0, "THB": 36.0,
+}
+
+async def _fetch_fx_rate(from_ccy: str, to_ccy: str) -> float:
+    """Return the multiplier so that amount_in_from * rate = amount_in_to."""
+    if from_ccy == to_ccy:
+        return 1.0
+    import time
+    now = time.time()
+    # Cache full rate table for 15 minutes
+    if _FX_CACHE["data"] and now - _FX_CACHE["ts"] < 900:
+        rates = _FX_CACHE["data"]
+    else:
+        rates = None
+        try:
+            async with _httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get("https://open.er-api.com/v6/latest/USD")
+                if r.status_code == 200:
+                    j = r.json()
+                    if j.get("result") == "success" and j.get("rates"):
+                        rates = j["rates"]
+                        _FX_CACHE["data"] = rates
+                        _FX_CACHE["ts"] = now
+        except Exception:
+            pass
+        if not rates:
+            rates = _FX_FALLBACK
+    # USD-based rates: convert source→USD→target
+    src = rates.get(from_ccy.upper())
+    dst = rates.get(to_ccy.upper())
+    if not src or not dst:
+        return 1.0
+    return round(dst / src, 6)
+
+@api_router.get("/fx/rate")
+async def fx_rate(from_ccy: str = "GBP", to_ccy: str = "EUR", amount: float = 1.0, current_user: User = Depends(get_current_user)):
+    rate = await _fetch_fx_rate(from_ccy, to_ccy)
+    return {
+        "from": from_ccy.upper(),
+        "to": to_ccy.upper(),
+        "rate": rate,
+        "amount": amount,
+        "converted": round(amount * rate, 2),
+        "source": "open.er-api.com" if _FX_CACHE["data"] else "fallback",
+    }
+
+@api_router.get("/fx/currencies")
+async def fx_currencies(current_user: User = Depends(get_current_user)):
+    """Return a list of supported currencies for the dropdown."""
+    currencies = [
+        {"code": "GBP", "name": "British Pound", "symbol": "£", "flag": "🇬🇧"},
+        {"code": "USD", "name": "US Dollar", "symbol": "$", "flag": "🇺🇸"},
+        {"code": "EUR", "name": "Euro", "symbol": "€", "flag": "🇪🇺"},
+        {"code": "JPY", "name": "Japanese Yen", "symbol": "¥", "flag": "🇯🇵"},
+        {"code": "AUD", "name": "Australian Dollar", "symbol": "A$", "flag": "🇦🇺"},
+        {"code": "CAD", "name": "Canadian Dollar", "symbol": "C$", "flag": "🇨🇦"},
+        {"code": "CHF", "name": "Swiss Franc", "symbol": "CHF", "flag": "🇨🇭"},
+        {"code": "CNY", "name": "Chinese Yuan", "symbol": "¥", "flag": "🇨🇳"},
+        {"code": "INR", "name": "Indian Rupee", "symbol": "₹", "flag": "🇮🇳"},
+        {"code": "AED", "name": "UAE Dirham", "symbol": "د.إ", "flag": "🇦🇪"},
+        {"code": "SGD", "name": "Singapore Dollar", "symbol": "S$", "flag": "🇸🇬"},
+        {"code": "HKD", "name": "Hong Kong Dollar", "symbol": "HK$", "flag": "🇭🇰"},
+        {"code": "ZAR", "name": "South African Rand", "symbol": "R", "flag": "🇿🇦"},
+        {"code": "NZD", "name": "New Zealand Dollar", "symbol": "NZ$", "flag": "🇳🇿"},
+        {"code": "NOK", "name": "Norwegian Krone", "symbol": "kr", "flag": "🇳🇴"},
+        {"code": "SEK", "name": "Swedish Krona", "symbol": "kr", "flag": "🇸🇪"},
+        {"code": "DKK", "name": "Danish Krone", "symbol": "kr", "flag": "🇩🇰"},
+        {"code": "PLN", "name": "Polish Zloty", "symbol": "zł", "flag": "🇵🇱"},
+    ]
+    return currencies
+
+
+# ==================== MONTHLY STATEMENT PDF ====================
+@api_router.get("/statements/monthly")
+async def download_monthly_statement(year: int, month: int, current_user: User = Depends(get_current_user)):
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+    from calendar import monthrange
+    start = datetime(year, month, 1)
+    last_day = monthrange(year, month)[1]
+    end = datetime(year, month, last_day, 23, 59, 59)
+    transactions = await db.transactions.find({
+        "user_id": current_user.id,
+        "timestamp": {"$gte": start, "$lte": end},
+    }).sort("timestamp", 1).to_list(1000)
+
+    # Compute opening/closing balance estimate
+    accounts = await db.accounts.find({"user_id": current_user.id}).to_list(50)
+    total_balance = sum(a.get("balance", 0) for a in accounts)
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=40, bottomMargin=40)
+    styles = getSampleStyleSheet()
+    elements = []
+    title = Paragraph(f"<b>HSBC UK — Monthly Statement</b>", styles["Title"])
+    elements.append(title)
+    elements.append(Paragraph(f"<b>Account holder:</b> {current_user.name}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Period:</b> {start.strftime('%B %Y')}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Statement issued:</b> {datetime.utcnow().strftime('%d %b %Y')}", styles["Normal"]))
+    elements.append(Paragraph(f"<b>Closing total balance:</b> £{total_balance:,.2f}", styles["Normal"]))
+    elements.append(Spacer(1, 14))
+
+    if not transactions:
+        elements.append(Paragraph("No transactions in this period.", styles["Normal"]))
+    else:
+        data = [["Date", "Type", "Description", "Amount (GBP)", "Status"]]
+        money_in = 0.0
+        money_out = 0.0
+        for txn in transactions:
+            ts = txn.get("timestamp", datetime.utcnow())
+            date_str = ts.strftime("%d %b %Y") if isinstance(ts, datetime) else str(ts)
+            txn_type = txn.get("transaction_type", "").title()
+            desc = (txn.get("recipient_name") or txn.get("description", ""))[:42]
+            amount = txn.get("amount", 0)
+            sign = "+" if txn.get("transaction_type") == "deposit" else "-"
+            if sign == "+":
+                money_in += amount
+            else:
+                money_out += amount
+            status = txn.get("status", "")
+            data.append([date_str, txn_type, desc, f"{sign}£{amount:,.2f}", status])
+        from reportlab.platypus import Table, TableStyle
+        from reportlab.lib import colors as rcolors
+        table = Table(data, colWidths=[80, 70, 220, 80, 70])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), rcolors.HexColor("#DB0011")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), rcolors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rcolors.white, rcolors.HexColor("#F8F8F8")]),
+            ("GRID", (0, 0), (-1, -1), 0.4, rcolors.HexColor("#CCCCCC")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+        ]))
+        elements.append(table)
+        elements.append(Spacer(1, 14))
+        elements.append(Paragraph(f"<b>Total money in:</b> +£{money_in:,.2f}", styles["Normal"]))
+        elements.append(Paragraph(f"<b>Total money out:</b> -£{money_out:,.2f}", styles["Normal"]))
+        elements.append(Paragraph(f"<b>Net change:</b> £{money_in - money_out:,.2f}", styles["Normal"]))
+
+    elements.append(Spacer(1, 24))
+    elements.append(Paragraph("This statement was generated by HSBC UK Mobile Banking. Keep for your records.", styles["Italic"]))
+    doc.build(elements)
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="HSBC_Statement_{year}_{month:02d}.pdf"'}
+    )
+
+
 @api_router.get("/statements/csv")
 async def download_csv_statement(current_user: User = Depends(get_current_user), limit: int = 100):
     transactions = await db.transactions.find({"user_id": current_user.id}).sort("timestamp", -1).to_list(limit)

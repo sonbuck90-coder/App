@@ -185,6 +185,34 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Banking Services row */}
+        <View style={styles.quickActionsContainer}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/international-transfer')} testID="quick-international">
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="globe-outline" size={22} color={customColors.primary} />
+            </View>
+            <Text style={styles.quickActionText}>International</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/statements')} testID="quick-statements">
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="document-text-outline" size={22} color={customColors.primary} />
+            </View>
+            <Text style={styles.quickActionText}>Statements</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/analytics')} testID="quick-analytics">
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="pie-chart-outline" size={22} color={customColors.primary} />
+            </View>
+            <Text style={styles.quickActionText}>Analytics</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/schedules')} testID="quick-schedules">
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="calendar-outline" size={22} color={customColors.primary} />
+            </View>
+            <Text style={styles.quickActionText}>Schedules</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Accounts Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>

@@ -25,6 +25,8 @@ export default function RootLayout() {
         <Stack.Screen name="card-details" />
         <Stack.Screen name="personal-details" />
         <Stack.Screen name="transaction-detail" />
+        <Stack.Screen name="international-transfer" />
+        <Stack.Screen name="statements" />
         </Stack>
       </CustomizationProvider>
     </AuthProvider>

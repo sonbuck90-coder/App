@@ -399,12 +399,72 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Any 4-digit passcode logs in"
-    - "Biometric (Face/Touch ID) auto-login on web"
-    - "Name change propagates: Personal Details → More → Home"
-  stuck_tasks: []
+    - "GET /api/fx/rate"
+    - "GET /api/fx/currencies"
+    - "POST /api/transfers/international"
+    - "DELETE /api/transactions/{id}"
+    - "GET /api/statements/monthly"
+  stuck_tasks:
+    - "GET /api/statements/monthly"
   test_all: false
   test_priority: "high_first"
+
+backend_review_v4:
+  - task: "GET /api/fx/rate"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS (3/3). GBP→EUR rate=1.154202 source=open.er-api.com; USD→JPY rate=157.817757 source=open.er-api.com; GBP→GBP rate=1.0 (same-currency short-circuit). Response body contains required keys from/to/rate/amount/converted/source; source is 'open.er-api.com' (live) for all three calls. Auth via fresh JWT (passcode 1234) works."
+  - task: "GET /api/fx/currencies"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS. Returned 18 currency objects (>=15 required). Each item has code/name/symbol/flag. Sample codes verified present: GBP, USD, EUR, JPY, AUD, INR, CHF, CNY."
+  - task: "POST /api/transfers/international"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS personal + business. Personal £100 GBP→EUR: transaction_id present, amount_sent=100.0, source_currency=GBP, target_currency=EUR, amount_received=115.42 (numeric), fx_rate=1.154202 (numeric), trn='TRNME3MT979Q92EF' (matches ^TRN[A-Z0-9]{13}$), fpid='FP815662050807990297' (matches ^FP\\d{18}$), status='completed'. Subsequent GET /api/transactions/{id} returned the stored record with transaction_type='international' and recipient_account_number = IBAN 'DE89370400440532013000'. Business variant with is_business=true + invoice_number='INV-2024-001' also returned status=completed with valid TRN/FPID."
+  - task: "DELETE /api/transactions/{id}"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ PASS. Created a domestic transfer (POST /api/transfers, sort_code=20-30-40, to=11223344, £12.50) → got txn id. DELETE /api/transactions/{id} → 200 with {message:'Transaction deleted', id:<same>}. Subsequent GET /api/transactions/{id} → 404 'Transaction not found'. DELETE /api/transactions/doesnotexist → 404 as expected."
+  - task: "GET /api/statements/monthly"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: false
+        agent: "testing"
+        comment: "❌ FAIL — 500 Internal Server Error on /api/statements/monthly?year=2025&month=11. Backend traceback: 'File /app/backend/server.py, line 715, in download_monthly_statement / doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=40, bottomMargin=40) / NameError: name SimpleDocTemplate is not defined'. ROOT CAUSE: The function at server.py lines 697–772 uses `SimpleDocTemplate`, `letter`, `getSampleStyleSheet`, `Paragraph`, `Spacer`, AND `Response` (fastapi.responses) but NONE of these are imported either at module top or inside the function. The neighbouring `download_pdf_statement` (line 806) and `download_csv_statement` (line 775) do their reportlab imports INSIDE the function body — that pattern needs to be mirrored here. Fix (≤6 lines): inside `download_monthly_statement`, add: `from fastapi.responses import Response`, `from reportlab.lib.pagesizes import letter`, `from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer`, `from reportlab.lib.styles import getSampleStyleSheet` (the Table / TableStyle / colors imports inside the `if transactions` branch are already present). The month-validation branch DOES work: month=13 → 400 with detail 'Month must be between 1 and 12' (validated before reaching the broken imports)."
 
 frontend_review_v3:
   - task: "Any 4-digit passcode logs in"
@@ -557,3 +617,5 @@ agent_communication:
     message: "✅ CUSTOMIZATION LOGO/LOGOUT/VERSION REVIEW (HSBC app, passcode 0503, mobile 390x844) — 6/6 acceptance items verified:\n  (a) ✅ Login flow — wrong passcode 1234 shows 'Invalid passcode. Please try again.'; passcode 0503 → /home loads with 'Hello, Oliver' and the full Home dashboard. Navigated More → Customization successfully.\n  (b) ✅ Live Preview logo — At the very top of /customization the Live Preview bar now shows the proper HSBC UK wordmark image (red hexagon + black 'HSBC UK' text), NOT a small red square. Captured 'http://localhost:3000/assets/?unstable_path=.%2Fassets%2Fimages/hsbc-uk-logo.png' rendered at 225x49 px near the top — the same AppLogo variant='header' asset used in the Home tab. Screenshot: customization_preview.png clearly shows the full HSBC UK wordmark.\n  (c) ✅ Logout button — At the bottom of /customization there is a red filled rectangular 'Log Out' button with white text + log-out icon, with data-testid='logout-btn' present in DOM (1 match). Wired to `handleLogout` which fires Alert.alert('Log Out','Are you sure you want to log out?',[Cancel,LogOut→logout()]). NOTE: on RN-Web the multi-button Alert.alert() with destructive style does NOT render as a visible browser dialog so the confirmation modal could not be fully exercised through Playwright on web — this is a known React Native Web limitation, NOT an implementation defect (on iOS/Android native the alert + 'app navigates back to /login' flow will work as designed). Code path verified in /app/frontend/app/customization.tsx lines 60-69 (Alert.alert wired to AuthContext.logout()).\n  (d) ✅ Version footer — Immediately below the Log Out button the footer renders: HSBC UK mini-logo (165x36 px image), text 'HSBC Mobile Banking', and smaller 'Version 2.04.6'. Literal string '2.04.6' is present on screen. Screenshot: customization_bottom.png shows Log Out button + footer.\n  (e) ✅ Passcode validation — 1234 rejected with 'Invalid passcode. Please try again.'; 0503 accepted and redirected to /home.\n  (f) ✅ More tab version — Bottom of More tab reads 'HSBC Mobile Banking v2.04.6' (verified literal substring present in inner text). Screenshot: more_version.png.\n  Summary: ALL FOUR REQUESTED CHANGES PASS. The only caveat is the logout confirmation alert UX cannot be visually validated in the web preview (RN-Web Alert.alert limitation); the button + handler + logout context are all correctly wired and will work on native. No code modifications made by testing agent."
   - agent: "testing-prev"
     message: "🟡 PRIOR REVIEW (HSBC modern chat + circular ⓘ save buttons + persistence): \n  ✅ AI Chat (Ellie) modern look — Header 'Ellie' + subtitle 'Your AI Banking Assistant' on red bar; tapping 'Last Transaction' shows red user bubble, 3 animated bouncing typing dots (no 'Ellie is typing…' text), then assistant bubble with circular 'E' avatar; timestamps '12:26' visible under each bubble; no raw '**markdown'. 'balance' produced rich Total/Current/Savings response. TRANSACTION RECEIPT heading not surfaced only because this test user had no transactions yet (Ellie correctly replied: 'You don't have any transactions yet'); RichMessage formatting itself is verified via the balance response.\n  ✅ Personal Details circular ⓘ save buttons — Top section has a 56x56 round red button with white information-circle icon centered and 'Tap to save' subtitle below (NOT a rectangular 'Save Changes' button). Account & Card edit modes use the small round 44x44 ⓘ save button (iconSaveBtnSmall in /app/frontend/app/personal-details.tsx lines 215-227 and 305-316). PUT /api/profile returns 200 OK on save.\n  ❌ Persistence after reload — IMPORTANT BUG: On full page reload / direct URL nav to /personal-details, GET /api/profile, /api/accounts, /api/cards all return 403 Forbidden. Backend logs confirm: ‘GET /api/profile HTTP/1.1 403 Forbidden’ immediately after passcode login. The same PUT /api/profile later in the session succeeds (200), proving the token IS eventually loaded — but the screen's initial load() in useEffect fires BEFORE AuthContext finishes hydrating the JWT from AsyncStorage and assigning api.defaults.headers.common['Authorization']. Consequence: name/sort-code/cardholder appear empty after refresh even though they ARE saved on the backend; Account Details and Bank Cards sections render empty (no edit-account-* / edit-card-* buttons), which also blocked direct verification of the account / card save flows in this run.\n  Suggested fix to main agent (DO NOT fix anywhere else — testing did not patch code): in /app/frontend/src/context/AuthContext.tsx, complete the AsyncStorage.getItem('auth_token') bootstrap BEFORE rendering children (use the existing isLoading flag to gate the Stack), OR in /app/frontend/app/personal-details.tsx gate load() on `useAuth().token` (depend on token in useEffect), OR add an axios request interceptor that reads the token from AsyncStorage on every request. The bug is reproducible 100% of the time on refresh."
+  - agent: "testing"
+    message: "✅/❌ BACKEND REVIEW v4 (5 new endpoints) — 4 of 5 PASS, 1 CRITICAL FAIL. Tested against https://vault-app-25.preview.emergentagent.com/api with fresh JWTs (passcode 1234/2222/3333/4444/5555) via /app/backend_test.py.\n\n  ✅ GET /api/fx/rate — GBP→EUR rate=1.154202 (live, source=open.er-api.com), USD→JPY rate=157.817757 (live), GBP→GBP rate=1.0. All 6 response keys (from/to/rate/amount/converted/source) present.\n  ✅ GET /api/fx/currencies — Returned 18 currency objects (>=15 required); each has code/name/symbol/flag; sample GBP/USD/EUR/JPY/AUD/INR/CHF/CNY all present.\n  ✅ POST /api/transfers/international — Personal £100 GBP→EUR returned transaction_id, amount_sent=100.0, source_currency=GBP, target_currency=EUR, amount_received=115.42, fx_rate=1.154202, trn='TRNME3MT979Q92EF' (matches ^TRN[A-Z0-9]{13}$), fpid='FP815662050807990297' (matches ^FP\\d{18}$), status='completed'. Subsequent GET /api/transactions/{id} confirmed transaction_type='international' and recipient_account_number='DE89370400440532013000' (IBAN). Business variant (is_business=true, invoice_number='INV-2024-001') also returned status=completed with valid TRN/FPID.\n  ✅ DELETE /api/transactions/{id} — Created domestic transfer (£12.50, sort 20-30-40, to 11223344) → DELETE returned 200 {message:'Transaction deleted', id:<same>} → subsequent GET returned 404. DELETE /api/transactions/doesnotexist → 404 ✅.\n  ❌ GET /api/statements/monthly?year=2025&month=11 → **500 Internal Server Error**. Backend traceback in /var/log/supervisor/backend.err.log: `File /app/backend/server.py, line 715, in download_monthly_statement / doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=40, bottomMargin=40) / NameError: name 'SimpleDocTemplate' is not defined`. ROOT CAUSE: the function at lines 697–772 references `SimpleDocTemplate`, `letter`, `getSampleStyleSheet`, `Paragraph`, `Spacer`, and `Response` (fastapi.responses) but NONE are imported at module top (only `StreamingResponse` is imported on line 3), and unlike the neighbouring `download_pdf_statement` / `download_csv_statement` which do their reportlab imports INSIDE the function body, this endpoint has no local imports. The bug is NOT in the input-validation path: month=13 → 400 with detail 'Month must be between 1 and 12' works correctly (validation runs before the broken lines). FIX (≤6 lines, inside `download_monthly_statement` after the validation block): `from fastapi.responses import Response`, `from reportlab.lib.pagesizes import letter`, `from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer`, `from reportlab.lib.styles import getSampleStyleSheet`. The Table/TableStyle/colors imports inside the `if transactions` branch are already present and are fine.\n\n  TEST CREDENTIALS: confirmed in /app/memory/test_credentials.md — any 4-digit passcode works (used 1234/2222/3333/4444/5555 across the 5 batches). No code modifications made by testing; the reportlab/fastapi Response import bug must be fixed by main agent."

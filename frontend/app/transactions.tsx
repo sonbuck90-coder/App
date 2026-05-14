@@ -181,6 +181,28 @@ export default function TransactionsScreen() {
                     key={txn.id}
                     style={[styles.txnRow, i < txns.length - 1 && styles.txnBorder]}
                     onPress={() => router.push({ pathname: '/transaction-detail', params: { id: txn.id } })}
+                    onLongPress={() => {
+                      Alert.alert(
+                        'Delete transaction?',
+                        `Are you sure you want to delete the £${txn.amount.toFixed(2)} ${txn.transaction_type} to ${txn.recipient_name || txn.description}? This cannot be undone.`,
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Delete',
+                            style: 'destructive',
+                            onPress: async () => {
+                              try {
+                                await transactionsApi.delete(txn.id);
+                                setTransactions((prev) => prev.filter((t) => t.id !== txn.id));
+                              } catch (e: any) {
+                                Alert.alert('Error', e.response?.data?.detail || 'Could not delete');
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                    delayLongPress={400}
                     testID={`txn-row-${txn.id}`}
                     activeOpacity={0.6}
                   >
