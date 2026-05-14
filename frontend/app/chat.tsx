@@ -227,8 +227,8 @@ export default function ChatScreen() {
       <View style={[styles.header, { backgroundColor: cc.header }]}>
         <View style={styles.headerLeft}>
           <BackButton color={headerTextColor} />
-          <View style={[styles.aiAvatar, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-            <Ionicons name="chatbubbles" size={18} color={C.white} />
+          <View style={[styles.aiAvatar, { backgroundColor: cc.primary }]}>
+            <Ionicons name="chatbubbles" size={18} color="#FFFFFF" />
           </View>
           <View>
             <Text style={[styles.headerTitle, { color: headerTextColor }]}>Ellie</Text>

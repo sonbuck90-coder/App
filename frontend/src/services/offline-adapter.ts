@@ -17,8 +17,82 @@ import {
   addNotification,
   FX_RATES_GBP,
   FX_CURRENCIES,
+  classifyTxn,
+  getBudgets,
+  setBudgetLimit,
+  monthlySpendByCategory,
+  checkBudgetAlerts,
+  BUDGET_CATEGORIES,
 } from './offline-store';
 import { sendTransactionNotification, formatGBP } from './notifications';
+
+// -----------------------------------------------------------------------------
+// Live FX rate refresh (best-effort, optional)
+// -----------------------------------------------------------------------------
+// Cache the live GBP-base rate table in-memory for the session. open.er-api.com
+// is a free public endpoint that returns rates relative to a chosen base.
+// If the network is unreachable we silently fall back to the static table.
+let liveRatesCache: Record<string, number> | null = null;
+let liveRatesFetchedAt = 0;
+const LIVE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+async function fetchLiveRatesIfStale(): Promise<Record<string, number> | null> {
+  const now = Date.now();
+  if (liveRatesCache && now - liveRatesFetchedAt < LIVE_TTL_MS) return liveRatesCache;
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), 3500);
+    const resp = await fetch('https://open.er-api.com/v6/latest/GBP', {
+      signal: controller.signal as any,
+    });
+    clearTimeout(t);
+    if (!resp.ok) return null;
+    const json: any = await resp.json();
+    if (json && json.rates && typeof json.rates === 'object') {
+      // Override only the currencies we know about so we don't blow up the table
+      const table: Record<string, number> = { ...FX_RATES_GBP };
+      Object.keys(table).forEach((k) => {
+        if (typeof json.rates[k] === 'number') table[k] = json.rates[k];
+      });
+      liveRatesCache = table;
+      liveRatesFetchedAt = now;
+      return table;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Budget alert helper
+// -----------------------------------------------------------------------------
+async function fireBudgetAlertsFor(transactionType: string) {
+  try {
+    const cat = classifyTxn(transactionType);
+    const alerts = await checkBudgetAlerts(cat);
+    for (const a of alerts) {
+      sendTransactionNotification({
+        title: a.level === 100 ? `Budget exceeded · ${a.category}` : `Budget alert · ${a.category}`,
+        body:
+          a.level === 100
+            ? `You've spent ${formatGBP(a.spent)} of your ${formatGBP(a.limit)} ${a.category} budget this month.`
+            : `You've used 80% of your ${a.category} budget — ${formatGBP(a.spent)} of ${formatGBP(a.limit)}.`,
+        data: { type: 'budget', category: a.category },
+      });
+      await addNotification({
+        user_id: (await getDb()).profile.id,
+        title: a.level === 100 ? `Budget exceeded · ${a.category}` : `Budget alert · ${a.category}`,
+        body: `${formatGBP(a.spent)} / ${formatGBP(a.limit)}`,
+        notification_type: 'budget',
+        is_read: false,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.warn('budget alert check failed', e);
+  }
+}
 
 // Small helper for crafting the response axios expects.
 function ok<T>(data: T, config: InternalAxiosRequestConfig): AxiosResponse<T> {
@@ -212,6 +286,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       body: `${formatGBP(amt)} to ${body.recipient_name || body.to_account_number}`,
       data: { txn_id: txn.id },
     });
+    await fireBudgetAlertsFor('transfer');
     return ok(txn, config);
   }
 
@@ -249,7 +324,31 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       body: `${formatGBP(amt)} → ${body.target_currency} ${converted.toFixed(2)} to ${body.recipient_name}`,
       data: { txn_id: txn.id },
     });
+    await fireBudgetAlertsFor('transfer');
     return ok({ ...txn, converted_amount: converted, rate }, config);
+  }
+
+  // ---- Budgets -------------------------------------------------------------
+  if (path === '/budgets' && method === 'GET') {
+    const budgets = await getBudgets();
+    const spent = await monthlySpendByCategory();
+    const data = BUDGET_CATEGORIES.map((cat) => {
+      const slot = budgets.categories[cat] || { limit: 0, alerted80: false, alerted100: false };
+      return {
+        category: cat,
+        limit: slot.limit,
+        spent: +(spent[cat] || 0).toFixed(2),
+        percent: slot.limit > 0 ? Math.min(100, +(((spent[cat] || 0) / slot.limit) * 100).toFixed(1)) : 0,
+      };
+    });
+    return ok({ month: budgets.month, items: data }, config);
+  }
+  if (path === '/budgets' && method === 'PUT') {
+    const cat = body?.category;
+    const limit = parseFloat(body?.limit || '0');
+    if (!cat) throw err(400, 'category required');
+    await setBudgetLimit(cat, limit);
+    return ok({ message: 'Budget updated' }, config);
   }
 
   // ---- FX -------------------------------------------------------------------
@@ -260,11 +359,24 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     const fromCcy = (query.from_ccy || 'GBP').toUpperCase();
     const toCcy = (query.to_ccy || 'GBP').toUpperCase();
     const amount = parseFloat(query.amount || '1');
-    const fromRate = FX_RATES_GBP[fromCcy] ?? 1;
-    const toRate = FX_RATES_GBP[toCcy] ?? 1;
+
+    // 1) Try to refresh live rates from open.er-api.com (silent on failure).
+    //    The result is cached for 6 hours so we don't spam the API.
+    const live = await fetchLiveRatesIfStale().catch(() => null);
+    const table = live || FX_RATES_GBP;
+
+    const fromRate = table[fromCcy] ?? FX_RATES_GBP[fromCcy] ?? 1;
+    const toRate = table[toCcy] ?? FX_RATES_GBP[toCcy] ?? 1;
     const rate = toRate / fromRate;
     return ok(
-      { from: fromCcy, to: toCcy, rate, amount, converted: +(amount * rate).toFixed(4) },
+      {
+        from: fromCcy,
+        to: toCcy,
+        rate,
+        amount,
+        converted: +(amount * rate).toFixed(4),
+        live: !!live,
+      },
       config,
     );
   }
@@ -382,6 +494,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       body: `${formatGBP(amt)} paid to ${biller.name}`,
       data: { txn_id: txn.id },
     });
+    await fireBudgetAlertsFor('payment');
     return ok(txn, config);
   }
 

@@ -114,6 +114,29 @@ interface OfflineDB {
   billers: Biller[];
   notifications: AppNotification[];
   schedules: Schedule[];
+  budgets?: BudgetState;
+}
+
+export interface BudgetState {
+  /** YYYY-MM the limits were last reset for */
+  month: string;
+  categories: Record<string, CategoryBudget>;
+}
+
+export interface CategoryBudget {
+  limit: number;
+  alerted80: boolean;
+  alerted100: boolean;
+}
+
+/** Categories we recognise for budgets — match the analytics screen. */
+export const BUDGET_CATEGORIES = ['Bills', 'Transfers', 'Other'] as const;
+export type BudgetCategory = (typeof BUDGET_CATEGORIES)[number];
+
+export function classifyTxn(transaction_type: string): BudgetCategory {
+  if (transaction_type === 'payment') return 'Bills';
+  if (transaction_type === 'transfer') return 'Transfers';
+  return 'Other';
 }
 
 // -----------------------------------------------------------------------------
@@ -366,6 +389,100 @@ export async function addNotification(n: Omit<AppNotification, 'id'>): Promise<A
 export function newId() {
   return uid();
 }
+
+// -----------------------------------------------------------------------------
+// Budgets
+// -----------------------------------------------------------------------------
+function currentMonthKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Lazily initialise / reset budgets for the current month. */
+export async function getBudgets(): Promise<BudgetState> {
+  const db = await getDb();
+  const key = currentMonthKey();
+  if (!db.budgets) {
+    db.budgets = {
+      month: key,
+      categories: {
+        Bills: { limit: 0, alerted80: false, alerted100: false },
+        Transfers: { limit: 0, alerted80: false, alerted100: false },
+        Other: { limit: 0, alerted80: false, alerted100: false },
+      },
+    };
+    await persist();
+  } else if (db.budgets.month !== key) {
+    // New month → reset the "alerted" flags so notifications fire again.
+    db.budgets.month = key;
+    Object.values(db.budgets.categories).forEach((c) => {
+      c.alerted80 = false;
+      c.alerted100 = false;
+    });
+    await persist();
+  }
+  return db.budgets;
+}
+
+/**
+ * Compute the spend so far this month for each category.
+ * Returns a map: category → spent amount.
+ */
+export async function monthlySpendByCategory(): Promise<Record<string, number>> {
+  const db = await getDb();
+  const now = new Date();
+  const out: Record<string, number> = { Bills: 0, Transfers: 0, Other: 0 };
+  db.transactions.forEach((t) => {
+    if (t.transaction_type === 'deposit') return;
+    const ts = new Date(t.timestamp);
+    if (ts.getMonth() !== now.getMonth() || ts.getFullYear() !== now.getFullYear()) return;
+    const cat = classifyTxn(t.transaction_type);
+    out[cat] = (out[cat] || 0) + t.amount;
+  });
+  return out;
+}
+
+export async function setBudgetLimit(cat: string, limit: number) {
+  const b = await getBudgets();
+  if (!b.categories[cat]) {
+    b.categories[cat] = { limit: 0, alerted80: false, alerted100: false };
+  }
+  b.categories[cat].limit = Math.max(0, +limit.toFixed(2));
+  // Resetting the limit allows future alerts again
+  b.categories[cat].alerted80 = false;
+  b.categories[cat].alerted100 = false;
+  await persist();
+  return b;
+}
+
+/**
+ * Should be called right after each spending transaction is persisted.
+ * Returns an array of alert payloads that the caller (offline-adapter)
+ * should turn into user-visible notifications.
+ */
+export async function checkBudgetAlerts(category: string): Promise<
+  Array<{ category: string; spent: number; limit: number; level: 80 | 100 }>
+> {
+  const b = await getBudgets();
+  const slot = b.categories[category];
+  if (!slot || slot.limit <= 0) return [];
+  const spend = await monthlySpendByCategory();
+  const spent = spend[category] || 0;
+  const pct = (spent / slot.limit) * 100;
+  const alerts: Array<{ category: string; spent: number; limit: number; level: 80 | 100 }> = [];
+  if (pct >= 100 && !slot.alerted100) {
+    slot.alerted100 = true;
+    slot.alerted80 = true; // implicitly
+    alerts.push({ category, spent, limit: slot.limit, level: 100 });
+  } else if (pct >= 80 && !slot.alerted80) {
+    slot.alerted80 = true;
+    alerts.push({ category, spent, limit: slot.limit, level: 80 });
+  }
+  if (alerts.length > 0) await persist();
+  return alerts;
+}
+
+
 
 // FX rates table — used while offline. Values are GBP base.
 export const FX_RATES_GBP: Record<string, number> = {
