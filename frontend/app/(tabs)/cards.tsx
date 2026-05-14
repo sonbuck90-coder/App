@@ -6,12 +6,27 @@ import { useRouter } from 'expo-router';
 import { cardsApi, Card } from '../../src/services/api';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import { useAuth } from '../../src/context/AuthContext';
+import { getLayoutFor } from '../../src/context/BankThemes';
+import CardsModern from '../../src/screens/CardsModern';
+import CardsMinimal from '../../src/screens/CardsMinimal';
 
 const { width } = Dimensions.get('window');
 
 const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#FFFFFF', cardBg: '#E8E8E8' };
 
-export default function CardsScreen() {
+/**
+ * Cards layout chooser — picks Classic / Modern / Minimal based on the
+ * active bank theme. Each layout is an entirely different visual design.
+ */
+export default function Cards() {
+  const { bankThemeId } = useCustomization();
+  const layout = getLayoutFor(bankThemeId);
+  if (layout === 'modern') return <CardsModern />;
+  if (layout === 'minimal') return <CardsMinimal />;
+  return <CardsClassic />;
+}
+
+function CardsClassic() {
   const { colors: cc } = useCustomization();
   const { user } = useAuth();
   const router = useRouter();
