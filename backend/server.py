@@ -711,62 +711,207 @@ async def download_monthly_statement(year: int, month: int, current_user: User =
         "timestamp": {"$gte": start, "$lte": end},
     }).sort("timestamp", 1).to_list(1000)
 
-    # Compute opening/closing balance estimate
+    # Pull user profile + accounts for the real statement header
+    profile = await db.users.find_one({"id": current_user.id}) or {}
     accounts = await db.accounts.find({"user_id": current_user.id}).to_list(50)
     total_balance = sum(a.get("balance", 0) for a in accounts)
 
+    # Choose the primary (checking) account for the statement header detail
+    primary = next((a for a in accounts if a.get("account_type") == "checking"), accounts[0] if accounts else {})
+    full_name = profile.get("name") or current_user.name
+    address = profile.get("address") or "8 Canada Square, London E14 5HQ, United Kingdom"
+    email = profile.get("email") or ""
+    phone = profile.get("phone") or ""
+    sort_code = primary.get("sort_code", "44-91-51")
+    acct_num = primary.get("account_number", "92647194")
+    # Derive IBAN/BIC from sort code + acct number
+    raw_acc = (acct_num or "").replace(" ", "").zfill(8)[-8:]
+    raw_sort = (sort_code or "").replace("-", "").replace(" ", "").zfill(6)[-6:]
+    iban = f"GB29 HBUK {raw_sort[0:2]}{raw_sort[2:4]} {raw_sort[4:6]}{raw_acc[0:2]} {raw_acc[2:6]} {raw_acc[6:8]}".strip()
+    bic = "HBUKGB4B"
+
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=letter, topMargin=40, bottomMargin=40)
+    doc = SimpleDocTemplate(
+        buf, pagesize=letter,
+        topMargin=36, bottomMargin=36, leftMargin=40, rightMargin=40,
+        title=f"HSBC UK Statement {start.strftime('%B %Y')}",
+        author="HSBC UK Mobile Banking",
+    )
     styles = getSampleStyleSheet()
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_RIGHT, TA_LEFT
+    from reportlab.platypus import Table, TableStyle
+    from reportlab.lib import colors as rcolors
+    HSBC_RED = rcolors.HexColor("#DB0011")
+    DARK = rcolors.HexColor("#0B1424")
+    MID = rcolors.HexColor("#5E6A7A")
+    LIGHT = rcolors.HexColor("#F1F3F6")
+
+    title_style = ParagraphStyle("t", parent=styles["Title"], textColor=HSBC_RED, fontSize=20, leading=22, alignment=TA_LEFT, spaceAfter=0)
+    sub_style = ParagraphStyle("s", parent=styles["Normal"], fontSize=10, textColor=MID, alignment=TA_LEFT)
+    small = ParagraphStyle("sm", parent=styles["Normal"], fontSize=9, textColor=MID, alignment=TA_LEFT)
+    label = ParagraphStyle("lbl", parent=styles["Normal"], fontSize=8, textColor=MID, alignment=TA_LEFT, leading=10)
+    value = ParagraphStyle("v", parent=styles["Normal"], fontSize=10, textColor=DARK, alignment=TA_LEFT, leading=12)
+    bold_value = ParagraphStyle("bv", parent=styles["Normal"], fontSize=11, textColor=DARK, alignment=TA_LEFT, leading=13, fontName="Helvetica-Bold")
+    right = ParagraphStyle("rt", parent=styles["Normal"], fontSize=9, textColor=DARK, alignment=TA_RIGHT)
+    section_header = ParagraphStyle("sh", parent=styles["Normal"], fontSize=11, textColor=HSBC_RED, fontName="Helvetica-Bold", spaceBefore=10, spaceAfter=4)
+
     elements = []
-    title = Paragraph(f"<b>HSBC UK — Monthly Statement</b>", styles["Title"])
-    elements.append(title)
-    elements.append(Paragraph(f"<b>Account holder:</b> {current_user.name}", styles["Normal"]))
-    elements.append(Paragraph(f"<b>Period:</b> {start.strftime('%B %Y')}", styles["Normal"]))
-    elements.append(Paragraph(f"<b>Statement issued:</b> {datetime.utcnow().strftime('%d %b %Y')}", styles["Normal"]))
-    elements.append(Paragraph(f"<b>Closing total balance:</b> £{total_balance:,.2f}", styles["Normal"]))
+
+    # ============ HEADER ============
+    header_data = [[
+        Paragraph("<b>HSBC UK</b>", title_style),
+        Paragraph(
+            f"<b>HSBC UK Bank plc</b><br/>"
+            f"1 Centenary Square<br/>"
+            f"Birmingham, B1 1HQ<br/>"
+            f"www.hsbc.co.uk &nbsp; · &nbsp; 03457 404 404",
+            small,
+        ),
+    ]]
+    header_tbl = Table(header_data, colWidths=[200, 320])
+    header_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+    ]))
+    elements.append(header_tbl)
+    elements.append(Spacer(1, 6))
+    # Divider
+    div = Table([[""]], colWidths=[520], rowHeights=[2])
+    div.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), HSBC_RED)]))
+    elements.append(div)
     elements.append(Spacer(1, 14))
 
+    elements.append(Paragraph("Monthly Bank Statement", ParagraphStyle("h", parent=styles["Heading1"], textColor=DARK, fontSize=18, spaceAfter=2)))
+    elements.append(Paragraph(f"Statement period: <b>{start.strftime('%d %b %Y')} – {end.strftime('%d %b %Y')}</b>", sub_style))
+    elements.append(Spacer(1, 12))
+
+    # ============ ACCOUNT HOLDER + ACCOUNT BOX ============
+    holder_block = [
+        [Paragraph("<b>Account Holder</b>", label)],
+        [Paragraph(full_name.upper(), bold_value)],
+        [Paragraph(address.replace(", ", "<br/>") , value)],
+        [Paragraph(f"{email}", small)] if email else [],
+        [Paragraph(f"{phone}", small)] if phone else [],
+    ]
+    holder_block = [r for r in holder_block if r]
+
+    detail_block = [
+        [Paragraph("<b>Account Details</b>", label)],
+        [Paragraph("Account Type", label), Paragraph("Current Account", value)],
+        [Paragraph("Sort Code", label), Paragraph(sort_code, value)],
+        [Paragraph("Account Number", label), Paragraph(acct_num, value)],
+        [Paragraph("IBAN", label), Paragraph(iban, value)],
+        [Paragraph("BIC / SWIFT", label), Paragraph(bic, value)],
+        [Paragraph("Currency", label), Paragraph("GBP £", value)],
+    ]
+
+    holder_tbl = Table(holder_block, colWidths=[260])
+    holder_tbl.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 4), ("BACKGROUND", (0, 0), (-1, -1), LIGHT)]))
+
+    detail_tbl = Table(detail_block[1:], colWidths=[85, 175])
+    detail_tbl.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("BACKGROUND", (0, 0), (-1, -1), LIGHT),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    detail_wrapper = Table([[detail_block[0][0]], [detail_tbl]], colWidths=[260])
+    detail_wrapper.setStyle(TableStyle([("LEFTPADDING", (0, 0), (-1, -1), 12), ("BACKGROUND", (0, 0), (-1, -1), LIGHT), ("TOPPADDING", (0, 0), (-1, -1), 4)]))
+
+    info_tbl = Table([[holder_tbl, detail_wrapper]], colWidths=[260, 260])
+    info_tbl.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    elements.append(info_tbl)
+    elements.append(Spacer(1, 14))
+
+    # ============ BALANCE SUMMARY ============
+    money_in = sum(t.get("amount", 0) for t in transactions if t.get("transaction_type") == "deposit")
+    money_out = sum(t.get("amount", 0) for t in transactions if t.get("transaction_type") != "deposit")
+    closing = total_balance
+    opening = round(closing - (money_in - money_out), 2)
+
+    summary_data = [
+        ["Opening balance", "Money in", "Money out", "Closing balance"],
+        [f"£{opening:,.2f}", f"+£{money_in:,.2f}", f"-£{money_out:,.2f}", f"£{closing:,.2f}"],
+    ]
+    summary_tbl = Table(summary_data, colWidths=[130, 130, 130, 130])
+    summary_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), HSBC_RED),
+        ("TEXTCOLOR", (0, 0), (-1, 0), rcolors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [LIGHT]),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("TEXTCOLOR", (0, 1), (0, 1), DARK),
+        ("TEXTCOLOR", (1, 1), (1, 1), rcolors.HexColor("#00847F")),
+        ("TEXTCOLOR", (2, 1), (2, 1), HSBC_RED),
+        ("TEXTCOLOR", (3, 1), (3, 1), DARK),
+    ]))
+    elements.append(summary_tbl)
+    elements.append(Spacer(1, 18))
+
+    # ============ TRANSACTIONS TABLE ============
+    elements.append(Paragraph("Transaction Details", section_header))
     if not transactions:
-        elements.append(Paragraph("No transactions in this period.", styles["Normal"]))
+        empty_tbl = Table([[Paragraph("No transactions in this period.", value)]], colWidths=[520])
+        empty_tbl.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), LIGHT), ("TOPPADDING", (0, 0), (-1, -1), 20), ("BOTTOMPADDING", (0, 0), (-1, -1), 20), ("ALIGN", (0, 0), (-1, -1), "CENTER")]))
+        elements.append(empty_tbl)
     else:
-        data = [["Date", "Type", "Description", "Amount (GBP)", "Status"]]
-        money_in = 0.0
-        money_out = 0.0
+        data = [["Date", "Description", "Reference / TRN", "Money In", "Money Out", "Balance"]]
+        running = opening
         for txn in transactions:
             ts = txn.get("timestamp", datetime.utcnow())
-            date_str = ts.strftime("%d %b %Y") if isinstance(ts, datetime) else str(ts)
-            txn_type = txn.get("transaction_type", "").title()
-            desc = (txn.get("recipient_name") or txn.get("description", ""))[:42]
+            date_str = ts.strftime("%d %b") if isinstance(ts, datetime) else str(ts)
+            txn_type = txn.get("transaction_type", "")
+            recipient = txn.get("recipient_name") or txn.get("description", "")
+            desc_lines = recipient[:30]
+            if txn.get("recipient_bank_name"):
+                desc_lines += f"\n{txn['recipient_bank_name']}"
+            ref = txn.get("trn") or txn.get("id", "")[:12].upper()
             amount = txn.get("amount", 0)
-            sign = "+" if txn.get("transaction_type") == "deposit" else "-"
-            if sign == "+":
-                money_in += amount
+            if txn_type == "deposit":
+                running += amount
+                in_col = f"£{amount:,.2f}"
+                out_col = ""
             else:
-                money_out += amount
-            status = txn.get("status", "")
-            data.append([date_str, txn_type, desc, f"{sign}£{amount:,.2f}", status])
-        from reportlab.platypus import Table, TableStyle
-        from reportlab.lib import colors as rcolors
-        table = Table(data, colWidths=[80, 70, 220, 80, 70])
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), rcolors.HexColor("#DB0011")),
+                running -= amount
+                in_col = ""
+                out_col = f"£{amount:,.2f}"
+            data.append([date_str, desc_lines, ref, in_col, out_col, f"£{running:,.2f}"])
+        txn_tbl = Table(data, colWidths=[55, 160, 110, 70, 70, 75])
+        txn_tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), DARK),
             ("TEXTCOLOR", (0, 0), (-1, 0), rcolors.white),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rcolors.white, rcolors.HexColor("#F8F8F8")]),
-            ("GRID", (0, 0), (-1, -1), 0.4, rcolors.HexColor("#CCCCCC")),
+            ("FONTSIZE", (0, 0), (-1, 0), 9),
+            ("FONTSIZE", (0, 1), (-1, -1), 8),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ALIGN", (3, 1), (3, -1), "RIGHT"),
+            ("ALIGN", (3, 0), (5, -1), "RIGHT"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rcolors.white, LIGHT]),
+            ("GRID", (0, 0), (-1, -1), 0.3, rcolors.HexColor("#CCCCCC")),
+            ("TEXTCOLOR", (3, 1), (3, -1), rcolors.HexColor("#00847F")),
+            ("TEXTCOLOR", (4, 1), (4, -1), HSBC_RED),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ]))
-        elements.append(table)
-        elements.append(Spacer(1, 14))
-        elements.append(Paragraph(f"<b>Total money in:</b> +£{money_in:,.2f}", styles["Normal"]))
-        elements.append(Paragraph(f"<b>Total money out:</b> -£{money_out:,.2f}", styles["Normal"]))
-        elements.append(Paragraph(f"<b>Net change:</b> £{money_in - money_out:,.2f}", styles["Normal"]))
+        elements.append(txn_tbl)
 
-    elements.append(Spacer(1, 24))
-    elements.append(Paragraph("This statement was generated by HSBC UK Mobile Banking. Keep for your records.", styles["Italic"]))
+    elements.append(Spacer(1, 20))
+    elements.append(Paragraph("Important information", section_header))
+    elements.append(Paragraph(
+        "Please check this statement carefully and tell us about any items that you think are wrong or you do not recognise within 30 days. "
+        "This statement was generated electronically by HSBC UK Mobile Banking and does not require a signature. "
+        "HSBC UK Bank plc is authorised by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation Authority. Registered in England and Wales (Company No. 09928412).",
+        ParagraphStyle("imp", parent=styles["Normal"], fontSize=8, textColor=MID, leading=11, alignment=TA_LEFT),
+    ))
+    elements.append(Spacer(1, 10))
+    elements.append(Paragraph(f"Statement generated on {datetime.utcnow().strftime('%d %b %Y at %H:%M')} UTC · Page 1 of 1", small))
+
     doc.build(elements)
     buf.seek(0)
     return Response(
