@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CustomizationProvider } from '../src/context/CustomizationContext';
+import { ensureNotificationPermission } from '../src/services/notifications';
 
 export default function RootLayout() {
+  useEffect(() => {
+    // Ask once on app start so the first transaction can already show a banner.
+    ensureNotificationPermission().catch(() => undefined);
+  }, []);
+
   return (
     <AuthProvider>
       <CustomizationProvider>

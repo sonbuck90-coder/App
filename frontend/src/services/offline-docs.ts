@@ -8,6 +8,7 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
 import { getDb, Transaction } from './offline-store';
 
 const MONTHS = [
@@ -195,9 +196,63 @@ function escapeHtml(s: string) {
 // -----------------------------------------------------------------------------
 // Public exports (download / share helpers)
 // -----------------------------------------------------------------------------
-async function deliver(filename: string, mime: string, content: string) {
+/**
+ * Deliver an HTML document as a real PDF.
+ *
+ * - Native: use `expo-print` to render the HTML to a PDF file on disk,
+ *   then open the share sheet so the user can save / send it.
+ * - Web: use `expo-print.printAsync` which opens the browser print dialog
+ *   (Chrome / Safari let the user choose "Save as PDF" or print directly).
+ *
+ * If for any reason PDF rendering fails on web, fall back to a Blob HTML
+ * download so the user still ends up with the document.
+ */
+async function deliverPdf(filename: string, html: string) {
   if (Platform.OS === 'web') {
-    const blob = new Blob([content], { type: mime });
+    try {
+      // expo-print on web triggers window.print on a hidden iframe — that
+      // gives the user a real PDF via the native print dialog.
+      await Print.printAsync({ html });
+      return;
+    } catch (e) {
+      // Fallback: open the styled HTML in a new tab; user can save as PDF.
+      try {
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        // Trigger download
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename.replace(/\.pdf$/i, '.html');
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+  }
+
+  // Native (iOS / Android): render to PDF then share the file.
+  const { uri } = await Print.printToFileAsync({ html, base64: false });
+  // Rename the file so the share sheet shows the HSBC-branded filename
+  const desired = `${FileSystem.documentDirectory}${filename}`;
+  try {
+    await FileSystem.moveAsync({ from: uri, to: desired });
+  } catch {
+    // If move fails (e.g. file exists), just share the original tmp uri.
+  }
+  const finalUri = (await FileSystem.getInfoAsync(desired)).exists ? desired : uri;
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(finalUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: filename });
+  }
+}
+
+/** CSV is a plain text file — keep the original Blob/FileSystem path. */
+async function deliverCsv(filename: string, csv: string) {
+  if (Platform.OS === 'web') {
+    const blob = new Blob([csv], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -208,17 +263,16 @@ async function deliver(filename: string, mime: string, content: string) {
     return;
   }
   const uri = `${FileSystem.documentDirectory}${filename}`;
-  await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+  await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 });
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, { mimeType: mime, dialogTitle: filename });
+    await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: filename });
   }
 }
 
 export async function downloadMonthlyStatement(year: number, monthIdx1: number) {
   const html = await buildStatementHtml(year, monthIdx1);
-  await deliver(
-    `HSBC_Statement_${year}_${String(monthIdx1).padStart(2, '0')}.html`,
-    'text/html',
+  await deliverPdf(
+    `HSBC_Statement_${year}_${String(monthIdx1).padStart(2, '0')}.pdf`,
     html,
   );
 }
@@ -226,21 +280,17 @@ export async function downloadMonthlyStatement(year: number, monthIdx1: number) 
 export async function downloadReceipt(txn: Transaction) {
   const db = await getDb();
   const html = buildReceiptHtml(txn, db.profile.name);
-  await deliver(`HSBC_Receipt_${txn.id}.html`, 'text/html', html);
+  await deliverPdf(`HSBC_Receipt_${txn.id}.pdf`, html);
 }
 
 export async function downloadTransactionsExport(format: 'csv' | 'pdf' | 'html') {
   const db = await getDb();
   const txns = [...db.transactions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
   if (format === 'csv') {
-    await deliver(`HSBC_Transactions_${Date.now()}.csv`, 'text/csv', buildCsv(txns));
+    await deliverCsv(`HSBC_Transactions_${Date.now()}.csv`, buildCsv(txns));
     return;
   }
-  // pdf or html → deliver styled HTML (browser/native both treat it as a doc)
+  // pdf or html → render the styled HTML to PDF
   const html = await buildStatementHtml(new Date().getFullYear(), new Date().getMonth() + 1);
-  await deliver(
-    `HSBC_Transactions_${Date.now()}.html`,
-    'text/html',
-    html,
-  );
+  await deliverPdf(`HSBC_Transactions_${Date.now()}.pdf`, html);
 }
