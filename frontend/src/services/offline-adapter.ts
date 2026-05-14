@@ -23,6 +23,7 @@ import {
   monthlySpendByCategory,
   checkBudgetAlerts,
   BUDGET_CATEGORIES,
+  runDueSchedules,
 } from './offline-store';
 import { sendTransactionNotification, formatGBP } from './notifications';
 
@@ -61,6 +62,46 @@ async function fetchLiveRatesIfStale(): Promise<Record<string, number> | null> {
     return null;
   } catch {
     return null;
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Scheduled deposits — auto-execute due schedules and notify the user
+// -----------------------------------------------------------------------------
+let lastSchedulesRunAt = 0;
+const SCHEDULES_THROTTLE_MS = 4000; // don't re-run more than once every 4s
+
+async function runSchedulesAndNotify(force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && now - lastSchedulesRunAt < SCHEDULES_THROTTLE_MS) return;
+  lastSchedulesRunAt = now;
+  try {
+    const outcomes = await runDueSchedules();
+    if (outcomes.length === 0) return;
+    const db = await getDb();
+    for (const o of outcomes) {
+      const acct = db.accounts.find((a) => a.id === o.account_id);
+      const totalAdded = +(o.amount * o.runs_executed).toFixed(2);
+      const summary =
+        o.runs_executed > 1
+          ? `${o.runs_executed} scheduled deposits of ${formatGBP(o.amount)} from ${o.source} (${formatGBP(totalAdded)} total)`
+          : `${formatGBP(o.amount)} from ${o.source} added to ${acct?.account_type === 'checking' ? 'Current' : 'Savings'} Account`;
+      void sendTransactionNotification({
+        title: 'Scheduled deposit received',
+        body: summary,
+        data: { type: 'schedule', schedule_id: o.schedule_id },
+      });
+      await addNotification({
+        user_id: db.profile.id,
+        title: 'Scheduled deposit received',
+        body: summary,
+        notification_type: 'schedule',
+        is_read: false,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (e) {
+    console.warn('runSchedulesAndNotify failed', e);
   }
 }
 
@@ -145,6 +186,11 @@ type Ctx = {
 async function handle(ctx: Ctx): Promise<AxiosResponse> {
   const { method, path, query, body, config } = ctx;
   const db = await getDb();
+
+  // Lazy background tick — every API call drains any due schedules. The
+  // helper is throttled internally so this is effectively free except on
+  // the first call after a long absence.
+  await runSchedulesAndNotify();
 
   // ---- Auth -----------------------------------------------------------------
   if (path === '/auth/passcode' && method === 'POST') {

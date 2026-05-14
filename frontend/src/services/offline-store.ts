@@ -482,6 +482,108 @@ export async function checkBudgetAlerts(category: string): Promise<
   return alerts;
 }
 
+// -----------------------------------------------------------------------------
+// Scheduled deposits — background auto-execution
+// -----------------------------------------------------------------------------
+
+/**
+ * Move `next_run` forward by one frequency tick.
+ *
+ * Supported frequency values are the same strings the schedule UI uses:
+ * `daily`, `weekly`, `biweekly` / `fortnightly`, `monthly`, `yearly`.
+ */
+function advanceSchedule(d: Date, frequency: string): Date {
+  const next = new Date(d);
+  const f = (frequency || 'monthly').toLowerCase();
+  if (f === 'daily') next.setDate(next.getDate() + 1);
+  else if (f === 'weekly') next.setDate(next.getDate() + 7);
+  else if (f === 'biweekly' || f === 'fortnightly') next.setDate(next.getDate() + 14);
+  else if (f === 'yearly' || f === 'annual') next.setFullYear(next.getFullYear() + 1);
+  else next.setMonth(next.getMonth() + 1); // monthly is the default
+  return next;
+}
+
+export interface ScheduleRunOutcome {
+  schedule_id: string;
+  account_id: string;
+  amount: number;
+  source: string;
+  runs_executed: number;
+}
+
+/**
+ * Execute every active schedule that is due (next_run <= now).
+ *
+ * Designed to be idempotent and safe to call multiple times:
+ *   - On every app launch (from `_layout.tsx`)
+ *   - When the user opens the schedules screen
+ *   - On focus events
+ *
+ * Each due schedule is processed as a real deposit so balances, the
+ * transaction list, and notifications stay perfectly in sync. If the user
+ * hasn't opened the app for several periods we catch up by looping until
+ * `next_run` is in the future.
+ */
+export async function runDueSchedules(): Promise<ScheduleRunOutcome[]> {
+  const db = await getDb();
+  const now = new Date();
+  const outcomes: ScheduleRunOutcome[] = [];
+
+  for (const sched of db.schedules) {
+    if (!sched.is_active) continue;
+    if (sched.end_date && new Date(sched.end_date) < now) {
+      // Already past its end date — deactivate and skip.
+      sched.is_active = false;
+      continue;
+    }
+
+    let runs = 0;
+    let nextRun = new Date(sched.next_run);
+    // Safety cap of 60 catch-up runs so a stale date can't lock the loop.
+    while (nextRun <= now && runs < 60) {
+      if (sched.end_date && nextRun > new Date(sched.end_date)) break;
+
+      const acct = db.accounts.find((a) => a.id === sched.account_id);
+      if (!acct) break;
+
+      acct.balance = +(acct.balance + sched.amount).toFixed(2);
+      db.transactions.unshift({
+        id: uid(),
+        user_id: db.profile.id,
+        to_account_id: acct.id,
+        amount: sched.amount,
+        transaction_type: 'deposit',
+        description: `Scheduled deposit — ${sched.source}`,
+        recipient_name: sched.source || 'Scheduled deposit',
+        reference: `SCH${Math.floor(Math.random() * 1e6)}`,
+        status: 'completed',
+        timestamp: nextRun.toISOString(),
+      });
+      runs += 1;
+      nextRun = advanceSchedule(nextRun, sched.frequency);
+    }
+
+    if (runs > 0) {
+      sched.next_run = nextRun.toISOString();
+      outcomes.push({
+        schedule_id: sched.id,
+        account_id: sched.account_id,
+        amount: sched.amount,
+        source: sched.source,
+        runs_executed: runs,
+      });
+    }
+
+    // If the schedule has hit its end date during catch-up, deactivate.
+    if (sched.end_date && nextRun > new Date(sched.end_date)) {
+      sched.is_active = false;
+    }
+  }
+
+  if (outcomes.length > 0) await persist();
+  return outcomes;
+}
+
 
 
 // FX rates table — used while offline. Values are GBP base.
