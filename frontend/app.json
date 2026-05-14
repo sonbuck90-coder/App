@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Choose a photo to use as your app logo"
+        "NSPhotoLibraryUsageDescription": "Choose a photo to use as your app logo",
+        "NSFaceIDUsageDescription": "Use Face ID to sign in to HSBC"
       }
     },
     "android": {
@@ -33,6 +34,12 @@
         "expo-image-picker",
         {
           "photosPermission": "Choose a photo to use as your app logo"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to sign in to HSBC"
         }
       ],
       [

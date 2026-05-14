@@ -30,6 +30,7 @@
     "expo-image": "~3.0.11",
     "expo-image-picker": "^55.0.20",
     "expo-linking": "~8.0.12",
+    "expo-local-authentication": "^55.0.14",
     "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.22",
     "expo-sharing": "~14.0.8",

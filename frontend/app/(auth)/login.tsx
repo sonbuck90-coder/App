@@ -15,6 +15,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { useAuth } from '../../src/context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { api } from '../../src/services/api';
@@ -56,9 +57,56 @@ export default function LoginScreen() {
   const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
   const [draft, setDraft] = useState<UserProfile>({ id: '', name: '', email: '', phone: '', address: '' });
 
+  const [biometricLabel, setBiometricLabel] = useState('Use Touch ID');
+  const [biometricAvailable, setBiometricAvailable] = useState(true);
+
   useEffect(() => {
     loadProfiles();
+    detectBiometrics();
   }, []);
+
+  const detectBiometrics = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+        setBiometricLabel('Use Face ID');
+      } else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        setBiometricLabel('Use Touch ID');
+      } else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+        setBiometricLabel('Use Iris');
+      }
+      setBiometricAvailable(hasHardware && enrolled);
+    } catch {
+      // Web or unsupported: keep label but still allow tap (will fall back)
+      setBiometricAvailable(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    if (isLoading) return;
+    try {
+      if (Platform.OS === 'web') {
+        // Web has no real biometrics — short-circuit straight into the passcode login
+        handleLogin('0503');
+        return;
+      }
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: `Sign in to HSBC as ${activeProfile.name}`,
+        cancelLabel: 'Cancel',
+        disableDeviceFallback: false,
+        fallbackLabel: 'Use Passcode',
+      });
+      if (result.success) {
+        handleLogin('0503');
+      } else if ('error' in result && result.error !== 'user_cancel') {
+        Alert.alert('Authentication Failed', 'Please try again or enter your passcode.');
+      }
+    } catch (e: any) {
+      Alert.alert('Biometric Error', e?.message || 'Could not authenticate.');
+    }
+  };
 
   const loadProfiles = async () => {
     try {
@@ -279,9 +327,15 @@ export default function LoginScreen() {
           })}
         </View>
 
-        <TouchableOpacity style={styles.biometricHint}>
-          <Ionicons name="finger-print" size={20} color={COLORS.primary} />
-          <Text style={styles.biometricText}>Use Touch ID</Text>
+        <TouchableOpacity
+          style={styles.biometricHint}
+          onPress={handleBiometricLogin}
+          disabled={isLoading}
+          testID="biometric-login"
+          activeOpacity={0.6}
+        >
+          <Ionicons name="finger-print" size={22} color={COLORS.primary} />
+          <Text style={styles.biometricText}>{biometricLabel}</Text>
         </TouchableOpacity>
       </View>
 
