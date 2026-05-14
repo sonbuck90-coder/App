@@ -17,6 +17,7 @@ export interface LogoSettings {
 export interface CustomizationSettings {
   colors: CustomColors;
   logo: LogoSettings;
+  bankPhone: string;
 }
 
 const HSBC_DEFAULTS: CustomizationSettings = {
@@ -31,6 +32,8 @@ const HSBC_DEFAULTS: CustomizationSettings = {
     url: '',
     size: 'large',
   },
+  // HSBC UK Personal Banking customer service line
+  bankPhone: '03457 404 404',
 };
 
 const LOGO_SIZES = { small: 44, medium: 72, large: 110, xlarge: 160 };
@@ -51,6 +54,7 @@ interface CustomizationContextType {
   colors: CustomColors;
   logoSize: number;
   headerTextColor: string;
+  bankPhone: string;
   updateColors: (colors: Partial<CustomColors>) => void;
   updateLogo: (logo: Partial<LogoSettings>) => void;
   updateBankPhone: (phone: string) => void;
@@ -74,7 +78,13 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        setSettings({ ...HSBC_DEFAULTS, ...parsed, colors: { ...HSBC_DEFAULTS.colors, ...parsed.colors }, logo: { ...HSBC_DEFAULTS.logo, ...parsed.logo } });
+        setSettings({
+          ...HSBC_DEFAULTS,
+          ...parsed,
+          colors: { ...HSBC_DEFAULTS.colors, ...(parsed.colors || {}) },
+          logo: { ...HSBC_DEFAULTS.logo, ...(parsed.logo || {}) },
+          bankPhone: parsed.bankPhone || HSBC_DEFAULTS.bankPhone,
+        });
       }
     } catch (e) {
       console.error('Error loading customization:', e);
@@ -121,6 +131,7 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         colors: settings.colors,
         logoSize: LOGO_SIZES[settings.logo.size],
         headerTextColor: computeHeaderTextColor(settings.colors.header),
+        bankPhone: settings.bankPhone,
         updateColors,
         updateLogo,
         updateBankPhone,
@@ -140,4 +151,3 @@ export function useCustomization() {
 }
 
 export { HSBC_DEFAULTS, LOGO_SIZES };
-ZES };

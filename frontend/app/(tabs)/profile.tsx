@@ -37,8 +37,32 @@ export default function ProfileScreen() {
       refreshUser();
     }, [])
   );
-  const { colors: customColors, headerTextColor } = useCustomization();
+  const { colors: customColors, headerTextColor, bankPhone } = useCustomization();
   const router = useRouter();
+
+  const callBank = () => {
+    const num = (bankPhone || '').replace(/\s/g, '');
+    if (!num) {
+      Alert.alert('No number set', 'Please set the bank phone number in Customization.');
+      return;
+    }
+    const url = `tel:${num}`;
+    if (Platform.OS === 'web') {
+      // window is available only on web; use Linking as a fallback otherwise.
+      try {
+        // eslint-disable-next-line no-undef
+        (window as any).open(url, '_self');
+      } catch {
+        Linking.openURL(url).catch(() =>
+          Alert.alert('Cannot call', 'Calling is not available on this device.')
+        );
+      }
+    } else {
+      Linking.openURL(url).catch(() =>
+        Alert.alert('Cannot call', 'Calling is not available on this device.')
+      );
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -75,7 +99,7 @@ export default function ProfileScreen() {
         { icon: 'chatbubble-outline', label: 'Contact Us', chevron: true },
         { icon: 'help-circle-outline', label: 'FAQs', chevron: true },
         { icon: 'location-outline', label: 'Branch & ATM Locator', chevron: true },
-        { icon: 'call-outline', label: 'Call Us', subtitle: '1-800-HSBC' },
+        { icon: 'call-outline', label: 'Call Support', subtitle: bankPhone, onPress: callBank, chevron: true },
       ],
     },
     {
