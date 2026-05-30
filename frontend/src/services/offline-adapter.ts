@@ -545,7 +545,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     return ok(txn, config);
   }
 
-  // ---- Deposits (Add Money) ------------------------------------------------
+  // ---- Deposits (Add Money / Incoming Transfer) ---------------------------
   if (path === '/deposits' && method === 'POST') {
     await microDelay(500);
     const acct = db.accounts.find((a) => a.id === body.account_id);
@@ -553,21 +553,36 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     const amt = Number(body.amount);
     if (!amt || amt <= 0) throw err(400, 'Invalid amount');
     acct.balance = +(acct.balance + amt).toFixed(2);
+
+    // Incoming transfers carry sender details so the receipt looks just
+    // like a real Faster Payment credit on a UK bank statement.
+    const senderName = body.sender_name || body.source || 'Bank Transfer Deposit';
+    const senderSort = body.sender_sort_code || undefined;
+    const senderAccount = body.sender_account_number || undefined;
+    const description = body.description ||
+      (senderSort ? `Incoming transfer from ${senderName}` : `Deposit from ${body.source}`);
+
     const txn = await addTransaction({
       user_id: db.profile.id,
       to_account_id: acct.id,
       amount: amt,
       transaction_type: 'deposit',
-      description: body.description || `Deposit from ${body.source}`,
-      recipient_name: body.source || 'Bank Transfer Deposit',
-      reference: `DEP${Math.floor(Math.random() * 1e6)}`,
+      description,
+      recipient_name: senderName,
+      recipient_sort_code: senderSort,
+      recipient_account_number: senderAccount,
+      reference: body.reference || `DEP${Math.floor(Math.random() * 1e6)}`,
+      trn: `TRN${(Math.floor(Math.random() * 1e10)).toString().padStart(10, '0')}`,
+      fpid: `FP${(Math.floor(Math.random() * 1e12)).toString().padStart(12, '0')}`,
       status: 'completed',
       timestamp: new Date().toISOString(),
     });
     await persist();
     void sendTransactionNotification({
       title: 'Money in',
-      body: `${formatGBP(amt)} added to ${acct.account_type === 'checking' ? 'Current' : 'Savings'} Account`,
+      body: senderSort
+        ? `${formatGBP(amt)} received from ${senderName}`
+        : `${formatGBP(amt)} added to ${acct.account_type === 'checking' ? 'Current' : 'Savings'} Account`,
       data: { txn_id: txn.id },
     });
     return ok(
