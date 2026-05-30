@@ -186,11 +186,11 @@ function HomeClassic() {
             </View>
             <Text style={styles.quickActionText}>Add Money</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/incoming-transfer')} testID="quick-action-receive">
             <View style={styles.quickActionIcon}>
-              <Ionicons name="receipt-outline" size={22} color={customColors.primary} />
+              <Ionicons name="arrow-down-circle-outline" size={22} color={customColors.primary} />
             </View>
-            <Text style={styles.quickActionText}>Pay Bills</Text>
+            <Text style={styles.quickActionText}>Receive</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickAction}>
             <View style={styles.quickActionIcon}>

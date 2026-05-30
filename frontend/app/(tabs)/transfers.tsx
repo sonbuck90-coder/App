@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
 import { useCustomization } from '../../src/context/CustomizationContext';
@@ -35,6 +36,7 @@ const COLORS = {
 
 export default function TransfersScreen() {
   const { colors: customColors, headerTextColor } = useCustomization();
+  const router = useRouter();
   const authGate = useAuthGate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -564,6 +566,23 @@ export default function TransfersScreen() {
             </TouchableOpacity>
           </View>
 
+          {/* Receive Money Banner — opens the incoming-transfer flow */}
+          <TouchableOpacity
+            style={[styles.receiveBanner, { borderLeftColor: COLORS.success }]}
+            onPress={() => router.push('/incoming-transfer')}
+            testID="receive-money-banner"
+            activeOpacity={0.7}
+          >
+            <View style={[styles.receiveIcon, { backgroundColor: COLORS.success }]}>
+              <Ionicons name="arrow-down" size={20} color={COLORS.white} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.receiveTitle}>Receive Money</Text>
+              <Text style={styles.receiveSubtitle}>Record an incoming Faster Payment from someone else</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+          </TouchableOpacity>
+
           {/* Recent Payees */}
           {recentPayees.length > 0 && (
             <View style={styles.recentPayeesSection}>
@@ -833,6 +852,36 @@ const styles = StyleSheet.create({
   },
   transferTypeTextActive: {
     color: '#DB0011',
+  },
+  // Receive money banner
+  receiveBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+  },
+  receiveIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiveTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.darkGray,
+  },
+  receiveSubtitle: {
+    fontSize: 12,
+    color: COLORS.gray,
+    marginTop: 3,
+    lineHeight: 16,
   },
   // Recent Payees
   recentPayeesSection: {

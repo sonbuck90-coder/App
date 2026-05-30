@@ -105,6 +105,7 @@ export default function HomeModern() {
             <View style={s.pillRow}>
               {[
                 { icon: 'arrow-up', label: 'Send', onPress: () => router.push('/(tabs)/transfers') },
+                { icon: 'arrow-down', label: 'Receive', onPress: () => router.push('/incoming-transfer') },
                 { icon: 'add', label: 'Add', onPress: () => router.push('/add-money') },
                 { icon: 'swap-horizontal', label: 'Move', onPress: () => router.push('/move-money') },
                 { icon: 'card', label: 'Cards', onPress: () => router.push('/(tabs)/cards') },

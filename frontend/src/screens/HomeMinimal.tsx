@@ -81,6 +81,7 @@ export default function HomeMinimal() {
         <View style={s.actions}>
           {[
             { icon: 'send-outline', label: 'Send money', onPress: () => router.push('/(tabs)/transfers') },
+            { icon: 'arrow-down-circle-outline', label: 'Receive money', onPress: () => router.push('/incoming-transfer') },
             { icon: 'add-circle-outline', label: 'Add money', onPress: () => router.push('/add-money') },
             { icon: 'card-outline', label: 'My cards', onPress: () => router.push('/(tabs)/cards') },
             { icon: 'globe-outline', label: 'International', onPress: () => router.push('/international-transfer') },

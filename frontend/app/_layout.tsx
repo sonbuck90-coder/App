@@ -3,12 +3,15 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../src/context/AuthContext';
 import { CustomizationProvider } from '../src/context/CustomizationContext';
-import { ensureNotificationPermission } from '../src/services/notifications';
+import { ensureNotificationPermission, prewarmNotificationAssets } from '../src/services/notifications';
 
 export default function RootLayout() {
   useEffect(() => {
     // Ask once on app start so the first transaction can already show a banner.
     ensureNotificationPermission().catch(() => undefined);
+    // Pre-resolve the active bank's logo so the very first notification can
+    // attach it without a download stutter.
+    prewarmNotificationAssets().catch(() => undefined);
   }, []);
 
   return (
@@ -32,6 +35,7 @@ export default function RootLayout() {
         <Stack.Screen name="personal-details" />
         <Stack.Screen name="transaction-detail" />
         <Stack.Screen name="international-transfer" />
+        <Stack.Screen name="incoming-transfer" />
         <Stack.Screen name="statements" />
         </Stack>
       </CustomizationProvider>
