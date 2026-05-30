@@ -736,11 +736,12 @@ export default function TransfersScreen() {
               <Text style={styles.inputLabel}>Account Number</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter account number"
+                placeholder="Enter 8-digit account number"
                 placeholderTextColor={COLORS.gray}
                 value={recipientAccount}
-                onChangeText={setRecipientAccount}
+                onChangeText={(t) => setRecipientAccount(t.replace(/\D/g, '').slice(0, 8))}
                 keyboardType="numeric"
+                maxLength={8}
                 testID="account-number-input"
               />
             </View>
@@ -1024,6 +1025,8 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    // Remove the default browser/RN-Web blue focus outline
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : null),
   },
   inputSuccess: {
     borderColor: COLORS.success,
@@ -1129,6 +1132,8 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '700',
     color: COLORS.darkGray,
+    // Remove the default browser/RN-Web blue focus outline
+    ...(Platform.OS === 'web' ? ({ outlineStyle: 'none', outlineWidth: 0 } as any) : null),
   },
   availableBalance: {
     fontSize: 13,
