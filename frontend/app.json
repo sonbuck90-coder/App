@@ -1,24 +1,28 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "HSBC UK",
+    "slug": "hsbc-uk",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "hsbcuk",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.hsbcuk.bankingapp",
+      "buildNumber": "1",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Choose a photo to use as your app logo",
         "NSFaceIDUsageDescription": "Use Face ID to sign in to HSBC"
       }
     },
     "android": {
+      "package": "com.hsbcuk.bankingapp",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#DB0011"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -58,7 +62,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#DB0011"
         }
       ],
       "expo-web-browser",

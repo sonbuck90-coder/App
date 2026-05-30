@@ -26,7 +26,7 @@ import {
   runDueSchedules,
 } from './offline-store';
 import { sendTransactionNotification, formatGBP } from './notifications';
-import { lookupBank, getBankPhone } from './bank-lookup';
+import { lookupBank } from './bank-lookup';
 
 // -----------------------------------------------------------------------------
 // HSBC-style notification body builder
@@ -34,17 +34,17 @@ import { lookupBank, getBankPhone } from './bank-lookup';
 // Real HSBC UK transaction alerts look like:
 //   Title:    "Money Out"
 //   Body:     "£1.00 transaction | STARLING BANK LIMI
-//              +442079304450  GB | BANK A/C"
+//              GB | BANK A/C"
 //
 // We reproduce that format from whatever data the offline flow gives us:
 //   amount   → "£X.XX transaction"
-//   payee    → bank display name (truncated to 16 chars, uppercased)
-//   phone    → the bank's published customer-services number
+//   payee    → recipient (or bank) display name (truncated, uppercased)
 //   country  → "GB" (all flows are UK domestic; international flow can pass
 //              its own country code)
-//   suffix   → "BANK A/C" for transfers / "BILL PAY" / "INTERNATIONAL"
+//   suffix   → "BANK A/C" for transfers / "BILL PAY" / etc.
 //
-// Helper returns an object you can spread into sendTransactionNotification.
+// The phone-number line that HSBC sometimes includes is intentionally
+// omitted — the user prefers the cleaner two-line variant.
 function formatHsbcAlert(opts: {
   direction: 'out' | 'in';
   amount: number;
@@ -65,11 +65,10 @@ function formatHsbcAlert(opts: {
   const PAYEE_MAX = 16;
   const upper = (payeeName || bankShort || 'UK PAYEE').toUpperCase();
   const payeeDisplay = upper.length > PAYEE_MAX ? upper.slice(0, PAYEE_MAX) : upper;
-  const phone = getBankPhone(bankShort);
   const title = direction === 'in' ? 'Money In' : 'Money Out';
   // Two-line body with a real newline so iOS/Android renders both lines.
   const line1 = `${formatGBP(amount)} transaction | ${payeeDisplay}`;
-  const line2 = `${phone}  ${country} | ${suffix}`;
+  const line2 = `${country} | ${suffix}`;
   return { title, body: `${line1}\n${line2}` };
 }
 
