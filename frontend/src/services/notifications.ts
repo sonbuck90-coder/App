@@ -74,8 +74,6 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-    // Older API names for backward compat with SDK <49
-    shouldShowAlert: true,
   }) as any,
 });
 
@@ -167,12 +165,17 @@ export async function sendTransactionNotification(n: TxnNotification): Promise<v
   if (!ok) return;
   try {
     const themeId = await getActiveBankThemeId();
-    const bankName = BANK_NAMES[themeId] || 'HSBC UK';
     const iconUri = await getBankIconUri(themeId);
 
-    // Prefix the title so users always see which bank the alert is from.
-    // If the caller already starts with that bank name, don't double-prefix.
-    const title = n.title.startsWith(bankName) ? n.title : `${bankName} · ${n.title}`;
+    // Notifications are styled to mimic the real HSBC UK banking app:
+    //   Title:    "Money Out" / "Money In"
+    //   Body:     "£X.XX transaction | RECIPIENT"
+    //              "+44…   GB | BANK A/C"
+    // The bank's brand identity is conveyed by the app icon (left of the
+    // banner on iOS) and by the bank-logo attachment on the right. We
+    // therefore DO NOT prefix the title with the bank name — that would
+    // duplicate the icon visual and look unlike a real bank alert.
+    const title = n.title;
 
     if (Platform.OS === 'web') {
       // eslint-disable-next-line no-undef
@@ -207,9 +210,8 @@ export async function sendTransactionNotification(n: TxnNotification): Promise<v
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
-        subtitle: Platform.OS === 'ios' ? bankName : undefined,
         body: n.body,
-        data: { ...(n.data || {}), themeId, bankName },
+        data: { ...(n.data || {}), themeId },
         sound: 'default',
         ...(attachments ? { attachments } : {}),
       } as any,

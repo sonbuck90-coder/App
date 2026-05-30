@@ -26,6 +26,52 @@ import {
   runDueSchedules,
 } from './offline-store';
 import { sendTransactionNotification, formatGBP } from './notifications';
+import { lookupBank, getBankPhone } from './bank-lookup';
+
+// -----------------------------------------------------------------------------
+// HSBC-style notification body builder
+// -----------------------------------------------------------------------------
+// Real HSBC UK transaction alerts look like:
+//   Title:    "Money Out"
+//   Body:     "£1.00 transaction | STARLING BANK LIMI
+//              +442079304450  GB | BANK A/C"
+//
+// We reproduce that format from whatever data the offline flow gives us:
+//   amount   → "£X.XX transaction"
+//   payee    → bank display name (truncated to 16 chars, uppercased)
+//   phone    → the bank's published customer-services number
+//   country  → "GB" (all flows are UK domestic; international flow can pass
+//              its own country code)
+//   suffix   → "BANK A/C" for transfers / "BILL PAY" / "INTERNATIONAL"
+//
+// Helper returns an object you can spread into sendTransactionNotification.
+function formatHsbcAlert(opts: {
+  direction: 'out' | 'in';
+  amount: number;
+  payeeName?: string;
+  sortCode?: string;
+  bankShortName?: string;
+  country?: string;
+  suffix?: string;
+}): { title: string; body: string } {
+  const { direction, amount, payeeName, sortCode, country = 'GB', suffix = 'BANK A/C' } = opts;
+  // Try to figure out the bank — explicit shortName wins, else look up sort code.
+  let bankShort = opts.bankShortName;
+  if (!bankShort && sortCode) {
+    const r = lookupBank(sortCode);
+    if (r.found && r.bank) bankShort = r.bank.shortName;
+  }
+  // HSBC truncates payee display names to ~16 chars on the lock screen.
+  const PAYEE_MAX = 16;
+  const upper = (payeeName || bankShort || 'UK PAYEE').toUpperCase();
+  const payeeDisplay = upper.length > PAYEE_MAX ? upper.slice(0, PAYEE_MAX) : upper;
+  const phone = getBankPhone(bankShort);
+  const title = direction === 'in' ? 'Money In' : 'Money Out';
+  // Two-line body with a real newline so iOS/Android renders both lines.
+  const line1 = `${formatGBP(amount)} transaction | ${payeeDisplay}`;
+  const line2 = `${phone}  ${country} | ${suffix}`;
+  return { title, body: `${line1}\n${line2}` };
+}
 
 // -----------------------------------------------------------------------------
 // Live FX rate refresh (best-effort, optional)
@@ -80,21 +126,23 @@ async function runSchedulesAndNotify(force = false): Promise<void> {
     if (outcomes.length === 0) return;
     const db = await getDb();
     for (const o of outcomes) {
-      const acct = db.accounts.find((a) => a.id === o.account_id);
       const totalAdded = +(o.amount * o.runs_executed).toFixed(2);
-      const summary =
-        o.runs_executed > 1
-          ? `${o.runs_executed} scheduled deposits of ${formatGBP(o.amount)} from ${o.source} (${formatGBP(totalAdded)} total)`
-          : `${formatGBP(o.amount)} from ${o.source} added to ${acct?.account_type === 'checking' ? 'Current' : 'Savings'} Account`;
       void sendTransactionNotification({
-        title: 'Scheduled deposit received',
-        body: summary,
+        ...formatHsbcAlert({
+          direction: 'in',
+          amount: totalAdded,
+          payeeName: o.source,
+          suffix: o.runs_executed > 1 ? `SCHED x${o.runs_executed}` : 'SCHEDULED',
+        }),
         data: { type: 'schedule', schedule_id: o.schedule_id },
       });
       await addNotification({
         user_id: db.profile.id,
         title: 'Scheduled deposit received',
-        body: summary,
+        body:
+          o.runs_executed > 1
+            ? `${o.runs_executed} scheduled deposits of ${formatGBP(o.amount)} from ${o.source} (${formatGBP(totalAdded)} total)`
+            : `${formatGBP(o.amount)} from ${o.source}`,
         notification_type: 'schedule',
         is_read: false,
         timestamp: new Date().toISOString(),
@@ -329,8 +377,13 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     await persist();
     // Fire-and-forget: never block the API response on notifications.
     void sendTransactionNotification({
-      title: 'Payment sent',
-      body: `${formatGBP(amt)} to ${body.recipient_name || body.to_account_number}`,
+      ...formatHsbcAlert({
+        direction: 'out',
+        amount: amt,
+        payeeName: body.recipient_name || body.to_account_number,
+        sortCode: body.sort_code,
+        suffix: 'BANK A/C',
+      }),
       data: { txn_id: txn.id },
     });
     void fireBudgetAlertsFor('transfer');
@@ -367,8 +420,14 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     });
     await persist();
     void sendTransactionNotification({
-      title: 'International transfer sent',
-      body: `${formatGBP(amt)} → ${body.target_currency} ${converted.toFixed(2)} to ${body.recipient_name}`,
+      ...formatHsbcAlert({
+        direction: 'out',
+        amount: amt,
+        payeeName: body.recipient_name || body.bank_name,
+        bankShortName: body.bank_name,
+        country: body.country_code || 'INTL',
+        suffix: 'INT TRANSFER',
+      }),
       data: { txn_id: txn.id },
     });
     void fireBudgetAlertsFor('transfer');
@@ -537,8 +596,12 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     });
     await persist();
     void sendTransactionNotification({
-      title: 'Bill paid',
-      body: `${formatGBP(amt)} paid to ${biller.name}`,
+      ...formatHsbcAlert({
+        direction: 'out',
+        amount: amt,
+        payeeName: biller.name,
+        suffix: 'BILL PAY',
+      }),
       data: { txn_id: txn.id },
     });
     void fireBudgetAlertsFor('payment');
@@ -579,10 +642,13 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     });
     await persist();
     void sendTransactionNotification({
-      title: 'Money in',
-      body: senderSort
-        ? `${formatGBP(amt)} received from ${senderName}`
-        : `${formatGBP(amt)} added to ${acct.account_type === 'checking' ? 'Current' : 'Savings'} Account`,
+      ...formatHsbcAlert({
+        direction: 'in',
+        amount: amt,
+        payeeName: senderName,
+        sortCode: senderSort,
+        suffix: 'BANK A/C',
+      }),
       data: { txn_id: txn.id },
     });
     return ok(
@@ -615,8 +681,13 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     });
     await persist();
     void sendTransactionNotification({
-      title: 'Money moved',
-      body: `${formatGBP(amt)} from ${from.account_type === 'checking' ? 'Current' : 'Savings'} → ${to.account_type === 'checking' ? 'Current' : 'Savings'}`,
+      ...formatHsbcAlert({
+        direction: 'out',
+        amount: amt,
+        payeeName: `OWN ${to.account_type === 'checking' ? 'CURRENT' : 'SAVINGS'}`,
+        bankShortName: 'HSBC',
+        suffix: 'OWN A/C',
+      }),
       data: { txn_id: txn.id },
     });
     return ok(

@@ -4,6 +4,8 @@
 export interface BankInfo {
   name: string;
   shortName: string;
+  /** UK customer-service phone number used in transaction notifications. */
+  phone?: string;
   logo?: string;
 }
 
@@ -173,4 +175,46 @@ export function getSupportedBanks(): BankInfo[] {
   return Array.from(uniqueBanks.values()).sort((a, b) => 
     a.shortName.localeCompare(b.shortName)
   );
+}
+
+/**
+ * UK bank customer-service phone numbers — used inside transaction
+ * notifications and statements so they look like real HSBC-style alerts:
+ *   "£1.00 transaction | STARLING BANK LIMI"
+ *   "+442079304450  GB | BANK A/C"
+ *
+ * Numbers are kept in international (E.164) form starting +44. Sources:
+ * each bank's published customer-services line.
+ */
+const BANK_PHONES: Record<string, string> = {
+  HSBC: '+443457404404',
+  'First Direct': '+443456100100',
+  Barclays: '+443457345345',
+  Lloyds: '+443456023453',
+  NatWest: '+443457888444',
+  RBS: '+443457242424',
+  Santander: '+443301232424',
+  Nationwide: '+448004640813',
+  Halifax: '+443457203040',
+  TSB: '+443459758758',
+  'Metro Bank': '+443458086644',
+  Monzo: '+442036080088',
+  Starling: '+442079304450',
+  Revolut: '+442033228352',
+  'Co-op Bank': '+443457212212',
+  'Bank of Scotland': '+443457213141',
+  'Virgin Money': '+440800678678',
+  'UK Bank': '+443450000000',
+};
+
+/** Look up a bank's customer-service phone by its `shortName`. */
+export function getBankPhone(shortName?: string): string {
+  if (!shortName) return BANK_PHONES['UK Bank'];
+  return BANK_PHONES[shortName] || BANK_PHONES['UK Bank'];
+}
+
+/** Look up a bank's customer-service phone directly from a sort code. */
+export function getBankPhoneBySortCode(sortCode: string): string {
+  const r = lookupBank(sortCode);
+  return getBankPhone(r.bank?.shortName);
 }
