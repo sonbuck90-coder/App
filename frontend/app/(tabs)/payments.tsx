@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { accountsApi, billersApi, Account, Biller } from '../../src/services/api';
 import { useCustomization } from '../../src/context/CustomizationContext';
+import HeaderInfoButton from '../../src/components/HeaderInfoButton';
 
 // Static colors (non-primary)
 const COLORS = {
@@ -151,8 +152,9 @@ export default function PaymentsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.header }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <Text style={[styles.headerTitle, { color: headerTextColor }]}>Services</Text>
+        <HeaderInfoButton tint={headerTextColor} />
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

@@ -7,6 +7,7 @@ import { cardsApi, Card } from '../../src/services/api';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { getLayoutFor } from '../../src/context/BankThemes';
+import HeaderInfoButton from '../../src/components/HeaderInfoButton';
 import CardsModern from '../../src/screens/CardsModern';
 import CardsMinimal from '../../src/screens/CardsMinimal';
 
@@ -88,6 +89,7 @@ function CardsClassic() {
         <TouchableOpacity style={styles.topNavMenuBtn} testID="nav-menu">
           <Ionicons name="menu" size={24} color={C.darkGray} />
         </TouchableOpacity>
+        <HeaderInfoButton tint={C.darkGray} />
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

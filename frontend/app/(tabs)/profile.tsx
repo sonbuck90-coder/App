@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCustomization } from '../../src/context/CustomizationContext';
+import HeaderInfoButton from '../../src/components/HeaderInfoButton';
 import { Linking, Platform } from 'react-native';
 
 // HSBC Colors
@@ -117,8 +118,9 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.header }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <Text style={[styles.headerTitle, { color: headerTextColor }]}>More</Text>
+        <HeaderInfoButton tint={headerTextColor} />
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>

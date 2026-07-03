@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userScopedKey, migrateLegacyIfNeeded, onActiveUserChange } from '../services/user-scope';
 
 export interface CustomColors {
   primary: string;
@@ -75,11 +76,19 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadSettings();
+    // Reload from storage whenever the active user is switched so each
+    // user keeps their own theme + logo + bank-phone unchanged.
+    const unsubscribe = onActiveUserChange(async () => {
+      await loadSettings();
+    });
+    return () => { unsubscribe(); };
   }, []);
 
   const loadSettings = async () => {
     try {
-      const stored = await AsyncStorage.getItem(STORAGE_KEY);
+      await migrateLegacyIfNeeded(STORAGE_KEY);
+      const key = await userScopedKey(STORAGE_KEY);
+      const stored = await AsyncStorage.getItem(key);
       if (stored) {
         const parsed = JSON.parse(stored);
         setSettings({
@@ -89,6 +98,10 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
           logo: { ...HSBC_DEFAULTS.logo, ...(parsed.logo || {}) },
           bankPhone: parsed.bankPhone || HSBC_DEFAULTS.bankPhone,
         });
+      } else {
+        // Fresh user → start them on the HSBC defaults rather than
+        // inheriting the previous user's theme.
+        setSettings(HSBC_DEFAULTS);
       }
     } catch (e) {
       console.error('Error loading customization:', e);
@@ -97,7 +110,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
 
   const saveSettings = async (newSettings: CustomizationSettings) => {
     try {
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+      const key = await userScopedKey(STORAGE_KEY);
+      await AsyncStorage.setItem(key, JSON.stringify(newSettings));
     } catch (e) {
       console.error('Error saving customization:', e);
     }

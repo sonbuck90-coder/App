@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import HeaderInfoButton from '../../src/components/HeaderInfoButton';
+import { onActiveUserChange } from '../../src/services/user-scope';
 import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
 import { useCustomization } from '../../src/context/CustomizationContext';
@@ -68,12 +70,42 @@ export default function TransfersScreen() {
     description: string;
     date: string;
     reference: string;
+    transactionId: string;
     fromAccount: string;
   } | null>(null);
 
   useEffect(() => {
     fetchAccounts();
     fetchRecentPayees();
+    // Whenever the active user is switched, drop every piece of local
+    // in-memory state (accounts, forms, receipts) and re-fetch fresh
+    // data belonging to the newly-active user. This prevents the app
+    // from trying to transfer from Oliver's account id while Sarah is
+    // signed in — a state-mismatch that used to abort the transfer.
+    const unsubscribe = onActiveUserChange(() => {
+      setSelectedAccount(null);
+      setAccounts([]);
+      setRecipientName('');
+      setRecipientAccount('');
+      setSortCode('');
+      setAmount('');
+      setDescription('');
+      setBankLookupResult(null);
+      setSortCodeError('');
+      setShowReview(false);
+      setShowReceipt(false);
+      setReceiptData(null);
+      setCopStatus('idle');
+      setCopResponse(null);
+      setProceedDespiteMismatch(false);
+      // Re-fetch after a tick so the offline-store cache is guaranteed
+      // to have been invalidated by its own listener.
+      setTimeout(() => {
+        fetchAccounts();
+        fetchRecentPayees();
+      }, 30);
+    });
+    return () => { unsubscribe(); };
   }, []);
 
   const fetchAccounts = async () => {
@@ -234,7 +266,13 @@ export default function TransfersScreen() {
         accountNumber: recipientAccount,
         description: description || `Transfer to ${recipientName}`,
         date: new Date().toLocaleString('en-GB', { dateStyle: 'full', timeStyle: 'short' }),
-        reference: (result.data.id || '').slice(0, 12).toUpperCase() || `REF${Math.floor(Math.random() * 1e6)}`,
+        // Reference shown on the receipt = whatever the user typed in the
+        // "Reference (Optional)" field. If they left it empty we fall back
+        // to a short transaction ID so the receipt is never blank.
+        reference: (description && description.trim()) || (result.data.id || '').slice(0, 12).toUpperCase() || `REF${Math.floor(Math.random() * 1e6)}`,
+        // Auto-generated internal payment id — displayed separately in
+        // small text on the receipt for tracing purposes only.
+        transactionId: (result.data.id || '').slice(0, 12).toUpperCase() || `TXN${Math.floor(Math.random() * 1e6)}`,
         fromAccount: `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}`,
       });
       setShowReview(false);
@@ -461,11 +499,6 @@ export default function TransfersScreen() {
               <Text style={styles.receiptLabel}>From</Text>
               <Text style={styles.receiptValue}>{receiptData.fromAccount}</Text>
             </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Description</Text>
-              <Text style={styles.receiptValue}>{receiptData.description || 'N/A'}</Text>
-            </View>
-
             <View style={styles.receiptDivider} />
 
             <View style={styles.receiptRow}>
@@ -475,6 +508,10 @@ export default function TransfersScreen() {
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Reference</Text>
               <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>{receiptData.reference}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>Transaction ID</Text>
+              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.transactionId}</Text>
             </View>
             <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Status</Text>
@@ -537,8 +574,9 @@ export default function TransfersScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: customColors.header }]}>
+      <View style={[styles.header, { backgroundColor: customColors.header, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
         <Text style={[styles.headerTitle, { color: headerTextColor }]}>Pay & Transfer</Text>
+        <HeaderInfoButton tint={headerTextColor} />
       </View>
 
       <KeyboardAvoidingView

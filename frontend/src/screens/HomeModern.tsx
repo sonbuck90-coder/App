@@ -20,6 +20,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { useCustomization } from '../context/CustomizationContext';
 import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../services/api';
+import HeaderInfoButton from '../components/HeaderInfoButton';
 
 const fmt = (a: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(a);
@@ -95,6 +96,7 @@ export default function HomeModern() {
                     <View style={[s.unreadDot, { backgroundColor: cc.accent }]} />
                   )}
                 </TouchableOpacity>
+                <HeaderInfoButton tint="#fff" />
               </View>
             </View>
             <Text style={s.balanceLabel}>TOTAL BALANCE</Text>

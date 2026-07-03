@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { api } from '../src/services/api';
 import { useAuth } from '../src/context/AuthContext';
 import { useCustomization } from '../src/context/CustomizationContext';
+import { switchActiveUser } from '../src/services/user-scope';
 import BackButton from '../src/components/BackButton';
 
 interface UserProfile {
@@ -84,7 +85,11 @@ export default function UsersScreen() {
 
   const switchTo = async (p: UserProfile) => {
     setActiveId(p.id);
-    await AsyncStorage.setItem(ACTIVE_PROFILE_KEY, p.id);
+    // Use the user-scope helper so the offline-store cache is busted and
+    // CustomizationContext reloads — guarantees the new user sees their
+    // own theme + data immediately, with no stale state from the previous
+    // session.
+    await switchActiveUser(p.id);
     try {
       // Sync the active profile data into the offline-store profile so the
       // app header / personal-details / receipts reflect the new user.
@@ -218,7 +223,7 @@ export default function UsersScreen() {
           <Text style={[s.addBtnText, { color: cc.primary }]}>Add new user</Text>
         </TouchableOpacity>
 
-        <Text style={s.footnote}>Signing in works for every user with any 4-digit code or Face ID — banking data is shared across users on this device for the demo.</Text>
+        <Text style={s.footnote}>Signing in works for every user with any 4-digit code or Face ID. Each user keeps their own theme, balances, transactions and personal details — switching from the (ⓘ) icon at the top of the app instantly loads that user's data.</Text>
       </ScrollView>
 
       {/* Add / Edit modal */}

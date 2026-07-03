@@ -14,6 +14,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import AppLogo from '../../src/components/AppLogo';
+import HeaderInfoButton from '../../src/components/HeaderInfoButton';
 import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../../src/services/api';
 import { getLayoutFor } from '../../src/context/BankThemes';
 import HomeModern from '../../src/screens/HomeModern';
@@ -149,6 +150,7 @@ function HomeClassic() {
                   </View>
                 )}
               </TouchableOpacity>
+              <HeaderInfoButton tint={headerTextColor} />
             </View>
           </View>
           <Text style={[styles.greeting, { color: headerTextColor }]}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>

@@ -736,3 +736,34 @@ frontend_v6:
       - working: true
         agent: "main"
         comment: "✅ Visually verified: (a) HSBC Classic Home now shows 'Receive' tile (arrow-down-circle-outline) where 'Pay Bills' used to sit — the dead button has been recycled for a useful action. (b) HomeModern pill row now has 5 pills: Send / Receive / Add / Move / Cards. (c) HomeMinimal pill action list now has 5 entries with 'Receive money' second from top. (d) Pay & Transfer tab shows a green-bordered Receive Money banner directly under the Transfer/Payee/Overseas type tabs — taps route to /incoming-transfer."
+
+frontend_v9:
+  - task: "Transaction receipt shows user-typed Reference + separate Transaction ID"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/transfers.tsx"
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "receiptData.reference now uses the value from the 'Reference (Optional)' input. If empty, falls back to short txn ID. Added separate 'Transaction ID' row in grey. Removed redundant Description row. Verified: Reference: 'Concert tickets', Transaction ID: MR5FEYDA9G37."
+  - task: "User-switch no longer glitches transfers"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/transfers.tsx, /app/frontend/src/services/user-scope.ts"
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "transfers.tsx subscribes to onActiveUserChange, resets all local state (selectedAccount, forms, receipts, CoP), re-fetches accounts for new user. Verified: switch → £75.50 transfer completes cleanly."
+  - task: "Shareable URL with proper meta tags + Add-to-Home-Screen"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/_layout.tsx"
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "https://vault-app-25.preview.emergentagent.com verified externally (HTTP 200). Added <title>, description, og:*, apple-mobile-web-app-*, apple-touch-icon tags. Each visitor gets isolated browser localStorage."
+
+agent_communication_v9:
+  - agent: "main"
+    message: "v9: 3 fixes shipped. (1) Receipt Reference = user's typed text, Transaction ID separate row. (2) Transfers screen subscribes to onActiveUserChange and clears/re-fetches state on user switch, fixing the post-switch freeze. (3) Public URL https://vault-app-25.preview.emergentagent.com now has proper OG/meta/apple-touch-icon tags for chat previews and iOS/Android Add-to-Home-Screen."
+

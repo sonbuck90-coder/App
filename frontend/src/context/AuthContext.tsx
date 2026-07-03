@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import { onActiveUserChange } from '../services/user-scope';
 
 interface User {
   id: string;
@@ -136,6 +137,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignore
     }
   };
+
+  // Whenever the active user is switched (via the (i) icon or the Manage
+  // Users screen) re-pull the now-active user's banking profile so the
+  // header greeting, profile screen, and any cached `auth_user` entry
+  // immediately reflect the new identity.
+  useEffect(() => {
+    const unsubscribe = onActiveUserChange(async () => {
+      await refreshUser();
+    });
+    return () => { unsubscribe(); };
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, token, isLoading, login, loginWithPasscode, register, logout, refreshUser }}>

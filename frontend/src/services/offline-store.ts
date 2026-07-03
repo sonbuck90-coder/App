@@ -6,8 +6,14 @@
  * required: every read/write happens locally, so the app works fully offline.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { userScopedKey, migrateLegacyIfNeeded, onActiveUserChange, getActiveUserId, DEFAULT_USER_ID } from './user-scope';
 
 const STORAGE_KEY = 'hsbc_offline_db_v1';
+
+async function getStorageKey(): Promise<string> {
+  await migrateLegacyIfNeeded(STORAGE_KEY);
+  return userScopedKey(STORAGE_KEY);
+}
 
 // -----------------------------------------------------------------------------
 // Types
@@ -161,15 +167,23 @@ function maskCard(num: string) {
 // -----------------------------------------------------------------------------
 // Seed data
 // -----------------------------------------------------------------------------
-function buildSeed(): OfflineDB {
-  const userId = uid();
+interface SeedOverride {
+  id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+}
+
+function buildSeed(override?: SeedOverride): OfflineDB {
+  const userId = override?.id || uid();
 
   const profile: Profile = {
     id: userId,
-    email: 'customer@hsbc.co.uk',
-    name: 'Oliver',
-    phone: '+44 7700 900000',
-    address: '8 Canada Square, London E14 5HQ',
+    email: override?.email || 'customer@hsbc.co.uk',
+    name: override?.name || 'Oliver',
+    phone: override?.phone || '+44 7700 900000',
+    address: override?.address || '8 Canada Square, London E14 5HQ',
     created_at: isoNow(),
   };
 
@@ -332,16 +346,28 @@ function buildSeed(): OfflineDB {
 let cached: OfflineDB | null = null;
 let loadPromise: Promise<OfflineDB> | null = null;
 
+// Bust the in-memory cache whenever the active user changes so the very
+// next getDb() call re-reads (and possibly re-seeds) for the new user.
+onActiveUserChange(() => {
+  cached = null;
+  loadPromise = null;
+});
+
 export async function getDb(): Promise<OfflineDB> {
   if (cached) return cached;
   if (loadPromise) return loadPromise;
   loadPromise = (async () => {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const key = await getStorageKey();
+      const raw = await AsyncStorage.getItem(key);
       if (raw) {
         cached = JSON.parse(raw) as OfflineDB;
       } else {
-        cached = buildSeed();
+        // Brand-new key space → seed it. Pull the saved-profile record so
+        // the seeded banking profile mirrors who is logging in (name,
+        // email, phone, address) instead of always starting as "Oliver".
+        const override = await loadSavedProfileOverride();
+        cached = buildSeed(override);
         await persist();
       }
       return cached!;
@@ -352,10 +378,28 @@ export async function getDb(): Promise<OfflineDB> {
   return loadPromise;
 }
 
+/** Look up the current user inside `saved_profiles` and return only the
+ *  fields buildSeed cares about. Returns `undefined` for the legacy /
+ *  default user so the original Oliver seed remains identical. */
+async function loadSavedProfileOverride(): Promise<SeedOverride | undefined> {
+  try {
+    const id = await getActiveUserId();
+    if (id === DEFAULT_USER_ID) return undefined;
+    const raw = await AsyncStorage.getItem('saved_profiles');
+    if (!raw) return { id };
+    const list = JSON.parse(raw) as Array<SeedOverride>;
+    const match = list.find((p) => p.id === id);
+    return match ? { ...match, id } : { id };
+  } catch {
+    return undefined;
+  }
+}
+
 export async function persist() {
   if (!cached) return;
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(cached));
+    const key = await getStorageKey();
+    await AsyncStorage.setItem(key, JSON.stringify(cached));
   } catch (e) {
     console.error('offline-store: persist failed', e);
   }

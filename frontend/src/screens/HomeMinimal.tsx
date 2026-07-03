@@ -20,6 +20,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../context/AuthContext';
 import { useCustomization } from '../context/CustomizationContext';
 import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../services/api';
+import HeaderInfoButton from '../components/HeaderInfoButton';
 
 const fmt = (a: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(a);
@@ -70,6 +71,7 @@ export default function HomeMinimal() {
                 <Ionicons name="notifications-outline" size={18} color={headerTextColor} />
                 {unread > 0 && <View style={[s.unreadDot, { backgroundColor: cc.accent }]} />}
               </TouchableOpacity>
+              <HeaderInfoButton tint={headerTextColor} size={22} />
             </View>
           </View>
           <Text style={[s.headerLabel, { color: headerTextColor, opacity: 0.7 }]}>YOUR MONEY</Text>
