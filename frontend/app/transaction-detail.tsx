@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { transactionsApi, accountsApi, api, Transaction, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
+import { getBankTheme } from '../src/context/BankThemes';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -23,7 +24,8 @@ const C = {
 export default function TransactionDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { colors: cc, headerTextColor } = useCustomization();
+  const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
+  const bankName = getBankTheme(bankThemeId).name;
   const [txn, setTxn] = useState<Transaction | null>(null);
   const [fromAccount, setFromAccount] = useState<Account | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -201,7 +203,7 @@ export default function TransactionDetailScreen() {
         {/* Footer Card */}
         <View style={s.footerCard}>
           <Ionicons name="shield-checkmark" size={18} color={C.success} />
-          <Text style={s.footerText}>Secured by HSBC. Keep this invoice for your records.</Text>
+          <Text style={s.footerText}>Secured by {bankName}. Keep this invoice for your records.</Text>
         </View>
 
         {/* Actions */}

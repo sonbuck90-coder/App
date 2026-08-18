@@ -9,12 +9,76 @@ import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDb, Transaction } from './offline-store';
+import { getBankTheme } from '../context/BankThemes';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+/** Resolve the currently-active bank so PDFs are branded per theme. */
+async function getActiveBank(): Promise<{ id: string; name: string; primary: string; shortId: string }> {
+  try {
+    const raw = await AsyncStorage.getItem('hsbc_customization');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const themeId = parsed?.bankThemeId || 'hsbc';
+      const theme = getBankTheme(themeId);
+      return {
+        id: themeId,
+        name: theme.name,
+        primary: theme.colors.primary,
+        shortId: themeId.toUpperCase(),
+      };
+    }
+  } catch {
+    /* ignore */
+  }
+  const hsbc = getBankTheme('hsbc');
+  return { id: 'hsbc', name: hsbc.name, primary: hsbc.colors.primary, shortId: 'HSBC' };
+}
+
+/** Build a themed header + STYLES block. */
+function themedAssets(bank: { name: string; primary: string }) {
+  return {
+    header: `
+      <div class="bank-bar">
+        <div class="hex"></div>
+        <div class="brand">${bank.name}</div>
+      </div>
+    `,
+    styles: `<style>
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0B1424; margin: 0; padding: 0; background: #ffffff; }
+      .page { max-width: 720px; margin: 0 auto; padding: 36px 40px; }
+      .bank-bar { display: flex; align-items: center; border-bottom: 3px solid ${bank.primary}; padding-bottom: 12px; margin-bottom: 24px; }
+      .hex { width: 28px; height: 28px; background: ${bank.primary}; clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); margin-right: 12px; }
+      .brand { font-size: 22px; font-weight: 800; color: ${bank.primary}; letter-spacing: 1.5px; }
+      h1 { font-size: 24px; margin: 0 0 4px; color: #0B1424; }
+      .sub { font-size: 13px; color: #5E6A7A; margin-bottom: 24px; }
+      .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+      .meta .label { font-size: 11px; color: #8893A3; text-transform: uppercase; letter-spacing: 0.7px; }
+      .meta .val { font-size: 14px; font-weight: 600; color: #0B1424; margin-top: 2px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+      th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8893A3; padding: 8px 4px; border-bottom: 1px solid #E4E7EB; }
+      td { padding: 10px 4px; border-bottom: 1px solid #F0F2F5; font-size: 13px; }
+      td.right, th.right { text-align: right; }
+      .amt-in { color: #00847F; font-weight: 600; }
+      .amt-out { color: #0B1424; font-weight: 600; }
+      .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 16px; background: #F7F8FA; border-radius: 6px; margin-bottom: 20px; }
+      .summary .lbl { font-size: 11px; color: #8893A3; text-transform: uppercase; letter-spacing: 0.6px; }
+      .summary .amt { font-size: 16px; font-weight: 700; margin-top: 4px; }
+      .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E4E7EB; font-size: 10px; color: #8893A3; line-height: 1.6; }
+      .receipt-card { padding: 20px; background: #F7F8FA; border-radius: 6px; margin-bottom: 16px; }
+      .receipt-amt { font-size: 32px; font-weight: 800; color: #0B1424; text-align: center; margin: 12px 0 4px; }
+      .receipt-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #E4E7EB; }
+      .receipt-row:last-child { border-bottom: none; }
+      .receipt-row .k { color: #8893A3; font-size: 12px; }
+      .receipt-row .v { color: #0B1424; font-size: 13px; font-weight: 600; }
+    </style>`,
+  };
+}
 
 function fmtGBP(v: number) {
   return `£${v.toFixed(2)}`;
@@ -37,52 +101,17 @@ function fmtDateTime(ts: string) {
 }
 
 // -----------------------------------------------------------------------------
-// HSBC styled HTML helpers
+// Bank-themed HTML helpers — the header + stylesheet are computed at render
+// time so the PDF matches whichever bank theme the user has active.
 // -----------------------------------------------------------------------------
-const HEADER_HTML = `
-  <div class="hsbc-bar">
-    <div class="hex"></div>
-    <div class="brand">HSBC UK</div>
-  </div>
-`;
-
-const STYLES = `
-<style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #0B1424; margin: 0; padding: 0; background: #ffffff; }
-  .page { max-width: 720px; margin: 0 auto; padding: 36px 40px; }
-  .hsbc-bar { display: flex; align-items: center; border-bottom: 3px solid #DB0011; padding-bottom: 12px; margin-bottom: 24px; }
-  .hex { width: 28px; height: 28px; background: #DB0011; clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); margin-right: 12px; }
-  .brand { font-size: 22px; font-weight: 800; color: #DB0011; letter-spacing: 1.5px; }
-  h1 { font-size: 24px; margin: 0 0 4px; color: #0B1424; }
-  .sub { font-size: 13px; color: #5E6A7A; margin-bottom: 24px; }
-  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-  .meta .label { font-size: 11px; color: #8893A3; text-transform: uppercase; letter-spacing: 0.7px; }
-  .meta .val { font-size: 14px; font-weight: 600; color: #0B1424; margin-top: 2px; }
-  .summary { background: #F5F6F8; border-radius: 8px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-  .summary .lbl { font-size: 11px; color: #5E6A7A; text-transform: uppercase; letter-spacing: 0.7px; }
-  .summary .amt { font-size: 22px; font-weight: 800; color: #DB0011; }
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th { text-align: left; padding: 10px 6px; font-size: 11px; color: #8893A3; text-transform: uppercase; border-bottom: 1px solid #E5E8EC; letter-spacing: 0.6px; }
-  td { padding: 10px 6px; border-bottom: 1px solid #EFF1F4; vertical-align: top; }
-  td.right { text-align: right; }
-  .pos { color: #00847F; font-weight: 600; }
-  .neg { color: #0B1424; font-weight: 600; }
-  .footer { margin-top: 28px; font-size: 10.5px; color: #8893A3; line-height: 1.5; }
-  .footer strong { color: #5E6A7A; }
-  .receipt-card { border: 1px solid #E5E8EC; border-radius: 10px; padding: 22px 24px; margin-bottom: 18px; }
-  .receipt-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #EFF1F4; }
-  .receipt-row:last-child { border-bottom: none; }
-  .receipt-row .k { font-size: 12px; color: #5E6A7A; }
-  .receipt-row .v { font-size: 13.5px; font-weight: 600; color: #0B1424; }
-  .receipt-amt { font-size: 30px; font-weight: 800; color: #DB0011; text-align: center; padding: 14px 0; }
-</style>
-`;
 
 // -----------------------------------------------------------------------------
 // Statement HTML
 // -----------------------------------------------------------------------------
 async function buildStatementHtml(year: number, monthIdx1: number): Promise<string> {
   const db = await getDb();
+  const bank = await getActiveBank();
+  const { header: HEADER_HTML, styles: STYLES } = themedAssets(bank);
   const first = new Date(year, monthIdx1 - 1, 1);
   const last = new Date(year, monthIdx1, 0);
 
@@ -112,7 +141,7 @@ async function buildStatementHtml(year: number, monthIdx1: number): Promise<stri
     })
     .join('');
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>HSBC Statement — ${periodLabel}</title>${STYLES}</head>
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${bank.name} Statement — ${periodLabel}</title>${STYLES}</head>
   <body><div class="page">
     ${HEADER_HTML}
     <h1>Monthly Statement</h1>
@@ -133,9 +162,9 @@ async function buildStatementHtml(year: number, monthIdx1: number): Promise<stri
       <tbody>${rows || '<tr><td colspan="3" style="text-align:center;color:#8893A3;padding:24px 0">No transactions in this period</td></tr>'}</tbody>
     </table>
     <div class="footer">
-      <strong>HSBC UK Bank plc.</strong> Registered in England and Wales, number 09928412. Registered Office: 1 Centenary Square, Birmingham B1 1HQ.<br/>
-      HSBC UK Bank plc is authorised by the Prudential Regulation Authority and regulated by the Financial Conduct Authority and the Prudential Regulation Authority.<br/>
-      This is an electronic copy of your statement, generated on ${fmtDateTime(new Date().toISOString())}.
+      <strong>${bank.name} Bank plc.</strong> Electronic statement generated on ${fmtDateTime(new Date().toISOString())}.<br/>
+      This document is an accurate reflection of the transactions on your account for the period shown.<br/>
+      For queries please contact your ${bank.name} branch or call the customer-services line printed in the app.
     </div>
   </div></body></html>`;
 }
@@ -143,7 +172,9 @@ async function buildStatementHtml(year: number, monthIdx1: number): Promise<stri
 // -----------------------------------------------------------------------------
 // Receipt HTML
 // -----------------------------------------------------------------------------
-function buildReceiptHtml(t: Transaction, holderName: string): string {
+async function buildReceiptHtml(t: Transaction, holderName: string): Promise<string> {
+  const bank = await getActiveBank();
+  const { header: HEADER_HTML, styles: STYLES } = themedAssets(bank);
   const isDeposit = t.transaction_type === 'deposit';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt</title>${STYLES}</head>
   <body><div class="page">
@@ -163,7 +194,7 @@ function buildReceiptHtml(t: Transaction, holderName: string): string {
       ${t.fpid ? `<div class="receipt-row"><span class="k">FPID</span><span class="v">${escapeHtml(t.fpid)}</span></div>` : ''}
       <div class="receipt-row"><span class="k">Holder</span><span class="v">${escapeHtml(holderName)}</span></div>
     </div>
-    <div class="footer">HSBC UK Bank plc · Digital receipt. Please retain for your records.</div>
+    <div class="footer">${bank.name} · Digital receipt. Please retain for your records.</div>
   </div></body></html>`;
 }
 
@@ -209,17 +240,49 @@ function escapeHtml(s: string) {
  */
 async function deliverPdf(filename: string, html: string) {
   if (Platform.OS === 'web') {
+    // 1) On mobile browsers (Chrome Android / Safari iOS 16.4+), the Web
+    //    Share API v2 can share files including PDFs — that gives the user
+    //    a real "Share to WhatsApp / Mail / Messages" sheet without any
+    //    extra install. We try this path first.
     try {
-      // expo-print on web triggers window.print on a hidden iframe — that
-      // gives the user a real PDF via the native print dialog.
+      const anyNav: any = typeof navigator !== 'undefined' ? navigator : null;
+      if (anyNav?.canShare && anyNav?.share) {
+        // Render HTML → PDF blob via a hidden iframe + print-to-blob is
+        // not universally supported; instead we ship the HTML file itself
+        // renamed as .html so WhatsApp / Mail accepts it as an attachment.
+        // This works on every browser that supports Web Share API v2.
+        const htmlBlob = new Blob([html], { type: 'text/html' });
+        const htmlFile = new File([htmlBlob], filename.replace(/\.pdf$/i, '.html'), {
+          type: 'text/html',
+        });
+        if (anyNav.canShare({ files: [htmlFile] })) {
+          try {
+            await anyNav.share({
+              title: filename,
+              text: 'Bank statement / receipt from your mobile banking app.',
+              files: [htmlFile],
+            });
+            return;
+          } catch (e: any) {
+            // User cancelled the share sheet — that is not an error.
+            if (e?.name === 'AbortError') return;
+            // Fall through to print / download fallbacks below.
+          }
+        }
+      }
+    } catch {
+      /* fall through */
+    }
+    // 2) Fall back to the browser's native print dialog — user can pick
+    //    "Save as PDF" and then attach the file manually to any app.
+    try {
       await Print.printAsync({ html });
       return;
-    } catch (e) {
-      // Fallback: open the styled HTML in a new tab; user can save as PDF.
+    } catch {
+      // 3) Last-resort HTML download so the user still gets the file.
       try {
         const blob = new Blob([html], { type: 'text/html' });
         const url = URL.createObjectURL(blob);
-        // Trigger download
         const a = document.createElement('a');
         a.href = url;
         a.download = filename.replace(/\.pdf$/i, '.html');
@@ -236,7 +299,7 @@ async function deliverPdf(filename: string, html: string) {
 
   // Native (iOS / Android): render to PDF then share the file.
   const { uri } = await Print.printToFileAsync({ html, base64: false });
-  // Rename the file so the share sheet shows the HSBC-branded filename
+  // Rename the file so the share sheet shows the bank-branded filename
   const desired = `${FileSystem.documentDirectory}${filename}`;
   try {
     await FileSystem.moveAsync({ from: uri, to: desired });
@@ -245,7 +308,11 @@ async function deliverPdf(filename: string, html: string) {
   }
   const finalUri = (await FileSystem.getInfoAsync(desired)).exists ? desired : uri;
   if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(finalUri, { mimeType: 'application/pdf', UTI: 'com.adobe.pdf', dialogTitle: filename });
+    await Sharing.shareAsync(finalUri, {
+      mimeType: 'application/pdf',
+      UTI: 'com.adobe.pdf',
+      dialogTitle: `Share ${filename}`,
+    });
   }
 }
 
@@ -270,27 +337,30 @@ async function deliverCsv(filename: string, csv: string) {
 }
 
 export async function downloadMonthlyStatement(year: number, monthIdx1: number) {
+  const bank = await getActiveBank();
   const html = await buildStatementHtml(year, monthIdx1);
   await deliverPdf(
-    `HSBC_Statement_${year}_${String(monthIdx1).padStart(2, '0')}.pdf`,
+    `${bank.shortId}_Statement_${year}_${String(monthIdx1).padStart(2, '0')}.pdf`,
     html,
   );
 }
 
 export async function downloadReceipt(txn: Transaction) {
   const db = await getDb();
-  const html = buildReceiptHtml(txn, db.profile.name);
-  await deliverPdf(`HSBC_Receipt_${txn.id}.pdf`, html);
+  const bank = await getActiveBank();
+  const html = await buildReceiptHtml(txn, db.profile.name);
+  await deliverPdf(`${bank.shortId}_Receipt_${txn.id}.pdf`, html);
 }
 
 export async function downloadTransactionsExport(format: 'csv' | 'pdf' | 'html') {
   const db = await getDb();
+  const bank = await getActiveBank();
   const txns = [...db.transactions].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
   if (format === 'csv') {
-    await deliverCsv(`HSBC_Transactions_${Date.now()}.csv`, buildCsv(txns));
+    await deliverCsv(`${bank.shortId}_Transactions_${Date.now()}.csv`, buildCsv(txns));
     return;
   }
   // pdf or html → render the styled HTML to PDF
   const html = await buildStatementHtml(new Date().getFullYear(), new Date().getMonth() + 1);
-  await deliverPdf(`HSBC_Transactions_${Date.now()}.pdf`, html);
+  await deliverPdf(`${bank.shortId}_Transactions_${Date.now()}.pdf`, html);
 }

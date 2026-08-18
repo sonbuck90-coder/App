@@ -1,0 +1,59 @@
+{
+  "summary": "Frontend-only regression of new international-transfer country picker + US-ACH + Canada + IBAN flows, transaction-detail footer theme sync, and statements share/download screen. All 6 review-request items PASS with no functional issues found.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/iteration_11.json"
+  ],
+  "verified_flows": [
+    {
+      "flow": "Country picker",
+      "status": "PASS",
+      "details": "Default country card shows Germany + flag with testID='country-picker-btn'. Bottom-sheet modal opens with 30 rows. All required testIDs present: US, CA, GB, DE, FR, ES, IT, NL, IE, PT, BE, AT, FI, GR, CH, NO, SE, DK, PL, AU, NZ, IN, AE, ZA, SG, HK, JP, MX, BR (29 verified) — modal also lists 30 total presets."
+    },
+    {
+      "flow": "US ACH transfer",
+      "status": "PASS",
+      "details": "Selecting country-US swaps IBAN/SWIFT for routing-input (9-digit numeric) + us-account-input. Submit → passcode 1234 → receipt renders with Country='🇺🇸 United States', label 'Routing / Account' = 'RTN 021000021 / Acc 9876543210', TRN + FPID both present. Amount 250 GBP converted to $317.50 USD."
+    },
+    {
+      "flow": "Canada transfer",
+      "status": "PASS",
+      "details": "Selecting country-CA shows transit-input, institution-input, ca-account-input. Submit → passcode → receipt shows Country='🇨🇦 Canada', label 'Transit-Institution-Acc' = '00001-001-1234567', TRN + FPID present. Amount 125 GBP → C$215 CAD."
+    },
+    {
+      "flow": "Germany IBAN transfer",
+      "status": "PASS",
+      "details": "IBAN + SWIFT fields render as expected. Submit → passcode → receipt shows Country='🇩🇪 Germany', label 'IBAN' = 'DE89370400440532013000', TRN + FPID present. Amount 100 GBP → €117 EUR."
+    },
+    {
+      "flow": "Transaction-detail footer theme swap",
+      "status": "PASS",
+      "details": "Default (HSBC) → footer reads 'Secured by HSBC. Keep this invoice for your records.' After setting localStorage.hsbc_customization = {bankThemeId:'santander', ...} and reloading, footer reads 'Secured by Santander. Keep this invoice for your records.' — bankName correctly wired via getBankTheme(bankThemeId).name."
+    },
+    {
+      "flow": "Statements share + download",
+      "status": "PASS",
+      "details": "/statements shows hero card + 'LAST 12 MONTHS' section with 12 rows (testID='statement-{y-m}'). Each row displays both share-outline icon and download-outline icon. Row tap invokes downloadMonthlyStatement without crash. Hero copy mentions Mail/WhatsApp share support."
+    }
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "offline-docs.ts web share path attaches an .html file (renamed from .pdf) instead of a real PDF blob when Web Share API v2 is available. This is intentional per code comment (universal browser compatibility), but the share sheet will offer an HTML file, not a PDF, on mobile web. Consider generating a real PDF blob via jsPDF or a service worker for parity with native.",
+    "AuthGate passcode keys (/app/frontend/src/components/AuthGate.tsx L192-200) have no testID props — automated tests must fall back to text selectors. Consider adding testID='authgate-key-{digit}' for cleaner automation.",
+    "international-transfer.tsx is 626 lines; the COUNTRY_PRESETS constant + the Modal render block could be extracted into a dedicated module to keep the screen under the 700-line soft cap.",
+    "Two unused imports in transaction-detail.tsx: `Platform` (line 2) and `FileSystem`/`Sharing` (lines 9-10) — they are pulled in but never referenced after the offline-docs refactor."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "seed_data_creation": "None — used built-in offline seeded transactions + accounts.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "AuthGate passcode keys do NOT have testIDs — use text selectors like page.get_by_text('1', exact=True).last for automated passcode entry. Transaction rows use testID pattern 'txn-row-{id}' (not 'transaction-{id}'). Theme switching is done via localStorage key 'hsbc_customization' with shape {bankThemeId:'<id>', colors:{...}} followed by page.reload().",
+  "rca_of_issue": "N/A — all flows working as specified in review request."
+}

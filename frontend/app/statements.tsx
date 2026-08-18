@@ -45,8 +45,8 @@ export default function StatementsScreen() {
       <ScrollView contentContainerStyle={s.content}>
         <View style={s.heroCard}>
           <Ionicons name="document-text" size={36} color={cc.primary} />
-          <Text style={s.heroTitle}>Download your statements</Text>
-          <Text style={s.heroSub}>{bankName} provides downloadable PDF statements for the past 12 months. Tap any month to download.</Text>
+          <Text style={s.heroTitle}>Download & share statements</Text>
+          <Text style={s.heroSub}>{bankName} provides downloadable PDF statements for the past 12 months. Tap any month to download or share to Mail, WhatsApp, Messages and more.</Text>
         </View>
 
         <Text style={s.sectionLabel}>LAST 12 MONTHS</Text>
@@ -64,12 +64,15 @@ export default function StatementsScreen() {
               </View>
               <View style={{ flex: 1, marginLeft: 12 }}>
                 <Text style={s.rowTitle}>{m.label}</Text>
-                <Text style={s.rowSub}>PDF · monthly statement</Text>
+                <Text style={s.rowSub}>PDF · Tap to download or share</Text>
               </View>
               {downloadingKey === m.key ? (
                 <ActivityIndicator color={cc.primary} />
               ) : (
-                <Ionicons name="download-outline" size={22} color={cc.primary} />
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="share-outline" size={20} color={cc.primary} style={{ marginRight: 10 }} />
+                  <Ionicons name="download-outline" size={22} color={cc.primary} />
+                </View>
               )}
             </TouchableOpacity>
           ))}
