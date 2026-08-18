@@ -1,0 +1,49 @@
+{
+  "summary": "Frontend-only test of theme-aware chatbot name, footer tagline, app version, domestic FPID/TRN, and international transfer freeze-fix. 4/5 features working. CRITICAL BUG: International transfer still crashes (not a freeze this time — a runtime TypeError in the inline receipt render). Root cause is a data-shape mismatch between offline-adapter.ts response and the screen's expected shape.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "international-transfer.tsx (inline receipt)",
+        "issue": "Runtime TypeError: 'Cannot read properties of undefined (reading toFixed)' at international-transfer.tsx:150. `receipt.amountReceived` (populated from `res.data.amount_received`) is undefined because offline-adapter.ts returns the field as `converted_amount`, not `amount_received`. Additionally `res.data.estimated_arrival` is missing from the adapter response and `res.data.fpid` from the adapter is `SWIFT##########` (does NOT match the required /FP\\w{14}/ pattern). The inline-receipt card `[data-testid=intl-receipt]` never rendered because the render threw before reaching the TRN/FPID rows.",
+        "testID": "intl-receipt / rcpt-trn / rcpt-fpid",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "International transfer → offline adapter response contract",
+        "issue": "Adapter (/api/transfers/international POST) returns { ...txn, converted_amount, rate } but screen reads amount_received, estimated_arrival, and expects fpid to start with 'FP'. Fix adapter response: return amount_received (=converted), estimated_arrival (e.g. '2-3 business days for SWIFT'), and change fpid generation to `FP` + 14 alphanum uppercase chars. See offline-adapter.ts lines 393-433.",
+        "affected_testIDs": ["submit-international", "intl-receipt", "rcpt-fpid", "rcpt-trn", "rcpt-done"]
+      }
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {
+        "component": "Global — legacy shadow* style props",
+        "issue": "Console warns: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' React Native Web 0.19+ prefers boxShadow. Non-blocking but should be migrated across StyleSheet.create blocks (multiple files, e.g. chat.tsx, transfers.tsx)."
+      },
+      {
+        "component": "Global — props.pointerEvents deprecation",
+        "issue": "Console warns: 'props.pointerEvents is deprecated. Use style.pointerEvents' — coming from an RN component (likely a Modal or overlay). Move pointerEvents into style prop."
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "URGENT FIX in /app/frontend/src/services/offline-adapter.ts /transfers/international handler (~line 433): change the return payload to include `amount_received: converted`, `estimated_arrival: '2-3 business days'` (or similar), and change `fpid` to `FP` + 14 uppercase alphanum chars (drop the 'SWIFT' prefix) so it matches the /FP\\w{14}/ regex the receipt uses.",
+    "Alternatively (cheaper fix) update /app/frontend/app/international-transfer.tsx lines 117-126 to read `res.data.converted_amount` and provide a fallback ETA string when undefined — but the FPID prefix mismatch still needs fixing in the adapter to satisfy the /FP\\w{14}/ regex.",
+    "Address the shadow* → boxShadow and pointerEvents deprecations across shared components once functional bugs are resolved."
+  ],
+  "critical_code_review_comments": [
+    "Data-contract mismatch between offline-adapter.ts and international-transfer.tsx caused the crash — a shared TypeScript type for the international-transfer response (used by both adapter and screen) would have prevented this.",
+    "The international-transfer.tsx submit handler does NOT reset `isSubmitting` on the render-throw path; if the crash didn't take down the whole screen, the submit button would stay disabled. Consider wrapping the setReceipt call in try/catch."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A", "frontend": "80%" },
+  "seed_data_creation": "Seeded localStorage key 'hsbc_customization' with the Santander theme to validate theme swap; reset back to HSBC before running domestic + international tests.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login screen auto-selects user Oliver; entering any 4 digits bypasses. Chat + Profile theme reactivity verified with Santander seed. Domestic transfer receipt WORKS end-to-end and shows Reference=Lunch, FPID=FP<14>, TRN=TRN<12>, Status=Completed, Footer='HSBC UK | Secure Banking'. International transfer FAILS after passcode entry due to adapter/screen contract mismatch — reproduce by /international-transfer, fill Alice Johnson / DE89370400440532013000 / COBADEFFXXX / DE / 100 / 'Family support', tap Send Transfer, enter passcode 1234 → RED SCREEN 'TypeError toFixed'. Verify fix by watching for [data-testid=intl-receipt] and rcpt-trn matching /TRN\\w{12}/ and rcpt-fpid matching /FP\\w{14}/.",
+  "rca_of_issue": "SYMPTOM: International transfer screen throws a runtime TypeError after passcode entry, preventing the inline receipt card (intl-receipt) from rendering. ROOT CAUSE: /app/frontend/src/services/offline-adapter.ts (line ~433) returns `{ ...txn, converted_amount, rate }` for POST /transfers/international, but /app/frontend/app/international-transfer.tsx (lines 117-126) accesses `res.data.amount_received`, `res.data.estimated_arrival`, and `res.data.fpid`. `amount_received` and `estimated_arrival` are undefined; calling `.toFixed(2)` on undefined at line 150 crashes the render. ADDITIONALLY the adapter's fpid string is `SWIFT##########` which will not match the required `/FP\\w{14}/` regex even after the crash is fixed. MITIGATION (adapter side): change return to `ok({ ...txn, amount_received: converted, converted_amount: converted, rate, estimated_arrival: '2-3 business days', fpid: 'FP' + randAlphaNum(14) }, config);`."
+}

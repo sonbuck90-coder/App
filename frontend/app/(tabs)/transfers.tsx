@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import HeaderInfoButton from '../../src/components/HeaderInfoButton';
 import { onActiveUserChange } from '../../src/services/user-scope';
+import { getFooterTagline } from '../../src/context/BankThemes';
 import { accountsApi, transfersApi, payeesApi, Account, Payee } from '../../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode, LookupResult } from '../../src/services/bank-lookup';
 import { useCustomization } from '../../src/context/CustomizationContext';
@@ -37,9 +38,10 @@ const COLORS = {
 };
 
 export default function TransfersScreen() {
-  const { colors: customColors, headerTextColor } = useCustomization();
+  const { colors: customColors, headerTextColor, bankThemeId } = useCustomization();
   const router = useRouter();
   const authGate = useAuthGate();
+  const footerTagline = getFooterTagline(bankThemeId);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [showAccountPicker, setShowAccountPicker] = useState(false);
@@ -71,6 +73,10 @@ export default function TransfersScreen() {
     date: string;
     reference: string;
     transactionId: string;
+    /** Faster Payments Instructing Party Identifier (FPID). */
+    fpid: string;
+    /** Transaction Reference Number (TRN) — Faster Payments trace id. */
+    trn: string;
     fromAccount: string;
   } | null>(null);
 
@@ -259,6 +265,16 @@ export default function TransfersScreen() {
         }),
       ]);
 
+      // Generate realistic UK Faster-Payments identifiers so the receipt
+      // matches what real HSBC / Barclays / Lloyds transaction confirmations
+      // print:
+      //   FPID (Faster Payments Instructing Party ID) — up to 18 alphanum.
+      //   TRN  (Transaction Reference Number) — Faster-Payments trace id.
+      const randHex = (n: number) =>
+        Array.from({ length: n }, () => Math.floor(Math.random() * 36).toString(36).toUpperCase()).join('');
+      const fpid = `FP${randHex(14)}`;
+      const trn = `TRN${randHex(12)}`;
+
       setReceiptData({
         amount: transferAmount,
         recipient: recipientName,
@@ -273,6 +289,8 @@ export default function TransfersScreen() {
         // Auto-generated internal payment id — displayed separately in
         // small text on the receipt for tracing purposes only.
         transactionId: (result.data.id || '').slice(0, 12).toUpperCase() || `TXN${Math.floor(Math.random() * 1e6)}`,
+        fpid,
+        trn,
         fromAccount: `${selectedAccount.account_type === 'checking' ? 'Current' : 'Savings'} ****${selectedAccount.account_number.slice(-4)}`,
       });
       setShowReview(false);
@@ -514,6 +532,14 @@ export default function TransfersScreen() {
               <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.transactionId}</Text>
             </View>
             <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>FPID</Text>
+              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.fpid}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptLabel}>TRN</Text>
+              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.trn}</Text>
+            </View>
+            <View style={styles.receiptRow}>
               <Text style={styles.receiptLabel}>Status</Text>
               <View style={styles.receiptStatusBadge}>
                 <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
@@ -524,7 +550,7 @@ export default function TransfersScreen() {
 
           {/* Footer */}
           <View style={styles.receiptFooter}>
-            <Text style={styles.receiptFooterText}>HSBC UK | Secure Banking</Text>
+            <Text style={styles.receiptFooterText}>{footerTagline}</Text>
           </View>
 
           {/* Buttons */}

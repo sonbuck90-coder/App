@@ -13,6 +13,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCustomization } from '../../src/context/CustomizationContext';
 import HeaderInfoButton from '../../src/components/HeaderInfoButton';
+import { getBankTheme } from '../../src/context/BankThemes';
 import { Linking, Platform } from 'react-native';
 
 // HSBC Colors
@@ -38,7 +39,7 @@ export default function ProfileScreen() {
       refreshUser();
     }, [])
   );
-  const { colors: customColors, headerTextColor, bankPhone } = useCustomization();
+  const { colors: customColors, headerTextColor, bankPhone, bankThemeId } = useCustomization();
   const router = useRouter();
 
   const callBank = () => {
@@ -208,7 +209,7 @@ export default function ProfileScreen() {
         </TouchableOpacity>
 
         {/* App Version */}
-        <Text style={styles.versionText}>HSBC Mobile Banking v2.04.6</Text>
+        <Text style={styles.versionText}>{getBankTheme(bankThemeId).name} Mobile Banking v2.04.6</Text>
 
         <View style={styles.bottomPadding} />
       </ScrollView>

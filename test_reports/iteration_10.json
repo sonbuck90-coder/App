@@ -1,0 +1,42 @@
+{
+  "summary": "Re-verified iteration_9 fix for international-transfer freeze. All three requested flows now PASS on the mobile-web preview. (1) International transfer completes end-to-end after passcode 1234; no red-box error; inline receipt [data-testid=intl-receipt] renders with TRN='TRNHCHC23IV9FPQ' matching /^TRN[A-Z0-9]{12}$/, FPID='FP4OOZYXGHNRYQDA' matching /^FP[A-Z0-9]{14}$/, Estimated arrival '2–3 business days'; 'Back to Home' (rcpt-done) navigates to /(tabs)/home. (2) Domestic transfer receipt still shows FPID (FP0Q1RDOV53ORTFZ), TRN (TRN769VFEAUJNQNS), user-typed Reference 'Lunch', Status 'Completed', and footer 'HSBC UK | Secure Banking'. (3) Chatbot name swaps per theme — HSBC→'Ellie', Santander→'Sandy'. Minor pre-existing RN deprecation warnings persist (shadow*, props.pointerEvents) but are non-blocking.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "chat.tsx (theme-swap)",
+        "issues": [
+          "When Santander theme active, chatbot header/name swaps to 'Sandy' correctly, but the greeting subtitle still hard-codes 'Your personal HSBC banking assistant. …'. Should use the current bank theme name (or a generic phrase). Non-blocking."
+        ]
+      }
+    ],
+    "react_native_issues": [
+      {
+        "component": "Global — legacy shadow* style props",
+        "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' React Native Web 0.19+ prefers boxShadow. Multiple StyleSheet.create blocks affected (already flagged in iteration_9)."
+      },
+      {
+        "component": "Global — props.pointerEvents deprecation",
+        "issue": "Console warning: 'props.pointerEvents is deprecated. Use style.pointerEvents' — likely coming from a Modal/overlay. Move pointerEvents into the style prop (already flagged in iteration_9)."
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "OPTIONAL (design polish): Update chat greeting subtitle to reference the active bank theme instead of hard-coding 'HSBC banking assistant' — e.g. use `${getBankTheme(bankThemeId).name} banking assistant`.",
+    "OPTIONAL (tech debt): Migrate shadow* → boxShadow and props.pointerEvents → style.pointerEvents across shared components (unchanged from iteration_9)."
+  ],
+  "critical_code_review_comments": [
+    "Adapter/screen contract now aligns for international transfer (amount_received, estimated_arrival, trn/TRN{12}, fpid/FP{14}). A shared TS interface for `/transfers/international` response — imported by both offline-adapter.ts and international-transfer.tsx — would prevent future drift.",
+    "international-transfer.tsx submit() still doesn't wrap setReceipt() in try/catch. If a future adapter regression breaks another field, isSubmitting could remain stuck on a render throw. Consider defensive fallbacks (e.g. `res.data.amount_received ?? res.data.converted_amount ?? 0`)."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "N/A (frontend-only)", "frontend": "100%" },
+  "seed_data_creation": "Set localStorage.hsbc_customization to {bankThemeId:'santander'} to validate chatbot name swap; reset to 'hsbc' after test.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "iteration_9 bug is fully fixed. International transfer end-to-end works: /international-transfer → fill Alice Johnson / DE89370400440532013000 / COBADEFFXXX / DE / 100 / 'Family support' → Send → passcode 1234 → intl-receipt with rcpt-trn matching /TRN[A-Z0-9]{12}/ and rcpt-fpid matching /FP[A-Z0-9]{14}/ → rcpt-done → home. Domestic transfer + chatbot theme swap regressions PASS. Note: on web the AuthGate keypad digits are div/text nodes without testIDs — press them by finding the largest visible element with matching innerText (>=30x30 bounding box) and dispatching a bubbling click event; page.get_by_text().click() may hit a background text node (e.g. digits inside IBAN) instead.",
+  "rca_of_issue": "N/A — original bug (undefined toFixed + wrong FPID prefix in offline-adapter.ts) is resolved. Adapter now returns amount_received, converted_amount, rate, trn (`TRN`+12 alnum), fpid (`FP`+14 alnum), and estimated_arrival='2–3 business days', matching what international-transfer.tsx expects."
+}

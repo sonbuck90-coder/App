@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { api, accountsApi, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuthGate } from '../src/components/AuthGate';
+import { getFooterTagline } from '../src/context/BankThemes';
 
 const C = { white: '#FFFFFF', bg: '#F5F6F8', card: '#FFFFFF', border: '#E5E8EC', gray: '#8893A3', mid: '#5E6A7A', dark: '#0B1424', success: '#00847F', warn: '#E67E22' };
 
@@ -16,7 +17,7 @@ interface Currency { code: string; name: string; symbol: string; flag: string }
 
 export default function InternationalTransferScreen() {
   const router = useRouter();
-  const { colors: cc, headerTextColor } = useCustomization();
+  const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
   const authGate = useAuthGate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
@@ -36,6 +37,19 @@ export default function InternationalTransferScreen() {
   const [charges, setCharges] = useState<'SHA' | 'OUR' | 'BEN'>('SHA');
   const [picker, setPicker] = useState<null | 'source' | 'target'>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Inline receipt state — displayed instead of an Alert to avoid the
+  // iOS/web modal-on-modal freeze that used to happen when Alert.alert
+  // fired immediately after the AuthGate Modal dismissed.
+  const [receipt, setReceipt] = useState<null | {
+    amountSent: number;
+    amountReceived: number;
+    recipient: string;
+    iban: string;
+    trn: string;
+    fpid: string;
+    eta: string;
+    invoice?: string;
+  }>(null);
 
   useEffect(() => {
     (async () => {
@@ -96,11 +110,20 @@ export default function InternationalTransferScreen() {
         is_business: isBusiness,
         invoice_number: isBusiness ? invoice.trim() : undefined,
       });
-      Alert.alert(
-        'Transfer Sent',
-        `${symbolOf(sourceCcy)}${numericAmount.toFixed(2)} sent.\nRecipient receives ${symbolOf(targetCcy)}${res.data.amount_received.toFixed(2)} ${targetCcy}.\nTRN: ${res.data.trn}\nFPID: ${res.data.fpid}\nEstimated arrival: ${res.data.estimated_arrival}`,
-        [{ text: 'OK', onPress: () => router.replace('/(tabs)/home') }]
-      );
+      // Inline success card avoids the modal-on-modal freeze that used to
+      // happen when Alert.alert was called immediately after the AuthGate
+      // Modal dismissed. TRN + FPID are preserved on the card so the user
+      // still sees the full HSBC-style Faster-Payments identifiers.
+      setReceipt({
+        amountSent: numericAmount,
+        amountReceived: res.data.amount_received,
+        recipient: recipientName.trim(),
+        iban: iban.replace(/\s/g, '').toUpperCase(),
+        trn: res.data.trn,
+        fpid: res.data.fpid,
+        eta: res.data.estimated_arrival,
+        invoice: isBusiness && invoice.trim() ? invoice.trim() : undefined,
+      });
     } catch (e: any) {
       Alert.alert('Transfer Failed', e.response?.data?.detail || 'Could not complete');
     } finally {
@@ -116,6 +139,34 @@ export default function InternationalTransferScreen() {
         <View style={{ width: 24 }} />
       </View>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        {receipt ? (
+          <ScrollView contentContainerStyle={s.content}>
+            <View style={s.rcpt} testID="intl-receipt">
+              <View style={[s.rcptIcon, { backgroundColor: cc.primary + '15' }]}>
+                <Ionicons name="checkmark-circle" size={54} color={cc.primary} />
+              </View>
+              <Text style={s.rcptTitle}>Transfer Sent</Text>
+              <Text style={s.rcptAmount}>{symbolOf(sourceCcy)}{receipt.amountSent.toFixed(2)}</Text>
+              <Text style={s.rcptSub}>Recipient receives {symbolOf(targetCcy)}{receipt.amountReceived.toFixed(2)} {targetCcy}</Text>
+              <View style={s.rcptDivider} />
+              <View style={s.rcptRow}><Text style={s.rcptLabel}>To</Text><Text style={s.rcptVal}>{receipt.recipient}</Text></View>
+              <View style={s.rcptRow}><Text style={s.rcptLabel}>IBAN</Text><Text style={[s.rcptVal, s.mono]}>{receipt.iban}</Text></View>
+              <View style={s.rcptRow}><Text style={s.rcptLabel}>TRN</Text><Text style={[s.rcptVal, s.mono]} testID="rcpt-trn">{receipt.trn}</Text></View>
+              <View style={s.rcptRow}><Text style={s.rcptLabel}>FPID</Text><Text style={[s.rcptVal, s.mono]} testID="rcpt-fpid">{receipt.fpid}</Text></View>
+              {receipt.invoice && (
+                <View style={s.rcptRow}><Text style={s.rcptLabel}>Invoice</Text><Text style={s.rcptVal}>{receipt.invoice}</Text></View>
+              )}
+              <View style={s.rcptRow}><Text style={s.rcptLabel}>Estimated arrival</Text><Text style={s.rcptVal}>{receipt.eta}</Text></View>
+              <TouchableOpacity
+                style={[s.rcptBtn, { backgroundColor: cc.primary }]}
+                onPress={() => { setReceipt(null); router.replace('/(tabs)/home' as any); }}
+                testID="rcpt-done">
+                <Text style={s.rcptBtnText}>Back to Home</Text>
+              </TouchableOpacity>
+              <Text style={s.rcptFooter}>{getFooterTagline(bankThemeId)}</Text>
+            </View>
+          </ScrollView>
+        ) : (
         <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
           {/* Live FX rate */}
@@ -241,6 +292,7 @@ export default function InternationalTransferScreen() {
 
           <View style={{ height: 40 }} />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
 
       {/* Currency Picker */}
@@ -339,4 +391,18 @@ const s = StyleSheet.create({
   ccyName: { fontSize: 15, fontWeight: '600', color: C.dark },
   ccySym: { fontSize: 12, color: C.gray, marginTop: 2 },
   modalClose: { alignItems: 'center', paddingVertical: 10, marginTop: 6 },
+  // Inline receipt (post-submit success card)
+  rcpt: { backgroundColor: C.card, borderRadius: 14, padding: 22, marginTop: 14, alignItems: 'center' },
+  rcptIcon: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  rcptTitle: { fontSize: 20, fontWeight: '800', color: C.dark, marginTop: 4 },
+  rcptAmount: { fontSize: 34, fontWeight: '800', color: C.dark, marginTop: 6 },
+  rcptSub: { fontSize: 13, color: C.mid, marginTop: 4, textAlign: 'center' },
+  rcptDivider: { height: 1, backgroundColor: '#EEF0F3', alignSelf: 'stretch', marginVertical: 16 },
+  rcptRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', alignSelf: 'stretch', paddingVertical: 6 },
+  rcptLabel: { fontSize: 13, color: C.gray },
+  rcptVal: { fontSize: 13, fontWeight: '600', color: C.dark, maxWidth: '65%', textAlign: 'right' },
+  mono: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  rcptBtn: { marginTop: 20, alignSelf: 'stretch', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  rcptBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
+  rcptFooter: { fontSize: 11, color: C.gray, marginTop: 16, letterSpacing: 0.5 },
 });

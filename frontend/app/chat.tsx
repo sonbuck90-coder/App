@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { transactionsApi, accountsApi, Transaction, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuth } from '../src/context/AuthContext';
+import { getChatbotName, getFooterTagline } from '../src/context/BankThemes';
 import RichMessage from '../src/components/RichMessage';
 import TypingDots from '../src/components/TypingDots';
 import BackButton from '../src/components/BackButton';
@@ -24,8 +25,9 @@ const QUICK_ACTIONS = [
 ];
 
 export default function ChatScreen() {
-  const { colors: cc, headerTextColor } = useCustomization();
+  const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
   const { user } = useAuth();
+  const botName = getChatbotName(bankThemeId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -83,7 +85,7 @@ export default function ChatScreen() {
         (txn.fpid ? `**FPID:** ${txn.fpid}\n` : '') +
         `\n` +
         `━━━━━━━━━━━━━━━━━━━━\n` +
-        `HSBC UK | Secure Banking`;
+        `${getFooterTagline(bankThemeId)}`;
     }
 
     // Transfer delays
@@ -100,7 +102,7 @@ export default function ChatScreen() {
         `• Weekends & bank holidays\n` +
         `• Security checks on large amounts (£10,000+)\n` +
         `• Incorrect sort code/account number\n\n` +
-        `Need help with a specific transfer? Just ask! — Ellie`;
+        `Need help with a specific transfer? Just ask! — ${botName}`;
     }
 
     // Cancel payment / reverse
@@ -115,7 +117,7 @@ export default function ChatScreen() {
         `• Recall requests should be made within 24 hours\n` +
         `• The receiving bank has up to 20 working days to respond\n` +
         `• If the recipient agrees, funds are usually returned within 5 working days\n\n` +
-        `Need me to help with anything else? — Ellie`;
+        `Need me to help with anything else? — ${botName}`;
     }
 
     // Support hours
@@ -133,7 +135,7 @@ export default function ChatScreen() {
         `• Sunday: Closed\n\n` +
         `**Emergencies (Lost/Stolen Card):**\n` +
         `• 0800 783 7654 — 24/7\n\n` +
-        `I'm also here to help anytime! — Ellie`;
+        `I'm also here to help anytime! — ${botName}`;
     }
 
     // Balance
@@ -143,7 +145,7 @@ export default function ChatScreen() {
       return `💰 **Your Account Balances**\n\n` +
         `**Total: ${fmt(total)}**\n\n` +
         `${accsInfo}\n\n` +
-        `Want to add funds or make a transfer? I can guide you through it! — Ellie`;
+        `Want to add funds or make a transfer? I can guide you through it! — ${botName}`;
     }
 
     // Transactions history
@@ -155,7 +157,7 @@ export default function ChatScreen() {
         return `• ${prefix}${fmt(t.amount)} — ${t.recipient_name || t.description} (${fmtDate(t.timestamp).split(',')[0]})`;
       }).join('\n');
       return `📊 **Recent Activity (Last 5)**\n\n${list}\n\n` +
-        `Want details on a specific transaction? Ask me about your "last transaction" for a full receipt! — Ellie`;
+        `Want details on a specific transaction? Ask me about your "last transaction" for a full receipt! — ${botName}`;
     }
 
     // Account details
@@ -166,24 +168,24 @@ export default function ChatScreen() {
         `• Account No: ${a.account_number}`
       ).join('\n\n');
       return `🏦 **Your Account Details**\n\n${accsInfo}\n\n` +
-        `You can update these in Settings → Personal Details. — Ellie`;
+        `You can update these in Settings → Personal Details. — ${botName}`;
     }
 
     // Greeting
     if (msg.includes('hello') || msg.includes('hi') || msg.includes('hey') || msg === 'hey ellie' || msg === 'hi ellie') {
-      return `Hello${user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋 I'm Ellie, your personal banking assistant.\n\n` +
+      return `Hello${user?.name ? `, ${user.name.split(' ')[0]}` : ''}! 👋 I'm ${botName}, your personal banking assistant.\n\n` +
         `Here's what I can help with:\n` +
         `• View your last transaction receipt\n` +
         `• Check your balance\n` +
         `• Transfer processing times\n` +
         `• Support hours & contact info\n` +
         `• Account details\n\n` +
-        `Just ask me anything! — Ellie`;
+        `Just ask me anything! — ${botName}`;
     }
 
     // Thank you
     if (msg.includes('thank') || msg.includes('thanks') || msg.includes('cheers')) {
-      return `You're welcome! 😊 Happy to help anytime. Is there anything else I can assist you with? — Ellie`;
+      return `You're welcome! 😊 Happy to help anytime. Is there anything else I can assist you with? — ${botName}`;
     }
 
     // Default fallback
@@ -194,7 +196,7 @@ export default function ChatScreen() {
       `• **"Support hours"** — How to contact HSBC\n` +
       `• **"Account details"** — Sort code & account number\n` +
       `• **"Recent activity"** — Last 5 transactions\n\n` +
-      `Try one of these or tap a quick action below! — Ellie`;
+      `Try one of these or tap a quick action below! — ${botName}`;
   };
 
   const sendMessage = async (text: string) => {
@@ -231,7 +233,7 @@ export default function ChatScreen() {
             <Ionicons name="chatbubbles" size={18} color="#FFFFFF" />
           </View>
           <View>
-            <Text style={[styles.headerTitle, { color: headerTextColor }]}>Ellie</Text>
+            <Text style={[styles.headerTitle, { color: headerTextColor }]}>{botName}</Text>
             <Text style={[styles.headerSubtitle, { color: headerTextColor, opacity: 0.75 }]}>Your AI Banking Assistant</Text>
           </View>
         </View>
@@ -251,7 +253,7 @@ export default function ChatScreen() {
               <View style={[styles.welcomeAvatar, { backgroundColor: `${cc.primary}15` }]}>
                 <Ionicons name="chatbubbles" size={32} color={cc.primary} />
               </View>
-              <Text style={styles.welcomeTitle}>Hello! I'm Ellie</Text>
+              <Text style={styles.welcomeTitle}>Hello! I'm {botName}</Text>
               <Text style={styles.welcomeText}>Your personal HSBC banking assistant. I can show you transaction receipts, check balances, and answer banking questions.</Text>
 
               <View style={styles.quickActionsContainer}>
@@ -323,7 +325,7 @@ export default function ChatScreen() {
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
-            placeholder="Ask Ellie anything..."
+            placeholder={`Ask ${botName} anything...`}
             placeholderTextColor={C.gray}
             value={input}
             onChangeText={setInput}

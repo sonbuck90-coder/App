@@ -402,6 +402,15 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     const rate = FX_RATES_GBP[body.target_currency] ?? 1;
     const converted = +(amt * rate).toFixed(2);
 
+    // Generate realistic Faster-Payments / SWIFT identifiers so the
+    // receipt matches HSBC's actual banking-slip formatting.
+    const randAlnum = (n: number) =>
+      Array.from({ length: n }, () =>
+        Math.floor(Math.random() * 36).toString(36).toUpperCase(),
+      ).join('');
+    const trn = `TRN${randAlnum(12)}`;
+    const fpid = `FP${randAlnum(14)}`;
+
     const txn = await addTransaction({
       user_id: db.profile.id,
       from_account_id: from.id,
@@ -412,8 +421,8 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       recipient_account_number: body.iban || body.account_number,
       recipient_bank_name: body.bank_name,
       reference: `INT${Math.floor(Math.random() * 1e6)}`,
-      trn: `TRN${(Math.floor(Math.random() * 1e10)).toString().padStart(10, '0')}`,
-      fpid: `SWIFT${(Math.floor(Math.random() * 1e10)).toString().padStart(10, '0')}`,
+      trn,
+      fpid,
       status: 'completed',
       timestamp: new Date().toISOString(),
     });
@@ -430,7 +439,21 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       data: { txn_id: txn.id },
     });
     void fireBudgetAlertsFor('transfer');
-    return ok({ ...txn, converted_amount: converted, rate }, config);
+    // Response contract the international-transfer screen expects:
+    //   amount_received, rate, trn, fpid, estimated_arrival.
+    // `converted_amount` is kept for legacy callers.
+    return ok(
+      {
+        ...txn,
+        amount_received: converted,
+        converted_amount: converted,
+        rate,
+        trn,
+        fpid,
+        estimated_arrival: '2–3 business days',
+      },
+      config,
+    );
   }
 
   // ---- Budgets -------------------------------------------------------------
