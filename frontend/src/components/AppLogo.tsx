@@ -17,14 +17,21 @@ export default function AppLogo({ variant = 'default' }: Props) {
   const isCustom = !!settings.logo.url;
   const source = isCustom ? { uri: settings.logo.url } : DEFAULT_LOGO;
 
-  // Resolve a HEIGHT for the logo based on variant
+  // Resolve a HEIGHT for the logo based on variant. Sizes are chosen so the
+  // "Giant" preset (520px) can actually take over the login/header hero area
+  // when the user has explicitly opted for a massive logo.
   let height: number;
   if (variant === 'header') {
-    // Header bars: cap height so the bar stays usable but honour user's size choice
-    height = Math.min(Math.max(28, Math.floor(logoSize * 0.45)), 56);
+    // Header bars: keep at least 28px readable but let the user scale it
+    // up quite generously — capped at 96 so the top-bar itself doesn't
+    // become the entire screen.
+    height = Math.min(Math.max(28, Math.floor(logoSize * 0.5)), 96);
   } else if (variant === 'small') {
-    height = Math.min(logoSize, 36);
+    // Inline text-adjacent logo, e.g. next to greetings. Scale ~30% of
+    // the chosen size but clamp to 72 so it doesn't overwhelm the row.
+    height = Math.min(Math.max(24, Math.floor(logoSize * 0.35)), 72);
   } else {
+    // Default (hero / login): honour the user's chosen size exactly, no cap.
     height = logoSize;
   }
 

@@ -12,7 +12,7 @@ export interface CustomColors {
 
 export interface LogoSettings {
   url: string;
-  size: 'small' | 'medium' | 'large' | 'xlarge';
+  size: 'small' | 'medium' | 'large' | 'xlarge' | 'xxlarge' | 'huge' | 'massive' | 'giant';
 }
 
 export interface CustomizationSettings {
@@ -39,7 +39,16 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   bankThemeId: 'hsbc',
 };
 
-const LOGO_SIZES = { small: 44, medium: 72, large: 110, xlarge: 160 };
+const LOGO_SIZES = {
+  small: 44,
+  medium: 72,
+  large: 110,
+  xlarge: 160,
+  xxlarge: 220,
+  huge: 300,
+  massive: 400,
+  giant: 520,
+};
 
 // Compute a readable text colour for the given background hex
 function computeHeaderTextColor(hex: string): string {

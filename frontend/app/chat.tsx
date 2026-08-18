@@ -21,6 +21,7 @@ interface Message {
 const QUICK_ACTIONS = [
   { label: 'Last Transaction', icon: 'receipt-outline', message: 'Show me my last transaction' },
   { label: 'Transfer Delays', icon: 'time-outline', message: 'How long do transfers take?' },
+  { label: 'International Transfer Time', icon: 'globe-outline', message: 'How long does an international transfer take?' },
   { label: 'Support Hours', icon: 'call-outline', message: 'What are your support hours?' },
 ];
 
@@ -88,7 +89,36 @@ export default function ChatScreen() {
         `${getFooterTagline(bankThemeId)}`;
     }
 
-    // Transfer delays
+    // International transfers — detailed timing (research-backed).
+    // This has to be matched BEFORE the generic "transfer delay" branch
+    // below so a query like "how long does an international transfer take"
+    // routes here instead of the domestic response.
+    if (
+      (msg.includes('international') || msg.includes('overseas') || msg.includes('abroad') || msg.includes('swift') || msg.includes('sepa') || msg.includes('foreign')) &&
+      (msg.includes('transfer') || msg.includes('payment') || msg.includes('send money') || msg.includes('long') || msg.includes('time') || msg.includes('how'))
+    ) {
+      return `🌍 **International Transfer Timings**\n\n` +
+        `International transfers typically take **longer than UK domestic** payments because they route through the SWIFT network (or SEPA for EUR) and go through multiple intermediary banks and compliance checks.\n\n` +
+        `**Typical arrival times** (based on published UK bank guidance):\n` +
+        `• **SEPA (Euro area)**: 1 business day, sometimes same-day\n` +
+        `• **SWIFT (most currencies)**: 1–4 business days\n` +
+        `• **Long-haul / exotic currencies**: up to 5 business days\n` +
+        `• **CHAPS (same-day GBP wire, UK-only)**: same working day if sent before 3:30 PM\n\n` +
+        `**Common reasons for extra delay:**\n` +
+        `• Weekends & bank holidays in the sending *and* receiving country — these aren't counted as business days\n` +
+        `• Intermediary/correspondent banks adding an extra hop (typical for USD via US correspondents)\n` +
+        `• Compliance / anti-money-laundering screening on amounts over £10,000 (or lower for some corridors)\n` +
+        `• Missing or incorrect IBAN, SWIFT/BIC or beneficiary details — this can bounce the payment back after 2–3 days\n` +
+        `• Currency-conversion cut-off times — FX only trades on weekdays\n` +
+        `• Public holidays in the destination country (e.g. Chinese New Year, Diwali, Ramadan Eid)\n\n` +
+        `**Tips to speed things up:**\n` +
+        `• Send **before 2:00 PM UK time** on a working day\n` +
+        `• Double-check the IBAN and SWIFT/BIC — one wrong character delays everything\n` +
+        `• For urgent payments, choose the **OUR** charge option so the beneficiary receives the full amount without deductions\n\n` +
+        `You can track any international transfer you've sent from the receipt — look for the **TRN** and **FPID** reference numbers. — ${botName}`;
+    }
+
+    // Transfer delays (domestic + generic)
     if (msg.includes('transfer') && (msg.includes('delay') || msg.includes('long') || msg.includes('time') || msg.includes('how long'))) {
       return `⏱️ **Transfer Processing Times**\n\n` +
         `**Domestic (UK) Transfers:**\n` +
@@ -177,7 +207,8 @@ export default function ChatScreen() {
         `Here's what I can help with:\n` +
         `• View your last transaction receipt\n` +
         `• Check your balance\n` +
-        `• Transfer processing times\n` +
+        `• Domestic transfer processing times\n` +
+        `• **International transfer timings** (SWIFT & SEPA)\n` +
         `• Support hours & contact info\n` +
         `• Account details\n\n` +
         `Just ask me anything! — ${botName}`;

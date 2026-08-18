@@ -5,12 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { downloadMonthlyStatement } from '../src/services/offline-docs';
+import { getBankTheme } from '../src/context/BankThemes';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export default function StatementsScreen() {
   const router = useRouter();
-  const { colors: cc, headerTextColor } = useCustomization();
+  const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
+  const bankName = getBankTheme(bankThemeId).name;
   const today = new Date();
   const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
 
@@ -44,7 +46,7 @@ export default function StatementsScreen() {
         <View style={s.heroCard}>
           <Ionicons name="document-text" size={36} color={cc.primary} />
           <Text style={s.heroTitle}>Download your statements</Text>
-          <Text style={s.heroSub}>HSBC UK provides downloadable PDF statements for the past 12 months. Tap any month to download.</Text>
+          <Text style={s.heroSub}>{bankName} provides downloadable PDF statements for the past 12 months. Tap any month to download.</Text>
         </View>
 
         <Text style={s.sectionLabel}>LAST 12 MONTHS</Text>

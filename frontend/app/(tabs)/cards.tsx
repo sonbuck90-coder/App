@@ -8,6 +8,7 @@ import { useCustomization } from '../../src/context/CustomizationContext';
 import { useAuth } from '../../src/context/AuthContext';
 import { getLayoutFor } from '../../src/context/BankThemes';
 import HeaderInfoButton from '../../src/components/HeaderInfoButton';
+import { getBankTheme } from '../../src/context/BankThemes';
 import CardsModern from '../../src/screens/CardsModern';
 import CardsMinimal from '../../src/screens/CardsMinimal';
 
@@ -29,6 +30,8 @@ export default function Cards() {
 
 function CardsClassic() {
   const { colors: cc } = useCustomization();
+  const { bankThemeId: activeBankThemeId } = useCustomization();
+  const activeBankName = getBankTheme(activeBankThemeId).name;
   const { user } = useAuth();
   const router = useRouter();
   const [cards, setCards] = useState<Card[]>([]);
@@ -134,7 +137,7 @@ function CardsClassic() {
                         <View style={[styles.hex, { backgroundColor: cc.primary }]} />
                       </View>
                     </View>
-                    <Text style={styles.cardBankName}>HSBC UK</Text>
+                    <Text style={styles.cardBankName}>{activeBankName}</Text>
                   </View>
                   <View style={styles.cardTypeBadge}>
                     <Text style={styles.cardTypeBadgeText}>

@@ -6,13 +6,15 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { cardsApi, transactionsApi, Card, Transaction } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuth } from '../src/context/AuthContext';
+import { getBankTheme } from '../src/context/BankThemes';
 
 const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5' };
 
 export default function CardDetailsScreen() {
   const router = useRouter();
   const { cardId } = useLocalSearchParams<{ cardId: string }>();
-  const { colors: cc, headerTextColor } = useCustomization();
+  const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
+  const bankName = getBankTheme(bankThemeId).name;
   const { user } = useAuth();
   const [card, setCard] = useState<Card | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -94,14 +96,14 @@ export default function CardDetailsScreen() {
                   <View style={styles.hexRow}><View style={[styles.hex, { backgroundColor: cc.primary }]} /><View style={[styles.hex, { backgroundColor: C.white, borderWidth: 1, borderColor: cc.primary }]} /></View>
                   <View style={styles.hexRow}><View style={[styles.hex, { backgroundColor: C.white, borderWidth: 1, borderColor: cc.primary }]} /><View style={[styles.hex, { backgroundColor: cc.primary }]} /></View>
                 </View>
-                <Text style={styles.cardBankName}>HSBC UK</Text>
+                <Text style={styles.cardBankName}>{bankName}</Text>
               </View>
               <View style={styles.typeBadge}><Text style={styles.typeBadgeText}>{card.card_type === 'debit' ? 'Debit' : 'Credit'}</Text></View>
             </View>
             <Text style={styles.cardNumber}>{displayNumber}</Text>
             <View style={styles.cardBottom}>
               <View><Text style={styles.cardLabel}>VALID THRU</Text><Text style={styles.cardValue}>{card.expiry_date}</Text></View>
-              <View><Text style={styles.cardLabel}>CARDHOLDER</Text><Text style={styles.cardValue}>{user?.name || 'HSBC Customer'}</Text></View>
+              <View><Text style={styles.cardLabel}>CARDHOLDER</Text><Text style={styles.cardValue}>{user?.name || `${bankName} Customer`}</Text></View>
             </View>
           </View>
         </View>

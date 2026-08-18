@@ -44,11 +44,15 @@ const ACCENT_COLORS = [
   { label: 'Pink', value: '#E91E63' },
 ];
 
-const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' | 'xlarge' }> = [
+const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' | 'xlarge' | 'xxlarge' | 'huge' | 'massive' | 'giant' }> = [
   { label: 'Small', value: 'small' },
   { label: 'Medium', value: 'medium' },
   { label: 'Large', value: 'large' },
   { label: 'X-Large', value: 'xlarge' },
+  { label: 'XX-Large', value: 'xxlarge' },
+  { label: 'Huge', value: 'huge' },
+  { label: 'Massive', value: 'massive' },
+  { label: 'Giant', value: 'giant' },
 ];
 
 export default function CustomizationScreen() {
