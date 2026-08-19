@@ -27,8 +27,15 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
-# JWT Settings
-SECRET_KEY = os.environ.get('JWT_SECRET', 'your-super-secret-key-change-in-production')
+# JWT Settings — the app is 100% offline for banking flows, but the auth
+# router is still exposed to guard the (unused-in-prod) FastAPI routes.
+# Fail fast if JWT_SECRET is missing so we never ship the placeholder value.
+SECRET_KEY = os.environ.get('JWT_SECRET')
+if not SECRET_KEY:
+    raise RuntimeError(
+        'JWT_SECRET environment variable is required. '
+        'Set it in backend/.env before starting the server.'
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 

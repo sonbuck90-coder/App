@@ -2,7 +2,12 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { offlineAdapter } from './offline-adapter';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+// Base URL is only used as an identifier for the axios instance — every
+// request is intercepted by `offlineAdapter` and served locally, so the
+// app never actually reaches this URL. Prefer the env value; fall back
+// to an obviously-fake placeholder so a missing env variable can't
+// silently ship a cleartext `http://localhost` URL to a real device.
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://offline-only.local';
 
 export const api = axios.create({
   baseURL: `${BACKEND_URL}/api`,
