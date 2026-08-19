@@ -6,7 +6,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { transactionsApi, accountsApi, api, Transaction, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { getBankTheme } from '../src/context/BankThemes';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 
 const C = {

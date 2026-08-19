@@ -6,7 +6,12 @@
  * directory and shared via expo-sharing.
  */
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+// Expo SDK 54 replaced the top-level expo-file-system API with a new
+// File/Directory class-based API. The legacy async helpers (getInfoAsync,
+// moveAsync, documentDirectory constant) are still supported but must be
+// imported from the /legacy sub-path — otherwise every call throws
+// "Method getInfoAsync imported from expo-file-system is deprecated".
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';

@@ -1,0 +1,23 @@
+{
+  "summary": "Bug fix verified: `expo-file-system` → `expo-file-system/legacy` imports resolve the SDK 54 'getInfoAsync deprecated' Download Failed alert. All 4 requested flows pass on web preview at http://localhost:3000. No deprecation alert appears anywhere; no 'Download Failed' alert; transfer regression produces a valid receipt with TRN + FPID; login with passcode 1234 works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "offline-docs.ts:14, transactions.tsx:7, transaction-detail.tsx:9 all now correctly import from 'expo-file-system/legacy' — no remaining top-level 'expo-file-system' imports found in /app/frontend/app or /app/frontend/src.",
+    "Minor: transactions.tsx imports FileSystem and Sharing but never uses them directly (delegates to offline-docs). Dead imports could be removed but do not affect runtime."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test executed on web preview (mobile viewport 390x844) via Playwright. Steps validated: (1) login /login → passcode 1234 → /home; (2) /statements loads 12 rows (August 2026 down through prior months); tapping 'statement-2026-8' triggers downloadMonthlyStatement → deliverPdf which on web routes through Web Share API/Print.printAsync — no JS alert dialog is fired; page.on('dialog') captured NO 'Download Failed' or 'getInfoAsync' alerts; document.body.innerText scanned for 'getInfoAsync'/'Download Failed'/'deprecated' → not present. (3) /transaction-detail?id=<first> → 'Download PDF Receipt' button click → no failure alert. (4) Domestic transfer £5.00 → Bob Smith / 60-83-71 / 12345678 → Confirm & Send → receipt shows TRN and FPID and Status Completed. Note: expo-file-system/legacy path only exercises on native — the web path uses Blob/Print APIs — so this fix is primarily validated for Expo Go/native by import-path presence check; on-device retest via Expo Go is recommended but web preview confirms no import-time throw.",
+  "rca_of_issue": "Expo SDK 54 refactored expo-file-system to a class-based (File/Directory) API and moved the async helpers (getInfoAsync, moveAsync, writeAsStringAsync, documentDirectory, EncodingType) behind an /legacy sub-path. Any top-level `import * as FileSystem from 'expo-file-system'` still resolves but every call now throws `Method X imported from expo-file-system is deprecated`. Fix: switch the three consumers (offline-docs.ts, transactions.tsx, transaction-detail.tsx) to `import * as FileSystem from 'expo-file-system/legacy'`. Verified: grep across /app/frontend shows zero remaining non-legacy imports; on web preview tapping a statement row and the Download Receipt button no longer surfaces the alert."
+}
