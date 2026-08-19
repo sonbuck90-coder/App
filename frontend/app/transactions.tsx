@@ -7,6 +7,7 @@ import { transactionsApi, Transaction } from '../src/services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import BackButton from '../src/components/BackButton';
+import { useCustomization } from '../src/context/CustomizationContext';
 
 const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5', warning: '#E67E22' };
 
@@ -17,6 +18,7 @@ const FILTERS = [
 ];
 
 export default function TransactionsScreen() {
+  const { colors: cc, headerTextColor } = useCustomization();
   const router = useRouter();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -103,9 +105,9 @@ export default function TransactionsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <BackButton color={COLORS.white} />
-        <Text style={styles.headerTitle}>Transaction History</Text>
+      <View style={[styles.header, { backgroundColor: cc.header }]}>
+        <BackButton color={headerTextColor} />
+        <Text style={[styles.headerTitle, { color: headerTextColor }]}>Transaction History</Text>
       </View>
 
       {/* Filter Tabs */}
@@ -113,7 +115,7 @@ export default function TransactionsScreen() {
         {FILTERS.map((f) => (
           <TouchableOpacity
             key={f.key}
-            style={[styles.filterTab, activeFilter === f.key && styles.filterTabActive]}
+            style={[styles.filterTab, activeFilter === f.key && { backgroundColor: cc.primary }]}
             onPress={() => { setActiveFilter(f.key); setIsLoading(true); }}
             testID={`filter-${f.key}`}
           >
@@ -124,20 +126,20 @@ export default function TransactionsScreen() {
 
       {/* Download Actions */}
       <View style={styles.downloadContainer}>
-        <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload('csv')} disabled={isDownloading} testID="download-csv-btn">
-          <Ionicons name="document-text-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.downloadBtnText}>CSV</Text>
+        <TouchableOpacity style={[styles.downloadBtn, { borderColor: cc.primary }]} onPress={() => handleDownload('csv')} disabled={isDownloading} testID="download-csv-btn">
+          <Ionicons name="document-text-outline" size={18} color={cc.primary} />
+          <Text style={[styles.downloadBtnText, { color: cc.primary }]}>CSV</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.downloadBtn} onPress={() => handleDownload('pdf')} disabled={isDownloading} testID="download-pdf-btn">
-          <Ionicons name="download-outline" size={18} color={COLORS.primary} />
-          <Text style={styles.downloadBtnText}>PDF</Text>
+        <TouchableOpacity style={[styles.downloadBtn, { borderColor: cc.primary }]} onPress={() => handleDownload('pdf')} disabled={isDownloading} testID="download-pdf-btn">
+          <Ionicons name="download-outline" size={18} color={cc.primary} />
+          <Text style={[styles.downloadBtnText, { color: cc.primary }]}>PDF</Text>
         </TouchableOpacity>
-        {isDownloading && <ActivityIndicator size="small" color={COLORS.primary} style={{ marginLeft: 12 }} />}
+        {isDownloading && <ActivityIndicator size="small" color={cc.primary} style={{ marginLeft: 12 }} />}
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={cc.primary} />}
         showsVerticalScrollIndicator={false}
       >
         {transactions.length === 0 ? (

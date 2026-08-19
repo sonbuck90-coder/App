@@ -167,6 +167,10 @@ export default function InternationalTransferScreen() {
     // the same offline adapter that generates the TRN + FPID receipt.
     setIsSubmitting(true);
     try {
+      // Realistic UK-bank-style 2.4-second processing delay so the user
+      // sees the "Verifying transaction…" progress and it doesn't feel
+      // instant. Matches the domestic-transfer feel.
+      await new Promise((r) => setTimeout(r, 2400));
       const res = await api.post('/transfers/international', {
         from_account_id: fromAccountId,
         amount: numericAmount,
@@ -442,7 +446,12 @@ export default function InternationalTransferScreen() {
           </View>
 
           <TouchableOpacity style={[s.submitBtn, { backgroundColor: cc.primary }, isSubmitting && { opacity: 0.7 }]} onPress={submit} disabled={isSubmitting} testID="submit-international">
-            {isSubmitting ? <ActivityIndicator color="#FFF" /> : (
+            {isSubmitting ? (
+              <>
+                <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+                <Text style={s.submitText}>Verifying transaction…</Text>
+              </>
+            ) : (
               <>
                 <Ionicons name="paper-plane" size={18} color="#FFF" />
                 <Text style={s.submitText}>Send {symbolOf(sourceCcy)}{numericAmount.toFixed(2)}</Text>

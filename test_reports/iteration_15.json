@@ -1,0 +1,31 @@
+{
+  "summary": "Frontend-only regression of the 4 reported fixes. ALL PASS. (1) INTL Face-ID/delay: /international-transfer with DE + Maria Garcia + IBAN DE89370400440532013000 + SWIFT DEUTDEFFXXX + £50 -> NO passcode/Face-ID/AuthGate DOM appears at any point; submit button transitions to spinner + 'Verifying transaction…' label (verified via innerText at t+600ms); inline receipt testID='intl-receipt' renders after ~3.4s with TRN=TRNOOWW46M2SVHR and FPID=FPMPSFWA312TW3KM; zero JS dialogs captured. (2) Transaction history theming with seeded Santander customization: header background computed to rgb(236,0,0) i.e. #EC0000; 'All' filter active pill bg = rgb(236,0,0); CSV download button border & text color = rgb(236,0,0); PDF button same. Verified via getComputedStyle. (3) PDF holder details: intercepted the web share path (navigator.canShare/share stub) to capture the generated HTML for both /statements January statement (SANTANDER_Statement_2026_01.html, 4513 chars) AND /transaction-detail -> Download PDF Receipt (SANTANDER_Receipt_*.html, 4136 chars). Both HTMLs contain 'Account holder', 'Address', 'Sort code', 'Account number'. Statement HTML additionally contains 'Email' + 'Phone' meta rows as expected. Verified real values rendered: Oliver / 8 Canada Square, London / 44-91-51 / 92647194 / customer@hsbc.co.uk / +44 7700 900000. (4) Domestic regression: /(tabs)/transfers with Bob / 608371 / 12345678 / £5 / ref 'Reg' -> Review & Continue -> Confirm & Send -> receipt shows Reference=Reg, TRN=TRN3XBKP6H3J8P9, FPID=FP7E86JW1KFBQB8K, status Completed, no extra AuthGate. Deprecated packages / RN warnings detected: shadow* style props deprecation and props.pointerEvents deprecation (non-blocking, carried over from iteration_14).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "shadow* style props", "issue": "Warning: 'shadow*' style props are deprecated. Use 'boxShadow'. Emitted across login/transfers/international-transfer. Non-blocking."},
+      {"component": "props.pointerEvents", "issue": "Warning: 'props.pointerEvents is deprecated. Use style.pointerEvents'. Emitted during submit flows. Non-blocking."}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "No fixes required — all 4 reported changes verified working on preview (localhost:3000).",
+    "User-facing note: their production build is stale — they must redeploy to pick up these changes (as flagged in the review request).",
+    "Optional cleanup carried over from prior iterations: migrate shadow* props to boxShadow and move pointerEvents into style prop to silence RN deprecation warnings."
+  ],
+  "critical_code_review_comments": [
+    "international-transfer.tsx has NO useAuthGate import, NO gate hook call, NO <authGate.Render/> mount — the AuthGate removal is complete. The 2400ms setTimeout precedes api.post('/transfers/international', ...) inside the try-block, so 'Verifying transaction…' is guaranteed to be visible for ~2.4s even on fast mocked adapters.",
+    "transactions.tsx correctly threads useCustomization()'s cc.header / cc.primary through header bg, active filter pill, download button border+icon+text, and RefreshControl tint.",
+    "offline-docs.ts buildStatementHtml + buildReceiptHtml both include Sort code + Account number in the .meta grid; statement adds Email + Phone. Values come from db.accounts (checking) and db.profile so they stay in sync with the active identity."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% (4/4)"},
+  "seed_data_creation": "localStorage 'hsbc_customization' seeded with {bankThemeId:'santander', colors:{primary:'#EC0000',accent:'#000',header:'#EC0000',gradientStart:'#EC0000',gradientEnd:'#B30000'}} for Test 2 & 3.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Domestic transfer testids are recipient-name-input, sort-code-input, account-number-input, amount-input, description-input, transfer-now-button, confirm-send-btn (NOT prefixed with 'transfer-'). To inspect PDF HTML on web without touching Print.printAsync, stub navigator.canShare=()=>true and navigator.share=async({files})=>{ window.__x = await files[0].text(); } — offline-docs deliverPdf() prefers the Web Share API path first, so the HTML is passed to your stub. Passcode selectors: [data-testid=\"passcode-key-{0..9}\"]. Intl receipt testIDs: intl-receipt, rcpt-trn, rcpt-fpid, rcpt-done.",
+  "rca_of_issue": "N/A — verification pass only. Prior AuthGate RCA (iteration_14) remains valid and no regression was found on this pass."
+}

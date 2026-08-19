@@ -154,6 +154,10 @@ async function buildStatementHtml(year: number, monthIdx1: number): Promise<stri
     <div class="meta">
       <div><div class="label">Account holder</div><div class="val">${escapeHtml(db.profile.name)}</div></div>
       <div><div class="label">Address</div><div class="val">${escapeHtml(db.profile.address)}</div></div>
+      <div><div class="label">Sort code</div><div class="val">${escapeHtml(checking?.sort_code || '--')}</div></div>
+      <div><div class="label">Account number</div><div class="val">${escapeHtml(checking?.account_number || '--')}</div></div>
+      <div><div class="label">Email</div><div class="val">${escapeHtml(db.profile.email || '—')}</div></div>
+      <div><div class="label">Phone</div><div class="val">${escapeHtml(db.profile.phone || '—')}</div></div>
       <div><div class="label">Statement period</div><div class="val">${fmtDate(first.toISOString())} – ${fmtDate(last.toISOString())}</div></div>
       <div><div class="label">Currency</div><div class="val">GBP (£)</div></div>
     </div>
@@ -180,12 +184,20 @@ async function buildStatementHtml(year: number, monthIdx1: number): Promise<stri
 async function buildReceiptHtml(t: Transaction, holderName: string): Promise<string> {
   const bank = await getActiveBank();
   const { header: HEADER_HTML, styles: STYLES } = themedAssets(bank);
+  const db = await getDb();
+  const checking = db.accounts.find((a) => a.account_type === 'checking');
   const isDeposit = t.transaction_type === 'deposit';
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Receipt</title>${STYLES}</head>
   <body><div class="page">
     ${HEADER_HTML}
     <h1>Transaction Receipt</h1>
     <div class="sub">Generated ${fmtDateTime(new Date().toISOString())}</div>
+    <div class="meta">
+      <div><div class="label">Account holder</div><div class="val">${escapeHtml(holderName)}</div></div>
+      <div><div class="label">Address</div><div class="val">${escapeHtml(db.profile.address)}</div></div>
+      <div><div class="label">Sort code</div><div class="val">${escapeHtml(checking?.sort_code || '--')}</div></div>
+      <div><div class="label">Account number</div><div class="val">${escapeHtml(checking?.account_number || '--')}</div></div>
+    </div>
     <div class="receipt-card">
       <div class="receipt-amt">${isDeposit ? '+' : '−'} ${fmtGBP(t.amount)}</div>
       <div class="receipt-row"><span class="k">Status</span><span class="v" style="color:#00847F">${escapeHtml(t.status)}</span></div>
@@ -197,7 +209,6 @@ async function buildReceiptHtml(t: Transaction, holderName: string): Promise<str
       ${t.reference ? `<div class="receipt-row"><span class="k">Reference</span><span class="v">${escapeHtml(t.reference)}</span></div>` : ''}
       ${t.trn ? `<div class="receipt-row"><span class="k">TRN</span><span class="v">${escapeHtml(t.trn)}</span></div>` : ''}
       ${t.fpid ? `<div class="receipt-row"><span class="k">FPID</span><span class="v">${escapeHtml(t.fpid)}</span></div>` : ''}
-      <div class="receipt-row"><span class="k">Holder</span><span class="v">${escapeHtml(holderName)}</span></div>
     </div>
     <div class="footer">${bank.name} · Digital receipt. Please retain for your records.</div>
   </div></body></html>`;
