@@ -8,7 +8,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { api, accountsApi, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
-import { useAuthGate } from '../src/components/AuthGate';
 import { getFooterTagline } from '../src/context/BankThemes';
 
 const C = { white: '#FFFFFF', bg: '#F5F6F8', card: '#FFFFFF', border: '#E5E8EC', gray: '#8893A3', mid: '#5E6A7A', dark: '#0B1424', success: '#00847F', warn: '#E67E22' };
@@ -69,7 +68,6 @@ const COUNTRY_PRESETS: CountryPreset[] = [
 export default function InternationalTransferScreen() {
   const router = useRouter();
   const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
-  const authGate = useAuthGate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [fromAccountId, setFromAccountId] = useState('');
@@ -162,11 +160,11 @@ export default function InternationalTransferScreen() {
     else if (country.scheme === 'canada') primaryIdent = `${transitNumber}-${institutionNumber}-${accountNumber}`;
     else primaryIdent = iban.replace(/\s/g, '').toUpperCase();
 
-    const authed = await authGate.confirm({
-      title: 'Confirm international transfer',
-      subtitle: `Authorise ${symbolOf(sourceCcy)}${numericAmount.toFixed(2)} to ${recipientName} · ${primaryIdent}`,
-    });
-    if (!authed) return;
+    // No passcode / Face-ID gate on international transfers — the user
+    // reported the AuthGate Modal was causing a freeze on submit. Domestic
+    // transfers don't require an extra prompt either, so we keep the two
+    // flows consistent. The transaction still needs a valid form and hits
+    // the same offline adapter that generates the TRN + FPID receipt.
     setIsSubmitting(true);
     try {
       const res = await api.post('/transfers/international', {
@@ -535,7 +533,6 @@ export default function InternationalTransferScreen() {
           </View>
         </View>
       </Modal>
-      <authGate.Render />
     </SafeAreaView>
   );
 }

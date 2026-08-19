@@ -1,0 +1,29 @@
+{
+  "summary": "Frontend-only regression for the international-transfer AuthGate removal. Verified the bug fix end-to-end: on both Germany (IBAN/SWIFT) and United States (routing+account) submits, NO passcode modal and NO Face ID prompt appears, no freeze occurs, and the inline receipt (testID='intl-receipt') renders within ~2s with TRN + FPID + 'Back to Home'. Domestic transfer regression passes (Test User / 60-83-71 / 12345678 / £5.00 / ref 'Reg') — Review & Continue → Confirm & Send flows straight into a receipt with Reference='Reg', TRN + FPID, no extra auth gate. Statements screen still loads correctly (12 months listed), so removing the AuthGate hook from international-transfer.tsx did not break any shared component or hook. No console errors, no dialogs, no crashes. Deprecated packages detected: expo-notifications (listener-not-supported-on-web warning is informational only, not a deprecation).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "shadow* style props", "issue": "Multiple 'shadow* style props are deprecated. Use boxShadow' warnings across screens (login, transfers, international-transfer). Non-blocking but should be migrated to boxShadow for future RN compatibility."},
+      {"component": "props.pointerEvents", "issue": "'props.pointerEvents is deprecated. Use style.pointerEvents' warning emitted during submit flows. Non-blocking but should be moved into style prop."}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "None for the reported bug — the AuthGate removal on international-transfer.tsx is verified working for DE + US and does not affect other flows.",
+    "Optional cleanup: migrate remaining shadow* style props to boxShadow and move pointerEvents into style to silence RN 0.7x deprecation warnings."
+  ],
+  "critical_code_review_comments": [
+    "international-transfer.tsx is 623 lines — still under the 700 LOC threshold but approaching it; consider extracting COUNTRY_PRESETS + the two Modal pickers into separate files for maintainability.",
+    "submit() uses Alert.alert for both validation errors and API errors, which on iOS Expo Go can occasionally stack modals. Consider migrating validation errors to inline field-level messages (the receipt path is already inline, which is why the freeze went away)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only request)", "frontend": "100%"},
+  "seed_data_creation": "None — used offline-adapter mocked data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Login passcode selectors are [data-testid=\"passcode-key-{digit}\"] (not passcode-{digit}). International transfer default country is DE; use [data-testid=\"country-picker-btn\"] + [data-testid=\"country-{ISO2}\"] to switch. Success receipt testIDs: intl-receipt, rcpt-trn, rcpt-fpid, rcpt-done. Domestic transfer flow: fill inputs -> transfer-now-button -> confirm-send-btn -> receipt-done-btn.",
+  "rca_of_issue": "Root cause (already fixed by main agent): international-transfer.tsx previously wrapped submit() behind authGate.confirm() which rendered a second full-screen Modal (AuthGate) on top of the transfer screen. On iOS Expo Go, dismissing that Modal and immediately opening an Alert.alert caused a modal-on-modal race that locked the JS thread and looked like a freeze. Fix: removed useAuthGate import, authGate hook call, the gate check inside submit(), and the <authGate.Render /> mount. Also, success is now rendered as an inline receipt card (setReceipt state) instead of Alert.alert, which eliminates the residual modal-on-modal risk. Verified: DE + US flows both submit → receipt with TRN + FPID directly, zero dialogs captured by Playwright, zero authgate DOM elements post-submit."
+}
