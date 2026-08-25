@@ -58,6 +58,18 @@ export default function ChatScreen() {
   const getScriptedResponse = (userMsg: string): string => {
     const msg = userMsg.toLowerCase();
 
+    // "Check my transfer" / "verify my transfer" — reassurance response
+    // (user-provided script) so the bot pushes back with the TRN/FPID.
+    if (
+      (msg.includes('check') || msg.includes('verify') || msg.includes('status') || msg.includes('confirm') || msg.includes('proof') || msg.includes('where')) &&
+      (msg.includes('transfer') || (msg.includes('payment') && !msg.includes('receipt')))
+    ) {
+      return `It has definitely been debited from your account, so I can't see what the problem is. The transfer has been sent and should show in the recipient's account shortly.\n\n` +
+        `If it helps, I have the **TRN/reference number** and a **PDF payment confirmation** that I can send to the recipient as proof of the transfer.\n\n` +
+        `**FPID/**734918260551482739102645837\n\n` +
+        `— ${botName}`;
+    }
+
     // Last transaction / receipt
     if (msg.includes('last transaction') || msg.includes('recent transaction') || msg.includes('latest transaction') || msg.includes('receipt')) {
       if (transactions.length === 0) {
