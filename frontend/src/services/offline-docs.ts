@@ -89,11 +89,11 @@ function themedAssets(bank: { name: string; primary: string }) {
         border-radius: 6px;
       }
       .meta .label {
-        font-size: 11px;
-        color: #4A4A4A;
+        font-size: 12px;
+        color: #000000;
         text-transform: uppercase;
-        letter-spacing: 0.7px;
-        font-weight: 600;
+        letter-spacing: 0.8px;
+        font-weight: 700;
       }
       .meta .val {
         font-size: 17px;
@@ -103,21 +103,21 @@ function themedAssets(bank: { name: string; primary: string }) {
         letter-spacing: 0.2px;
       }
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8893A3; padding: 8px 4px; border-bottom: 1px solid #E4E7EB; }
-      td { padding: 10px 4px; border-bottom: 1px solid #F0F2F5; font-size: 13px; }
+      th { text-align: left; font-size: 12px; text-transform: uppercase; color: #000000; padding: 8px 4px; border-bottom: 1px solid #000000; font-weight: 800; }
+      td { padding: 10px 4px; border-bottom: 1px solid #E4E7EB; font-size: 13px; color: #000000; font-weight: 600; }
       td.right, th.right { text-align: right; }
-      .amt-in { color: #00847F; font-weight: 600; }
-      .amt-out { color: #0B1424; font-weight: 600; }
+      .amt-in { color: #00847F; font-weight: 700; }
+      .amt-out { color: #000000; font-weight: 700; }
       .summary { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; padding: 16px; background: #F7F8FA; border-radius: 6px; margin-bottom: 20px; }
-      .summary .lbl { font-size: 11px; color: #8893A3; text-transform: uppercase; letter-spacing: 0.6px; }
-      .summary .amt { font-size: 16px; font-weight: 700; margin-top: 4px; }
-      .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E4E7EB; font-size: 10px; color: #8893A3; line-height: 1.6; }
+      .summary .lbl { font-size: 12px; color: #000000; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; }
+      .summary .amt { font-size: 18px; font-weight: 800; margin-top: 4px; color: #000000; }
+      .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #E4E7EB; font-size: 11px; color: #333333; line-height: 1.6; }
       .receipt-card { padding: 20px; background: #F7F8FA; border-radius: 6px; margin-bottom: 16px; }
-      .receipt-amt { font-size: 32px; font-weight: 800; color: #0B1424; text-align: center; margin: 12px 0 4px; }
-      .receipt-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #E4E7EB; }
+      .receipt-amt { font-size: 32px; font-weight: 800; color: #000000; text-align: center; margin: 12px 0 4px; }
+      .receipt-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #C9CED4; }
       .receipt-row:last-child { border-bottom: none; }
-      .receipt-row .k { color: #8893A3; font-size: 12px; }
-      .receipt-row .v { color: #0B1424; font-size: 13px; font-weight: 600; }
+      .receipt-row .k { color: #000000; font-size: 13px; font-weight: 700; }
+      .receipt-row .v { color: #000000; font-size: 14px; font-weight: 700; }
     </style>`,
   };
 }
