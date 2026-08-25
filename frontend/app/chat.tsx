@@ -27,7 +27,7 @@ interface Message {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Last Transaction', icon: 'receipt-outline', message: 'Show me my last transaction' },
+  { label: 'Last Transaction', icon: 'receipt-outline', message: 'Check my last transfer' },
   { label: 'Transfer Delays', icon: 'time-outline', message: 'How long do transfers take?' },
   { label: 'International Transfer Time', icon: 'globe-outline', message: 'How long does an international transfer take?' },
   { label: 'Support Hours', icon: 'call-outline', message: 'What are your support hours?' },

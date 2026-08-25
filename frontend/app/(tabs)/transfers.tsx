@@ -15,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Clipboard from 'expo-clipboard';
+import AppLogo from '../../src/components/AppLogo';
 import HeaderInfoButton from '../../src/components/HeaderInfoButton';
 import { onActiveUserChange } from '../../src/services/user-scope';
 import { getFooterTagline } from '../../src/context/BankThemes';
@@ -470,13 +472,61 @@ export default function TransfersScreen() {
 
   // Receipt Screen
   if (showReceipt && receiptData) {
+    // Copy helper — writes text to the clipboard and flashes a native
+    // toast/alert so the user knows the value was captured.
+    const copyToClipboard = async (val: string, label: string) => {
+      try {
+        await Clipboard.setStringAsync(val);
+        if (Platform.OS === 'web') {
+          // Alert.alert on web renders as window.alert which is jarring; skip it.
+          return;
+        }
+        Alert.alert(`${label} copied`, val);
+      } catch {
+        /* ignore */
+      }
+    };
+
+    // Small copy button reused for Transaction ID / FPID / TRN rows.
+    const CopyBtn = ({ value, label, testID }: { value: string; label: string; testID?: string }) => (
+      <TouchableOpacity
+        onPress={() => copyToClipboard(value, label)}
+        style={styles.rcCopyBtn}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        testID={testID}
+      >
+        <Ionicons name="copy-outline" size={16} color="#5E6A7A" />
+      </TouchableOpacity>
+    );
+
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={[styles.header, { backgroundColor: customColors.header }]}>
-          <Text style={[styles.headerTitle, { color: headerTextColor }]}>Transfer Complete</Text>
-        </View>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.receiptScrollNew}>
-          {/* Success Header — matches the HSBC UK reference photo */}
+          {/* -------- HSBC-style brand header with labeled icons -------- */}
+          <View style={styles.rcBrandBar}>
+            <AppLogo variant="header" />
+            <View style={styles.rcBrandRight}>
+              <View style={styles.rcBrandIconBtn}>
+                <Ionicons name="search-outline" size={22} color="#0B1424" />
+                <Text style={styles.rcBrandIconLbl}>Search</Text>
+              </View>
+              <View style={styles.rcBrandIconBtn}>
+                <View>
+                  <Ionicons name="notifications-outline" size={22} color="#0B1424" />
+                  <View style={[styles.rcBrandBadge, { backgroundColor: customColors.primary }]}>
+                    <Text style={styles.rcBrandBadgeText}>3</Text>
+                  </View>
+                </View>
+                <Text style={styles.rcBrandIconLbl}>Alerts</Text>
+              </View>
+              <View style={styles.rcBrandIconBtn}>
+                <HeaderInfoButton tint="#0B1424" size={22} />
+                <Text style={styles.rcBrandIconLbl}>Menu</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* -------- Success header -------- */}
           <View style={styles.rcSuccessBlock}>
             <View style={styles.rcCheckRing}>
               <Ionicons name="checkmark" size={30} color="#00847F" />
@@ -485,7 +535,7 @@ export default function TransfersScreen() {
             <Text style={styles.rcSubtitle}>Your payment has been sent successfully.</Text>
           </View>
 
-          {/* Main payment card */}
+          {/* -------- Main payment card -------- */}
           <View style={styles.rcCard}>
             <View style={styles.rcCardRow}>
               <Text style={styles.rcCardLabel}>From</Text>
@@ -526,23 +576,32 @@ export default function TransfersScreen() {
             </View>
           </View>
 
-          {/* Transaction details card */}
+          {/* -------- Transaction details card -------- */}
           <View style={styles.rcCard}>
             <Text style={styles.rcCardTitle}>Transaction details</Text>
             <View style={styles.rcCardDivider} />
             <View style={styles.rcCardRow}>
               <Text style={styles.rcCardLabel}>Transaction ID</Text>
-              <Text style={[styles.rcCardVal, styles.rcMono]}>{receiptData.transactionId}</Text>
+              <View style={styles.rcCopyRowValue}>
+                <Text style={[styles.rcCardVal, styles.rcMono, { flex: 0 }]}>{receiptData.transactionId}</Text>
+                <CopyBtn value={receiptData.transactionId} label="Transaction ID" testID="rc-copy-txn" />
+              </View>
             </View>
             <View style={styles.rcCardDivider} />
             <View style={styles.rcCardRow}>
               <Text style={styles.rcCardLabel}>FPID</Text>
-              <Text style={[styles.rcCardVal, styles.rcMono]}>{receiptData.fpid}</Text>
+              <View style={styles.rcCopyRowValue}>
+                <Text style={[styles.rcCardVal, styles.rcMono, { flex: 0 }]}>{receiptData.fpid}</Text>
+                <CopyBtn value={receiptData.fpid} label="FPID" testID="rc-copy-fpid" />
+              </View>
             </View>
             <View style={styles.rcCardDivider} />
             <View style={styles.rcCardRow}>
               <Text style={styles.rcCardLabel}>TRN</Text>
-              <Text style={[styles.rcCardVal, styles.rcMono]}>{receiptData.trn}</Text>
+              <View style={styles.rcCopyRowValue}>
+                <Text style={[styles.rcCardVal, styles.rcMono, { flex: 0 }]}>{receiptData.trn}</Text>
+                <CopyBtn value={receiptData.trn} label="TRN" testID="rc-copy-trn" />
+              </View>
             </View>
             <View style={styles.rcCardDivider} />
             <View style={styles.rcCardRow}>
@@ -551,7 +610,7 @@ export default function TransfersScreen() {
             </View>
           </View>
 
-          {/* Confirmation banner */}
+          {/* -------- Confirmation banner -------- */}
           <View style={[styles.rcConfirmBanner, { borderLeftColor: customColors.primary }]}>
             <Ionicons name="shield-checkmark-outline" size={22} color="#0B1424" style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
@@ -560,7 +619,7 @@ export default function TransfersScreen() {
             </View>
           </View>
 
-          {/* 4 quick-action buttons */}
+          {/* -------- 4 red circular action buttons -------- */}
           <View style={styles.rcActionRow}>
             {[
               { icon: 'download-outline', label: 'Save receipt', testID: 'rc-save' },
@@ -1327,6 +1386,47 @@ const styles = StyleSheet.create({
   },
   // ── New HSBC-UK-style receipt (matches reference photo) ──────────────────
   receiptScrollNew: { padding: 16, paddingBottom: 40 },
+  rcBrandBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingTop: 6,
+    paddingBottom: 18,
+  },
+  rcBrandRight: { flexDirection: 'row', alignItems: 'flex-start' },
+  rcBrandIconBtn: {
+    alignItems: 'center',
+    marginLeft: 16,
+    width: 52,
+  },
+  rcBrandIconLbl: {
+    fontSize: 10,
+    color: '#5E6A7A',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  rcBrandBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  rcBrandBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '700' },
+  rcCopyBtn: {
+    marginLeft: 8,
+    padding: 2,
+  },
+  rcCopyRowValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
   rcSuccessBlock: { alignItems: 'center', paddingTop: 6, paddingBottom: 20 },
   rcCheckRing: {
     width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center',
