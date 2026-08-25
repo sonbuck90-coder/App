@@ -336,6 +336,23 @@ function HomeClassic() {
           />
         </View>
 
+        {/* -------- Spending this month (prominent card) -------- */}
+        <TouchableOpacity
+          style={s.spendCard}
+          onPress={() => router.push('/analytics')}
+          activeOpacity={0.85}
+          testID="home-spending-card"
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={s.spendLabel}>SPENDING THIS MONTH</Text>
+            <Text style={s.spendAmount}>{fmt(stats?.monthly_spending || 0)}</Text>
+            <Text style={s.spendSub}>Tap to see full breakdown</Text>
+          </View>
+          <View style={[s.spendIconWrap, { backgroundColor: `${cc.primary}18` }]}>
+            <Ionicons name="trending-down" size={26} color={cc.primary} />
+          </View>
+        </TouchableOpacity>
+
         {/* -------- Accounts -------- */}
         <View style={s.sectionHeader}>
           <Text style={s.sectionTitle}>Accounts</Text>
@@ -352,30 +369,33 @@ function HomeClassic() {
             return (
               <TouchableOpacity
                 key={acc.id}
-                style={s.acctCard}
+                style={[s.acctCard, { borderLeftWidth: 4, borderLeftColor: barColor }]}
                 onPress={() => router.push({ pathname: '/transactions', params: { account_id: acc.id } })}
                 activeOpacity={0.7}
                 testID={`acct-card-${acc.account_type}`}
               >
-                <View style={[s.acctBar, { backgroundColor: barColor }]} />
-                <View style={{ flex: 1, paddingLeft: 14, paddingVertical: 16 }}>
-                  <Text style={s.acctName}>{label}</Text>
+                <View style={s.acctBody}>
+                  <View style={s.acctTopRow}>
+                    <Text style={s.acctName}>{label}</Text>
+                    <TouchableOpacity
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={() =>
+                        router.push({ pathname: '/transactions', params: { account_id: acc.id } })
+                      }
+                    >
+                      <Ionicons name="ellipsis-horizontal" size={20} color={C.mutedInk} />
+                    </TouchableOpacity>
+                  </View>
                   <Text style={s.acctMeta}>
                     {acc.sort_code || '00-00-00'}   {acctFormatted}
                   </Text>
-                  <Text style={s.acctBalLabel}>Available balance</Text>
-                  <Text style={s.acctBalAmount}>{fmt(acc.balance)}</Text>
-                </View>
-                <View style={s.acctRight}>
-                  <TouchableOpacity
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    onPress={() =>
-                      router.push({ pathname: '/transactions', params: { account_id: acc.id } })
-                    }
-                  >
-                    <Ionicons name="ellipsis-horizontal" size={20} color={C.mutedInk} />
-                  </TouchableOpacity>
-                  <Ionicons name="chevron-forward" size={22} color={C.mutedInk} />
+                  <View style={s.acctBottomRow}>
+                    <View>
+                      <Text style={s.acctBalLabel}>Available balance</Text>
+                      <Text style={s.acctBalAmount}>{fmt(acc.balance)}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={22} color={C.mutedInk} />
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -580,32 +600,75 @@ const s = StyleSheet.create({
     lineHeight: 14,
   },
 
-  // -------- accounts --------
-  acctCard: {
+  // -------- spending card --------
+  spendCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: C.white,
+    marginHorizontal: 16,
+    marginTop: 20,
+    padding: 18,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.softLine,
+  },
+  spendLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.mutedInk,
+    letterSpacing: 1,
+  },
+  spendAmount: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: C.ink,
+    marginTop: 6,
+    letterSpacing: -0.5,
+  },
+  spendSub: {
+    fontSize: 12,
+    color: C.mutedInk,
+    marginTop: 4,
+  },
+  spendIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 14,
+  },
+
+  // -------- accounts --------
+  acctCard: {
     backgroundColor: C.white,
     borderRadius: 10,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: C.softLine,
     overflow: 'hidden',
+    paddingLeft: 14,
+    paddingRight: 14,
+    paddingVertical: 14,
   },
-  acctBar: {
-    width: 4,
-    alignSelf: 'stretch',
+  acctBody: {
+    // holds all three rows for a clean vertical layout
+  },
+  acctTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  acctBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 10,
   },
   acctName: { fontSize: 15, fontWeight: '700', color: C.ink },
   acctMeta: { fontSize: 12, color: C.mutedInk, marginTop: 4, letterSpacing: 0.3 },
-  acctBalLabel: { fontSize: 12, color: C.mutedInk, marginTop: 12 },
+  acctBalLabel: { fontSize: 12, color: C.mutedInk },
   acctBalAmount: { fontSize: 22, fontWeight: '700', color: C.ink, marginTop: 2 },
-  acctRight: {
-    paddingHorizontal: 12,
-    height: '100%',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 16,
-  },
 
   // -------- transactions --------
   txnList: {
