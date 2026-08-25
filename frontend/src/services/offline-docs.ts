@@ -17,16 +17,23 @@ import * as Print from 'expo-print';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getDb, Transaction } from './offline-store';
 import { getBankTheme } from '../context/BankThemes';
+import { userScopedKey } from './user-scope';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** Resolve the currently-active bank so PDFs are branded per theme. */
+/** Resolve the currently-active bank so PDFs are branded per theme.
+ *  Must read the *user-scoped* customization key so switching profiles
+ *  does not leak another user's theme into the generated PDF. */
 async function getActiveBank(): Promise<{ id: string; name: string; primary: string; shortId: string }> {
   try {
-    const raw = await AsyncStorage.getItem('hsbc_customization');
+    // Per-user customization key (e.g. "hsbc_customization::userId")
+    const key = await userScopedKey('hsbc_customization');
+    // Try user-scoped first; fall back to the legacy global key so
+    // pre-multi-user installations still find their theme.
+    const raw = (await AsyncStorage.getItem(key)) || (await AsyncStorage.getItem('hsbc_customization'));
     if (raw) {
       const parsed = JSON.parse(raw);
       const themeId = parsed?.bankThemeId || 'hsbc';

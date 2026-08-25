@@ -6,9 +6,11 @@ import { transactionsApi, accountsApi, Transaction, Account } from '../src/servi
 import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuth } from '../src/context/AuthContext';
 import { getChatbotName, getFooterTagline } from '../src/context/BankThemes';
+import { lookupBank } from '../src/services/bank-lookup';
 import RichMessage from '../src/components/RichMessage';
 import TypingDots from '../src/components/TypingDots';
 import BackButton from '../src/components/BackButton';
+import { downloadReceipt } from '../src/services/offline-docs';
 
 const C = { white: '#FFFFFF', lightGray: '#F2F2F2', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', bg: '#F5F5F5', bubbleBg: '#FFFFFF', userBubbleText: '#FFFFFF' };
 
@@ -16,6 +18,12 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  /** Optional inline action button rendered below the bubble.
+   *  Currently only "send-pdf" is used, which triggers a receipt export
+   *  for the most recent outgoing transfer. */
+  action?: 'send-pdf';
+  /** Attached transaction (for send-pdf action) */
+  txnId?: string;
 }
 
 const QUICK_ACTIONS = [
@@ -59,15 +67,63 @@ export default function ChatScreen() {
     const msg = userMsg.toLowerCase();
 
     // "Check my transfer" / "verify my transfer" — reassurance response
-    // (user-provided script) so the bot pushes back with the TRN/FPID.
+    // (user-provided script) so the bot pushes back with the TRN/FPID and
+    // adds timing based on the recipient bank of the last outgoing transfer.
     if (
-      (msg.includes('check') || msg.includes('verify') || msg.includes('status') || msg.includes('confirm') || msg.includes('proof') || msg.includes('where')) &&
+      (msg.includes('check') || msg.includes('verify') || msg.includes('status') || msg.includes('confirm') || msg.includes('proof') || msg.includes('where') || msg.includes('when') || msg.includes('arrive')) &&
       (msg.includes('transfer') || (msg.includes('payment') && !msg.includes('receipt')))
     ) {
+      // Find the most recent outgoing transaction so we can identify the
+      // recipient bank and quote a realistic credit window.
+      const lastOut = transactions.find(
+        (t) => t.transaction_type === 'transfer' || t.transaction_type === 'payment'
+      );
+      // Prefer the actual FPID from the last transfer so the number Ellie
+      // quotes matches the receipt. Fall back to a freshly generated one.
+      const genFpid = () => {
+        let out = '';
+        for (let i = 0; i < 27; i++) out += Math.floor(Math.random() * 10);
+        return out;
+      };
+      const fpid = (lastOut as any)?.fpid || genFpid();
+      let bankTimingLine = '';
+      if (lastOut) {
+        const sc = (lastOut as any).recipient_sort_code || '';
+        const explicitBank = (lastOut as any).recipient_bank_name || '';
+        const lookup = sc ? lookupBank(sc) : null;
+        const bankShort =
+          (lookup?.bank?.shortName) || explicitBank.split(' ')[0] || 'the recipient bank';
+        // Typical UK credit windows for Faster Payments (published guidance).
+        const timings: Record<string, string> = {
+          Monzo: 'usually credits within a few seconds',
+          Starling: 'usually credits within a few seconds',
+          Revolut: 'usually credits within a few seconds',
+          Chase: 'usually credits within a few minutes',
+          Barclays: 'usually credits within 2 hours',
+          HSBC: 'usually credits within 2 hours',
+          Lloyds: 'usually credits within 2 hours',
+          NatWest: 'usually credits within 2 hours',
+          RBS: 'usually credits within 2 hours',
+          Halifax: 'usually credits within 2 hours',
+          Santander: 'usually credits within 2 hours (sometimes end of day)',
+          Nationwide: 'usually credits within 2 hours',
+          TSB: 'usually credits within 2 hours',
+          'Metro Bank': 'usually credits within 2 hours',
+          Metro: 'usually credits within 2 hours',
+        };
+        const timing = timings[bankShort] || 'typically credits within 2 hours under Faster Payments';
+        bankTimingLine =
+          `\n\nBased on **${bankShort}**'s published timings, funds ${timing}. ` +
+          `If it hasn't landed after that window, the recipient should check their pending/incoming payments and ask their bank to search for the FPID above.`;
+      }
+
       return `It has definitely been debited from your account, so I can't see what the problem is. The transfer has been sent and should show in the recipient's account shortly.\n\n` +
         `If it helps, I have the **TRN/reference number** and a **PDF payment confirmation** that I can send to the recipient as proof of the transfer.\n\n` +
-        `**FPID/**734918260551482739102645837\n\n` +
-        `— ${botName}`;
+        `**FPID/**${fpid}` +
+        bankTimingLine +
+        `\n\n— ${botName}` +
+        // Hidden marker consumed by sendMessage() to attach a "Send PDF" button.
+        (lastOut ? `\n[[SEND_PDF:${lastOut.id}]]` : '');
     }
 
     // Last transaction / receipt
@@ -258,7 +314,24 @@ export default function ChatScreen() {
     await new Promise(resolve => setTimeout(resolve, 7000));
 
     const response = getScriptedResponse(text.trim());
-    const aiMsg: Message = { role: 'assistant', content: response, timestamp: new Date() };
+    // Detect and strip the hidden SEND_PDF marker used to attach an
+    // inline "Send PDF confirmation" button below the AI reply.
+    let cleanText = response;
+    let action: 'send-pdf' | undefined;
+    let txnId: string | undefined;
+    const pdfMarker = response.match(/\n\[\[SEND_PDF:([^\]]+)\]\]/);
+    if (pdfMarker) {
+      cleanText = response.replace(pdfMarker[0], '');
+      action = 'send-pdf';
+      txnId = pdfMarker[1];
+    }
+    const aiMsg: Message = {
+      role: 'assistant',
+      content: cleanText,
+      timestamp: new Date(),
+      action,
+      txnId,
+    };
     setMessages(prev => [...prev, aiMsg]);
     setIsLoading(false);
   };
@@ -334,6 +407,26 @@ export default function ChatScreen() {
                       <RichMessage content={msg.content} accentColor={cc.primary} />
                     )}
                   </View>
+                  {/* Inline action button (e.g. Send PDF confirmation) */}
+                  {!isUser && msg.action === 'send-pdf' && msg.txnId && (
+                    <TouchableOpacity
+                      style={[styles.actionChip, { borderColor: cc.primary }]}
+                      onPress={async () => {
+                        const target = transactions.find((t) => t.id === msg.txnId);
+                        if (!target) return;
+                        try {
+                          await downloadReceipt(target as any);
+                        } catch (e) {
+                          console.error('receipt error', e);
+                        }
+                      }}
+                      testID={`send-pdf-${i}`}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="document-attach-outline" size={16} color={cc.primary} />
+                      <Text style={[styles.actionChipText, { color: cc.primary }]}>Send PDF confirmation</Text>
+                    </TouchableOpacity>
+                  )}
                   <Text style={[styles.timestamp, isUser ? styles.timestampRight : styles.timestampLeft]}>{timeStr}</Text>
                 </View>
               </View>
@@ -460,6 +553,22 @@ const styles = StyleSheet.create({
   timestamp: { fontSize: 10, color: C.gray, marginTop: 4, paddingHorizontal: 4 },
   timestampLeft: { alignSelf: 'flex-start' },
   timestampRight: { alignSelf: 'flex-end' },
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+  },
+  actionChipText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
+  },
   typingContainer: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   typingText: { fontSize: 14, color: C.gray, marginLeft: 8 },
   inlineQuickActions: { paddingTop: 14, paddingBottom: 4 },
