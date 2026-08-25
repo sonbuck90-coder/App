@@ -69,9 +69,39 @@ function themedAssets(bank: { name: string; primary: string }) {
       .brand { font-size: 22px; font-weight: 800; color: ${bank.primary}; letter-spacing: 1.5px; }
       h1 { font-size: 24px; margin: 0 0 4px; color: #0B1424; }
       .sub { font-size: 13px; color: #5E6A7A; margin-bottom: 24px; }
-      .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
-      .meta .label { font-size: 11px; color: #8893A3; text-transform: uppercase; letter-spacing: 0.7px; }
-      .meta .val { font-size: 14px; font-weight: 600; color: #0B1424; margin-top: 2px; }
+      /* -------- Sender / account-holder block (highlighted) -------- */
+      .sender-heading {
+        font-size: 12px;
+        font-weight: 800;
+        color: #000000;
+        text-transform: uppercase;
+        letter-spacing: 1.2px;
+        margin: 0 0 10px;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px 24px;
+        margin-bottom: 28px;
+        padding: 18px 20px;
+        background: #FFFFFF;
+        border: 2px solid #000000;
+        border-radius: 6px;
+      }
+      .meta .label {
+        font-size: 11px;
+        color: #4A4A4A;
+        text-transform: uppercase;
+        letter-spacing: 0.7px;
+        font-weight: 600;
+      }
+      .meta .val {
+        font-size: 17px;
+        font-weight: 800;
+        color: #000000;
+        margin-top: 3px;
+        letter-spacing: 0.2px;
+      }
       table { width: 100%; border-collapse: collapse; margin-top: 8px; }
       th { text-align: left; font-size: 11px; text-transform: uppercase; color: #8893A3; padding: 8px 4px; border-bottom: 1px solid #E4E7EB; }
       td { padding: 10px 4px; border-bottom: 1px solid #F0F2F5; font-size: 13px; }
@@ -158,6 +188,7 @@ async function buildStatementHtml(year: number, monthIdx1: number): Promise<stri
     ${HEADER_HTML}
     <h1>Monthly Statement</h1>
     <div class="sub">${periodLabel} · Account ${checking?.sort_code || '--'} ${checking?.account_number || '--'}</div>
+    <div class="sender-heading">Sender / Account Holder Details</div>
     <div class="meta">
       <div><div class="label">Account holder</div><div class="val">${escapeHtml(db.profile.name)}</div></div>
       <div><div class="label">Address</div><div class="val">${escapeHtml(db.profile.address)}</div></div>
@@ -199,6 +230,7 @@ async function buildReceiptHtml(t: Transaction, holderName: string): Promise<str
     ${HEADER_HTML}
     <h1>Transaction Receipt</h1>
     <div class="sub">Generated ${fmtDateTime(new Date().toISOString())}</div>
+    <div class="sender-heading">Sender / Account Holder Details</div>
     <div class="meta">
       <div><div class="label">Account holder</div><div class="val">${escapeHtml(holderName)}</div></div>
       <div><div class="label">Address</div><div class="val">${escapeHtml(db.profile.address)}</div></div>
