@@ -111,7 +111,7 @@ export default function ProfileScreen() {
       items: [
         { icon: 'document-text-outline', label: 'Terms & Conditions', chevron: true },
         { icon: 'shield-outline', label: 'Privacy Policy', chevron: true },
-        { icon: 'information-circle-outline', label: 'About HSBC', chevron: true },
+        { icon: 'information-circle-outline', label: `About ${getBankTheme(bankThemeId).name}`, chevron: true },
       ],
     },
   ];
@@ -125,8 +125,13 @@ export default function ProfileScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* User Card */}
-        <View style={styles.userCard}>
+        {/* User Card — whole card is tappable and opens Personal Details */}
+        <TouchableOpacity
+          style={styles.userCard}
+          onPress={() => router.push('/personal-details')}
+          activeOpacity={0.7}
+          testID="user-card"
+        >
           <View style={[styles.userAvatar, { backgroundColor: customColors.primary }]}>
             <Text style={styles.avatarText}>
               {user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase() || 'U'}
@@ -136,10 +141,10 @@ export default function ProfileScreen() {
             <Text style={styles.userName}>{user?.name || 'User'}</Text>
             <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
           </View>
-          <TouchableOpacity style={styles.editButton}>
+          <View style={styles.editButton}>
             <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
-          </TouchableOpacity>
-        </View>
+          </View>
+        </TouchableOpacity>
 
         {/* Quick Actions */}
         <View style={styles.quickActionsCard}>

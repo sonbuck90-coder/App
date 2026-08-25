@@ -475,121 +475,120 @@ export default function TransfersScreen() {
         <View style={[styles.header, { backgroundColor: customColors.header }]}>
           <Text style={[styles.headerTitle, { color: headerTextColor }]}>Transfer Complete</Text>
         </View>
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.receiptScroll}>
-          {/* Success Icon */}
-          <View style={styles.receiptSuccess}>
-            <View style={[styles.receiptSuccessCircle, { backgroundColor: COLORS.success }]}>
-              <Ionicons name="checkmark" size={40} color={COLORS.white} />
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.receiptScrollNew}>
+          {/* Success Header — matches the HSBC UK reference photo */}
+          <View style={styles.rcSuccessBlock}>
+            <View style={styles.rcCheckRing}>
+              <Ionicons name="checkmark" size={30} color="#00847F" />
             </View>
-            <Text style={styles.receiptSuccessText}>Payment Sent</Text>
-            <Text style={[styles.receiptAmount, { color: customColors.primary }]}>-£{receiptData.amount.toFixed(2)}</Text>
+            <Text style={styles.rcTitle}>Transfer complete</Text>
+            <Text style={styles.rcSubtitle}>Your payment has been sent successfully.</Text>
           </View>
 
-          {/* Receipt Card */}
-          <View style={styles.receiptCard}>
-            <View style={styles.receiptCardHeader}>
-              <Ionicons name="receipt" size={20} color={customColors.primary} />
-              <Text style={styles.receiptCardTitle}>Transaction Receipt</Text>
+          {/* Main payment card */}
+          <View style={styles.rcCard}>
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>From</Text>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.rcCardVal}>{receiptData.fromAccount.split('****')[0].trim() || 'Current Account'}</Text>
+                <Text style={styles.rcCardSub}>{receiptData.fromAccount}</Text>
+              </View>
             </View>
-
-            <View style={styles.receiptDivider} />
-
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Recipient</Text>
-              <Text style={styles.receiptValue}>{receiptData.recipient}</Text>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>To</Text>
+              <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                <Text style={styles.rcCardVal}>{receiptData.recipient}</Text>
+                <Text style={styles.rcCardSub}>{receiptData.sortCode}   {receiptData.accountNumber}</Text>
+              </View>
             </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Sort Code</Text>
-              <Text style={styles.receiptValue}>{receiptData.sortCode}</Text>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>Amount</Text>
+              <Text style={[styles.rcCardVal, { fontWeight: '800' }]}>£{receiptData.amount.toFixed(2)}</Text>
             </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Account Number</Text>
-              <Text style={styles.receiptValue}>{receiptData.accountNumber}</Text>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>Date and time</Text>
+              <Text style={styles.rcCardVal}>{receiptData.date}</Text>
             </View>
-
-            <View style={styles.receiptDivider} />
-
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Amount</Text>
-              <Text style={[styles.receiptValue, styles.receiptValueBold]}>£{receiptData.amount.toFixed(2)}</Text>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>Reference</Text>
+              <Text style={styles.rcCardVal}>{receiptData.reference}</Text>
             </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>From</Text>
-              <Text style={styles.receiptValue}>{receiptData.fromAccount}</Text>
-            </View>
-            <View style={styles.receiptDivider} />
-
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Date & Time</Text>
-              <Text style={styles.receiptValue}>{receiptData.date}</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Reference</Text>
-              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }]}>{receiptData.reference}</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Transaction ID</Text>
-              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.transactionId}</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>FPID</Text>
-              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.fpid}</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>TRN</Text>
-              <Text style={[styles.receiptValue, { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, color: COLORS.gray }]}>{receiptData.trn}</Text>
-            </View>
-            <View style={styles.receiptRow}>
-              <Text style={styles.receiptLabel}>Status</Text>
-              <View style={styles.receiptStatusBadge}>
-                <Ionicons name="checkmark-circle" size={14} color={COLORS.success} />
-                <Text style={styles.receiptStatusText}>Completed</Text>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>Status</Text>
+              <View style={styles.rcStatusPill}>
+                <Text style={styles.rcStatusText}>Completed</Text>
               </View>
             </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.receiptFooter}>
-            <Text style={styles.receiptFooterText}>{footerTagline}</Text>
+          {/* Transaction details card */}
+          <View style={styles.rcCard}>
+            <Text style={styles.rcCardTitle}>Transaction details</Text>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>Transaction ID</Text>
+              <Text style={[styles.rcCardVal, styles.rcMono]}>{receiptData.transactionId}</Text>
+            </View>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>FPID</Text>
+              <Text style={[styles.rcCardVal, styles.rcMono]}>{receiptData.fpid}</Text>
+            </View>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>TRN</Text>
+              <Text style={[styles.rcCardVal, styles.rcMono]}>{receiptData.trn}</Text>
+            </View>
+            <View style={styles.rcCardDivider} />
+            <View style={styles.rcCardRow}>
+              <Text style={styles.rcCardLabel}>Payment method</Text>
+              <Text style={styles.rcCardVal}>Faster Payment</Text>
+            </View>
           </View>
 
-          {/* Buttons */}
-          <TouchableOpacity
-            style={[styles.receiptDoneBtn, { backgroundColor: customColors.primary }]}
-            onPress={() => {
-              setShowReceipt(false);
-              setReceiptData(null);
-              setRecipientAccount('');
-              setRecipientName('');
-              setSortCode('');
-              setBankLookupResult(null);
-              setSortCodeError('');
-              setAmount('');
-              setDescription('');
-            }}
-            testID="receipt-done-btn"
-          >
-            <Text style={styles.receiptDoneBtnText}>Done</Text>
-          </TouchableOpacity>
+          {/* Confirmation banner */}
+          <View style={[styles.rcConfirmBanner, { borderLeftColor: customColors.primary }]}>
+            <Ionicons name="shield-checkmark-outline" size={22} color="#0B1424" style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rcConfirmTitle}>Confirmation</Text>
+              <Text style={styles.rcConfirmBody}>This is confirmation that your payment has been sent successfully.</Text>
+            </View>
+          </View>
 
-          <TouchableOpacity
-            style={styles.receiptAnotherBtn}
-            onPress={() => {
-              setShowReceipt(false);
-              setReceiptData(null);
-              setRecipientAccount('');
-              setRecipientName('');
-              setSortCode('');
-              setBankLookupResult(null);
-              setSortCodeError('');
-              setAmount('');
-              setDescription('');
-            }}
-            testID="receipt-another-btn"
-          >
-            <Text style={[styles.receiptAnotherBtnText, { color: customColors.primary }]}>Make Another Transfer</Text>
-          </TouchableOpacity>
+          {/* 4 quick-action buttons */}
+          <View style={styles.rcActionRow}>
+            {[
+              { icon: 'download-outline', label: 'Save receipt', testID: 'rc-save' },
+              { icon: 'mail-outline',     label: 'Email receipt', testID: 'rc-email' },
+              { icon: 'share-outline',    label: 'Share', testID: 'rc-share' },
+              { icon: 'home-outline',     label: 'Back to home', testID: 'rc-home' },
+            ].map((a) => (
+              <TouchableOpacity
+                key={a.label}
+                style={styles.rcActionBtn}
+                onPress={() => {
+                  setShowReceipt(false);
+                  setReceiptData(null);
+                  setRecipientAccount(''); setRecipientName(''); setSortCode('');
+                  setBankLookupResult(null); setSortCodeError(''); setAmount(''); setDescription('');
+                  if (a.testID === 'rc-home') router.push('/(tabs)/home' as any);
+                }}
+                testID={a.testID}
+              >
+                <View style={[styles.rcActionCircle, { backgroundColor: customColors.primary + '18' }]}>
+                  <Ionicons name={a.icon as any} size={22} color={customColors.primary} />
+                </View>
+                <Text style={styles.rcActionLabel}>{a.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
 
+          <Text style={styles.rcFooterTag}>{footerTagline}</Text>
           <View style={{ height: 40 }} />
         </ScrollView>
         <authGate.Render />
@@ -1326,6 +1325,48 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.gray,
   },
+  // ── New HSBC-UK-style receipt (matches reference photo) ──────────────────
+  receiptScrollNew: { padding: 16, paddingBottom: 40 },
+  rcSuccessBlock: { alignItems: 'center', paddingTop: 6, paddingBottom: 20 },
+  rcCheckRing: {
+    width: 62, height: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#00847F', backgroundColor: '#FFFFFF', marginBottom: 12,
+  },
+  rcTitle: { fontSize: 26, fontWeight: '700', color: '#0B1424' },
+  rcSubtitle: { fontSize: 14, color: '#5E6A7A', marginTop: 4, textAlign: 'center' },
+  rcCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 8, padding: 16, marginBottom: 14,
+    borderWidth: 1, borderColor: '#EFEFEF',
+  },
+  rcCardTitle: { fontSize: 15, fontWeight: '700', color: '#0B1424', marginBottom: 6 },
+  rcCardRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+  rcCardLabel: { fontSize: 13, color: '#0B1424', width: 120 },
+  rcCardVal: { fontSize: 14, fontWeight: '600', color: '#0B1424', flex: 1, textAlign: 'right' },
+  rcCardSub: { fontSize: 12, color: '#5E6A7A', marginTop: 2 },
+  rcCardDivider: { height: 1, backgroundColor: '#F1F2F4' },
+  rcMono: { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
+  rcStatusPill: {
+    backgroundColor: '#D6F0EA', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4,
+  },
+  rcStatusText: { color: '#00695B', fontSize: 12, fontWeight: '700' },
+  rcConfirmBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', backgroundColor: '#F7F8FA',
+    borderLeftWidth: 4, borderRadius: 6, padding: 14, marginTop: 4, marginBottom: 18,
+  },
+  rcConfirmTitle: { fontSize: 14, fontWeight: '700', color: '#0B1424' },
+  rcConfirmBody: { fontSize: 12, color: '#5E6A7A', marginTop: 3, lineHeight: 16 },
+  rcActionRow: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
+    marginTop: 4, marginBottom: 18,
+  },
+  rcActionBtn: { alignItems: 'center', flex: 1 },
+  rcActionCircle: {
+    width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 6,
+  },
+  rcActionLabel: { fontSize: 11, color: '#0B1424', textAlign: 'center', fontWeight: '500' },
+  rcFooterTag: { fontSize: 11, color: '#8893A3', textAlign: 'center', marginTop: 6, letterSpacing: 0.4 },
+
   receiptDoneBtn: {
     height: 52,
     borderRadius: 6,

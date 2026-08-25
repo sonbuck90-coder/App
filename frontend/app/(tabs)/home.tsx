@@ -13,24 +13,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useCustomization } from '../../src/context/CustomizationContext';
-import AppLogo from '../../src/components/AppLogo';
 import HeaderInfoButton from '../../src/components/HeaderInfoButton';
+import AppLogo from '../../src/components/AppLogo';
 import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } from '../../src/services/api';
-import { getLayoutFor } from '../../src/context/BankThemes';
+import { getLayoutFor, getBankTheme } from '../../src/context/BankThemes';
 import HomeModern from '../../src/screens/HomeModern';
 import HomeMinimal from '../../src/screens/HomeMinimal';
-
-// HSBC Colors
-const COLORS = {
-  secondary: '#333333',
-  white: '#FFFFFF',
-  lightGray: '#F5F5F5',
-  gray: '#767676',
-  darkGray: '#333333',
-  black: '#000000',
-  success: '#00847F',
-  background: '#F5F5F5',
-};
 
 /**
  * Home layout chooser — picks Classic / Modern / Minimal based on the
@@ -44,15 +32,48 @@ export default function Home() {
   return <HomeClassic />;
 }
 
+// -----------------------------------------------------------------------------
+// Colours & helpers
+// -----------------------------------------------------------------------------
+const C = {
+  white: '#FFFFFF',
+  bg: '#F4F5F7',
+  ink: '#1B1B1B',
+  midInk: '#4A4A4A',
+  mutedInk: '#6E6E6E',
+  softLine: '#E9EBEE',
+  chipBg: '#F5F6F8',
+  greenAccent: '#00847F',
+};
+
+const fmt = (n: number) =>
+  new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(n || 0);
+
+const greetingWord = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
+const nowTime = () =>
+  new Date().toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit' }).toLowerCase();
+
+// -----------------------------------------------------------------------------
+// Classic HSBC-style layout
+// -----------------------------------------------------------------------------
 function HomeClassic() {
   const { user, refreshUser } = useAuth();
-  const { colors: customColors, headerTextColor } = useCustomization();
+  const { colors: cc, bankThemeId } = useCustomization();
+  const bankName = getBankTheme(bankThemeId).name;
   const router = useRouter();
+
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [hideBalance, setHideBalance] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -75,8 +96,6 @@ function HomeClassic() {
   useFocusEffect(
     useCallback(() => {
       fetchData();
-      // Always refresh the user (name, email) so any change made in Personal
-      // Details is reflected in the header greeting immediately.
       refreshUser();
     }, [])
   );
@@ -86,609 +105,541 @@ function HomeClassic() {
     fetchData();
   }, []);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const getTransactionIcon = (type: string) => {
-    switch (type) {
-      case 'transfer':
-        return 'arrow-forward';
-      case 'payment':
-        return 'receipt';
-      case 'deposit':
-        return 'arrow-down';
-      case 'withdrawal':
-        return 'arrow-up';
-      default:
-        return 'cash';
-    }
-  };
-
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <SafeAreaView style={s.loading}>
+        <ActivityIndicator size="large" color={cc.primary} />
       </SafeAreaView>
     );
   }
 
+  const firstName = user?.name?.split(' ')[0] || 'there';
+  const totalBalance = stats?.total_balance || 0;
+
+  // ---------------------------------------------------------------------------
+  // Header icon (with label underneath) — mirrors HSBC mobile app hero icons
+  // ---------------------------------------------------------------------------
+  const IconWithLabel = ({
+    icon,
+    label,
+    badge,
+    onPress,
+    testID,
+  }: {
+    icon: any;
+    label: string;
+    badge?: number;
+    onPress?: () => void;
+    testID?: string;
+  }) => (
+    <TouchableOpacity style={s.iconBtn} onPress={onPress} testID={testID} activeOpacity={0.7}>
+      <View>
+        <Ionicons name={icon} size={22} color={C.ink} />
+        {badge && badge > 0 ? (
+          <View style={[s.iconBadge, { backgroundColor: cc.primary }]}>
+            <Text style={s.iconBadgeText}>{badge > 9 ? '9+' : String(badge)}</Text>
+          </View>
+        ) : null}
+      </View>
+      <Text style={s.iconLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  // Quick-action tile
+  const QuickTile = ({
+    icon,
+    label,
+    onPress,
+    testID,
+  }: {
+    icon: any;
+    label: string;
+    onPress?: () => void;
+    testID?: string;
+  }) => (
+    <TouchableOpacity style={s.tile} onPress={onPress} testID={testID} activeOpacity={0.7}>
+      <View style={[s.tileIcon, { backgroundColor: `${cc.primary}12` }]}>
+        <Ionicons name={icon} size={22} color={cc.primary} />
+      </View>
+      <Text style={s.tileLabel} numberOfLines={2}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  // HSBC-style diamond motif watermark for the balance card
+  const DiamondMotif = () => (
+    <View style={s.diamondWrap} pointerEvents="none">
+      {[0, 1, 2].map((row) => (
+        <View key={row} style={{ flexDirection: 'row' }}>
+          {[0, 1, 2, 3].map((col) => {
+            const filled = (row + col) % 2 === 0;
+            return (
+              <View
+                key={col}
+                style={[
+                  s.diamond,
+                  {
+                    backgroundColor: filled ? `${cc.primary}22` : 'transparent',
+                    borderColor: `${cc.primary}66`,
+                    borderWidth: filled ? 0 : 1,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView
-        style={styles.scrollView}
+        style={s.scroll}
+        contentContainerStyle={{ paddingBottom: 40 }}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={cc.primary} />
         }
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[]}
       >
-        {/* Header — now scrolls with content */}
-        <View style={[styles.header, { backgroundColor: customColors.header }]}>
-          <View style={styles.headerTop}>
+        {/* -------- Top brand row + labeled icons -------- */}
+        <View style={s.topBar}>
+          <View style={s.topBarLeft}>
             <AppLogo variant="header" />
-            <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.headerIcon}>
-                <Ionicons name="search" size={22} color={headerTextColor} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerIcon} onPress={() => router.push('/notifications')} testID="notification-bell">
-                <Ionicons name="notifications-outline" size={22} color={headerTextColor} />
-                {unreadCount > 0 && (
-                  <View style={styles.notifBadge}>
-                    <Text style={styles.notifBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <HeaderInfoButton tint={headerTextColor} />
+          </View>
+          <View style={s.topBarRight}>
+            <IconWithLabel
+              icon="search-outline"
+              label="Search"
+              onPress={() => router.push('/transactions')}
+              testID="home-search"
+            />
+            <IconWithLabel
+              icon="notifications-outline"
+              label="Alerts"
+              badge={unreadCount}
+              onPress={() => router.push('/notifications')}
+              testID="home-alerts"
+            />
+            {/* Info button doubles as the "Menu" affordance and hosts user switching */}
+            <View style={s.iconBtn}>
+              <HeaderInfoButton tint={C.ink} size={22} />
+              <Text style={s.iconLabel}>Menu</Text>
             </View>
           </View>
-          <Text style={[styles.greeting, { color: headerTextColor }]}>Hello, {user?.name?.split(' ')[0] || 'User'}</Text>
-          <Text style={[styles.lastLogin, { color: headerTextColor, opacity: 0.7 }]}>Last logged in: Today at {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</Text>
         </View>
-        {/* Total Balance Card */}
-        <View style={[styles.totalBalanceCard, { borderLeftColor: customColors.primary }]}>
-          <View style={styles.totalBalanceHeader}>
-            <Text style={styles.totalBalanceLabel}>Total Account Balance</Text>
-            <TouchableOpacity
-              style={[styles.totalAddFundsBtn, { backgroundColor: customColors.primary }]}
-              onPress={() => router.push('/add-money')}
-              testID="total-balance-add-funds"
-            >
-              <Ionicons name="add" size={16} color={COLORS.white} />
-              <Text style={styles.totalAddFundsText}>Add Funds</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.totalBalanceAmount}>
-            {formatCurrency(stats?.total_balance || 0)}
+
+        {/* -------- Greeting -------- */}
+        <View style={s.greetBlock}>
+          <Text style={s.greetLine}>
+            {greetingWord()}, <Text style={s.greetName}>{firstName}</Text>
           </Text>
+          <Text style={s.greetSub}>Last logged on: Today at {nowTime()}</Text>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/move-money')} testID="quick-action-move">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="swap-horizontal" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Move Money</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/add-money')} testID="quick-action-add-money">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="add-circle-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Add Money</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/incoming-transfer')} testID="quick-action-receive">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="arrow-down-circle-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Receive</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="card-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Cards</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Banking Services row */}
-        <View style={styles.quickActionsContainer}>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/international-transfer')} testID="quick-international">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="globe-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>International</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/statements')} testID="quick-statements">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="document-text-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Statements</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/analytics')} testID="quick-analytics">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="pie-chart-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Analytics</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/schedules')} testID="quick-schedules">
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="calendar-outline" size={22} color={customColors.primary} />
-            </View>
-            <Text style={styles.quickActionText}>Schedules</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Accounts Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Accounts</Text>
-            <TouchableOpacity>
-              <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
+        {/* -------- Total balance card with diamond motif -------- */}
+        <View style={s.balanceCard}>
+          <DiamondMotif />
+          <View style={s.balanceCardTop}>
+            <Text style={s.balanceCardTitle}>Your accounts</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/add-money')}
+              testID="home-add-money"
+              activeOpacity={0.7}
+            >
+              <Text style={[s.balanceCardLink, { color: cc.primary }]}>Add money ›</Text>
             </TouchableOpacity>
           </View>
-          {accounts.map((account) => (
-            <View key={account.id} style={styles.accountCard}>
-              <View style={styles.accountTop}>
-                <View style={styles.accountTypeContainer}>
-                  <View style={[styles.accountDot, { backgroundColor: account.account_type === 'checking' ? customColors.primary : COLORS.success }]} />
-                  <Text style={styles.accountType}>
-                    {account.account_type === 'checking' ? 'Current Account' : 'Savings Account'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
-              </View>
-              {/* Sort Code & Account Number */}
-              <View style={styles.accountDetails}>
-                <View style={styles.accountDetailItem}>
-                  <Text style={styles.accountDetailLabel}>Sort Code</Text>
-                  <Text style={styles.accountDetailValue}>{account.sort_code || '40-47-84'}</Text>
-                </View>
-                <View style={styles.accountDetailDivider} />
-                <View style={styles.accountDetailItem}>
-                  <Text style={styles.accountDetailLabel}>Account No.</Text>
-                  <Text style={styles.accountDetailValue}>
-                    {account.account_number.replace(/(\d{4})(\d{4})(\d{2})?/, '$1 $2 $3').trim()}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.accountBottom}>
-                <View>
-                  <Text style={styles.balanceLabel}>Available Balance</Text>
-                  <Text style={styles.accountBalance}>{formatCurrency(account.balance)}</Text>
-                </View>
-                <TouchableOpacity
-                  style={[styles.addFundsBtn, { backgroundColor: customColors.primary }]}
-                  onPress={() => router.push('/add-money')}
-                  testID={`add-funds-${account.account_type}`}
-                >
-                  <Ionicons name="add" size={16} color={COLORS.white} />
-                  <Text style={styles.addFundsBtnText}>Add Funds</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+          <Text style={s.balanceLabel}>Balance</Text>
+          <Text style={s.balanceAmount}>{hideBalance ? '£••••••' : fmt(totalBalance)}</Text>
+          <TouchableOpacity
+            style={s.hideRow}
+            onPress={() => setHideBalance((h) => !h)}
+            activeOpacity={0.7}
+            testID="home-hide-balance"
+          >
+            <Ionicons
+              name={hideBalance ? 'eye-off-outline' : 'eye-outline'}
+              size={16}
+              color={C.mutedInk}
+            />
+            <Text style={s.hideText}>{hideBalance ? 'Show balance' : 'Hide balance'}</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Recent Transactions */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity onPress={() => router.push('/transactions')}>
-              <Text style={styles.viewAll}>View All</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.transactionsCard}>
-            {stats?.recent_transactions && stats.recent_transactions.length > 0 ? (
-              stats.recent_transactions.map((transaction, index) => (
+        {/* -------- Quick actions -------- */}
+        <View style={s.sectionHeader}>
+          <Text style={s.sectionTitle}>Quick actions</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/transfers')}>
+            <Text style={[s.sectionLink, { color: cc.primary }]}>Manage</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={s.tileRow}>
+          <QuickTile
+            icon="swap-horizontal"
+            label={'Pay &\ntransfer'}
+            onPress={() => router.push('/(tabs)/transfers')}
+            testID="qa-pay-transfer"
+          />
+          <QuickTile
+            icon="person-outline"
+            label={'Send to\npayee'}
+            onPress={() => router.push('/payees')}
+            testID="qa-payees"
+          />
+          <QuickTile
+            icon="arrow-down-outline"
+            label={'Receive\nmoney'}
+            onPress={() => router.push('/incoming-transfer')}
+            testID="qa-receive"
+          />
+          <QuickTile
+            icon="card-outline"
+            label={'Manage\ncards'}
+            onPress={() => router.push('/(tabs)/cards')}
+            testID="qa-cards"
+          />
+        </View>
+
+        {/* -------- Widgets -------- */}
+        <View style={s.sectionHeader}>
+          <Text style={s.sectionTitle}>Widgets</Text>
+          <TouchableOpacity onPress={() => router.push('/customization')}>
+            <Text style={[s.sectionLink, { color: cc.primary }]}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={s.tileRow}>
+          <QuickTile
+            icon="globe-outline"
+            label={'International\nservices'}
+            onPress={() => router.push('/international-transfer')}
+            testID="widget-intl"
+          />
+          <QuickTile
+            icon="document-text-outline"
+            label={'Statements\n& documents'}
+            onPress={() => router.push('/statements')}
+            testID="widget-statements"
+          />
+          <QuickTile
+            icon="pie-chart-outline"
+            label={'Spending\ninsights'}
+            onPress={() => router.push('/analytics')}
+            testID="widget-insights"
+          />
+          <QuickTile
+            icon="calendar-outline"
+            label={'Scheduled\npayments'}
+            onPress={() => router.push('/schedules')}
+            testID="widget-schedules"
+          />
+        </View>
+
+        {/* -------- Accounts -------- */}
+        <View style={s.sectionHeader}>
+          <Text style={s.sectionTitle}>Accounts</Text>
+          <TouchableOpacity onPress={() => router.push('/transactions')}>
+            <Text style={[s.sectionLink, { color: cc.primary }]}>View all</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ paddingHorizontal: 16 }}>
+          {accounts.map((acc) => {
+            const isChecking = acc.account_type === 'checking';
+            const barColor = isChecking ? cc.primary : C.greenAccent;
+            const label = isChecking ? 'Current Account' : 'Savings Account';
+            const acctFormatted = acc.account_number.replace(/(\d{4})(\d+)/, '$1 $2');
+            return (
+              <TouchableOpacity
+                key={acc.id}
+                style={s.acctCard}
+                onPress={() => router.push({ pathname: '/transactions', params: { account_id: acc.id } })}
+                activeOpacity={0.7}
+                testID={`acct-card-${acc.account_type}`}
+              >
+                <View style={[s.acctBar, { backgroundColor: barColor }]} />
+                <View style={{ flex: 1, paddingLeft: 14, paddingVertical: 16 }}>
+                  <Text style={s.acctName}>{label}</Text>
+                  <Text style={s.acctMeta}>
+                    {acc.sort_code || '00-00-00'}   {acctFormatted}
+                  </Text>
+                  <Text style={s.acctBalLabel}>Available balance</Text>
+                  <Text style={s.acctBalAmount}>{fmt(acc.balance)}</Text>
+                </View>
+                <View style={s.acctRight}>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() =>
+                      router.push({ pathname: '/transactions', params: { account_id: acc.id } })
+                    }
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={20} color={C.mutedInk} />
+                  </TouchableOpacity>
+                  <Ionicons name="chevron-forward" size={22} color={C.mutedInk} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* -------- Recent activity (kept for parity) -------- */}
+        {stats?.recent_transactions && stats.recent_transactions.length > 0 && (
+          <>
+            <View style={s.sectionHeader}>
+              <Text style={s.sectionTitle}>Recent activity</Text>
+              <TouchableOpacity onPress={() => router.push('/transactions')}>
+                <Text style={[s.sectionLink, { color: cc.primary }]}>View all</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={s.txnList}>
+              {stats.recent_transactions.slice(0, 4).map((t, i, arr) => (
                 <TouchableOpacity
-                  key={transaction.id}
-                  style={[
-                    styles.transactionItem,
-                    index < stats.recent_transactions.length - 1 && styles.transactionBorder
-                  ]}
-                  onPress={() => router.push({ pathname: '/transaction-detail', params: { id: transaction.id } })}
-                  activeOpacity={0.6}
-                  testID={`home-txn-${transaction.id}`}
+                  key={t.id}
+                  style={[s.txnRow, i < arr.length - 1 && s.txnRowBorder]}
+                  onPress={() => router.push({ pathname: '/transaction-detail', params: { id: t.id } })}
+                  activeOpacity={0.7}
                 >
-                  <View style={styles.transactionLeft}>
-                    <View style={styles.transactionIconContainer}>
-                      <Ionicons
-                        name={getTransactionIcon(transaction.transaction_type) as any}
-                        size={18}
-                        color={COLORS.darkGray}
-                      />
-                    </View>
-                    <View style={styles.transactionInfo}>
-                      <Text style={styles.transactionTitle}>
-                        {transaction.recipient_name || transaction.description}
-                      </Text>
-                      <Text style={styles.transactionDate}>
-                        {formatDate(transaction.timestamp)}
-                      </Text>
-                    </View>
+                  <View style={[s.txnIcon, { backgroundColor: `${cc.primary}10` }]}>
+                    <Ionicons
+                      name={t.transaction_type === 'deposit' ? 'arrow-down' : 'arrow-forward'}
+                      size={16}
+                      color={cc.primary}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.txnName} numberOfLines={1}>
+                      {t.recipient_name || t.description}
+                    </Text>
+                    <Text style={s.txnDate}>
+                      {new Date(t.timestamp).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                      })}
+                    </Text>
                   </View>
                   <Text
                     style={[
-                      styles.transactionAmount,
-                      transaction.transaction_type === 'deposit'
-                        ? styles.positiveAmount
-                        : styles.negativeAmount,
+                      s.txnAmt,
+                      t.transaction_type === 'deposit' && { color: C.greenAccent },
                     ]}
                   >
-                    {transaction.transaction_type === 'deposit' ? '+' : '-'}
-                    {formatCurrency(transaction.amount)}
+                    {t.transaction_type === 'deposit' ? '+' : '−'} {fmt(t.amount)}
                   </Text>
                 </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Ionicons name="receipt-outline" size={40} color={COLORS.gray} />
-                <Text style={styles.emptyStateText}>No recent transactions</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Spending Summary */}
-        <View style={styles.section}>
-          <View style={styles.spendingCard}>
-            <View style={styles.spendingHeader}>
-              <Ionicons name="trending-down" size={20} color={COLORS.primary} />
-              <Text style={styles.spendingTitle}>This Month's Spending</Text>
+              ))}
             </View>
-            <Text style={styles.spendingAmount}>{formatCurrency(stats?.monthly_spending || 0)}</Text>
-          </View>
-        </View>
+          </>
+        )}
 
-        <View style={styles.bottomPadding} />
+        <Text style={s.footer}>{bankName} UK plc • FCA-regulated</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: {
-    backgroundColor: COLORS.primary,
+// -----------------------------------------------------------------------------
+// Styles
+// -----------------------------------------------------------------------------
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: C.bg },
+  loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
+  scroll: { flex: 1 },
+
+  // -------- top bar --------
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 20,
+    paddingBottom: 8,
+    backgroundColor: C.white,
   },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  topBarLeft: { flexDirection: 'row', alignItems: 'center', paddingTop: 8 },
+  topBarRight: { flexDirection: 'row', alignItems: 'flex-start' },
+  iconBtn: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginLeft: 18,
+    paddingVertical: 4,
+    width: 54,
   },
-  logoContainer: {
-    flexDirection: 'column',
-  },
-  hexagonRow: {
-    flexDirection: 'row',
-  },
-  hexagon: {
-    width: 14,
-    height: 14,
-    margin: 0.5,
-  },
-  hexagonRed: {
-    backgroundColor: COLORS.white,
-  },
-  hexagonWhite: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  headerRight: {
-    flexDirection: 'row',
-  },
-  headerIcon: {
-    marginLeft: 20,
-    position: 'relative' as const,
-  },
-  notifBadge: {
-    position: 'absolute' as const,
-    top: -6,
-    right: -8,
-    backgroundColor: COLORS.white,
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    paddingHorizontal: 4,
-  },
-  notifBadgeText: {
+  iconLabel: {
     fontSize: 10,
-    fontWeight: '700' as const,
-    color: COLORS.primary,
-  },
-  greeting: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  lastLogin: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  totalBalanceCard: {
-    backgroundColor: COLORS.white,
-    margin: 16,
-    padding: 20,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-  },
-  totalBalanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  totalBalanceLabel: {
-    fontSize: 14,
-    color: COLORS.gray,
-  },
-  totalAddFundsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-  },
-  totalAddFundsText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  totalBalanceAmount: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: COLORS.darkGray,
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    paddingVertical: 16,
-    borderRadius: 8,
-  },
-  quickAction: {
-    alignItems: 'center',
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF0F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: COLORS.darkGray,
+    color: C.midInk,
+    marginTop: 4,
     fontWeight: '500',
   },
-  section: {
-    marginHorizontal: 16,
-    marginBottom: 16,
+  iconBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
   },
+  iconBadgeText: { color: C.white, fontSize: 9, fontWeight: '700' },
+
+  // -------- greeting --------
+  greetBlock: {
+    backgroundColor: C.white,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingTop: 6,
+  },
+  greetLine: { fontSize: 22, fontWeight: '400', color: C.ink },
+  greetName: { fontWeight: '700', color: C.ink },
+  greetSub: { fontSize: 12, color: C.mutedInk, marginTop: 4 },
+
+  // -------- balance card --------
+  balanceCard: {
+    backgroundColor: C.white,
+    marginHorizontal: 16,
+    marginTop: 8,
+    padding: 20,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: C.softLine,
+  },
+  balanceCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  balanceCardTitle: { fontSize: 15, fontWeight: '700', color: C.ink },
+  balanceCardLink: { fontSize: 14, fontWeight: '600' },
+  balanceLabel: { fontSize: 12, color: C.mutedInk, marginTop: 12 },
+  balanceAmount: {
+    fontSize: 38,
+    fontWeight: '700',
+    color: C.ink,
+    marginTop: 4,
+    letterSpacing: -1,
+  },
+  hideRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  hideText: { fontSize: 13, color: C.mutedInk, marginLeft: 6, fontWeight: '500' },
+  diamondWrap: {
+    position: 'absolute',
+    right: -12,
+    top: -8,
+    transform: [{ rotate: '45deg' }],
+    opacity: 0.9,
+  },
+  diamond: {
+    width: 18,
+    height: 18,
+    margin: 2,
+  },
+
+  // -------- section header --------
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    marginTop: 24,
+    marginBottom: 10,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-  },
-  viewAll: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  accountCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  accountTop: {
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: C.ink },
+  sectionLink: { fontSize: 14, fontWeight: '600' },
+
+  // -------- tile row --------
+  tileRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+    paddingHorizontal: 12,
   },
-  accountTypeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  accountDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  accountType: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-  },
-  accountNumber: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginBottom: 12,
-  },
-  accountDetails: {
-    flexDirection: 'row',
-    backgroundColor: '#F8F8F8',
-    borderRadius: 6,
-    padding: 10,
-    marginBottom: 12,
-  },
-  accountDetailItem: {
+  tile: {
     flex: 1,
-  },
-  accountDetailLabel: {
-    fontSize: 11,
-    color: COLORS.gray,
-    marginBottom: 3,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  accountDetailValue: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.darkGray,
-    letterSpacing: 0.5,
-  },
-  accountDetailDivider: {
-    width: 1,
-    backgroundColor: '#E0E0E0',
-    marginHorizontal: 12,
-  },
-  accountBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  addFundsBtn: {
-    flexDirection: 'row',
+    marginHorizontal: 4,
+    backgroundColor: C.white,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.softLine,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    minHeight: 96,
   },
-  addFundsBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  balanceLabel: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginBottom: 4,
-  },
-  accountBalance: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.darkGray,
-  },
-  transactionsCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 4,
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-  },
-  transactionBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  transactionLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  transactionIconContainer: {
+  tileIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  tileLabel: {
+    fontSize: 11,
+    color: C.ink,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
+
+  // -------- accounts --------
+  acctCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: C.white,
+    borderRadius: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: C.softLine,
+    overflow: 'hidden',
+  },
+  acctBar: {
+    width: 4,
+    alignSelf: 'stretch',
+  },
+  acctName: { fontSize: 15, fontWeight: '700', color: C.ink },
+  acctMeta: { fontSize: 12, color: C.mutedInk, marginTop: 4, letterSpacing: 0.3 },
+  acctBalLabel: { fontSize: 12, color: C.mutedInk, marginTop: 12 },
+  acctBalAmount: { fontSize: 22, fontWeight: '700', color: C.ink, marginTop: 2 },
+  acctRight: {
+    paddingHorizontal: 12,
+    height: '100%',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+
+  // -------- transactions --------
+  txnList: {
+    backgroundColor: C.white,
+    marginHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.softLine,
+    overflow: 'hidden',
+  },
+  txnRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  txnRowBorder: { borderBottomWidth: 1, borderBottomColor: C.softLine },
+  txnIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.darkGray,
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: COLORS.gray,
-    marginTop: 2,
-  },
-  transactionAmount: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  positiveAmount: {
-    color: COLORS.success,
-  },
-  negativeAmount: {
-    color: COLORS.darkGray,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyStateText: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginTop: 12,
-  },
-  spendingCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    padding: 16,
-  },
-  spendingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  txnName: { fontSize: 14, fontWeight: '600', color: C.ink },
+  txnDate: { fontSize: 12, color: C.mutedInk, marginTop: 2 },
+  txnAmt: { fontSize: 14, fontWeight: '700', color: C.ink },
+
+  footer: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: C.mutedInk,
+    marginTop: 24,
     marginBottom: 8,
-  },
-  spendingTitle: {
-    fontSize: 14,
-    color: COLORS.gray,
-    marginLeft: 8,
-  },
-  spendingAmount: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  bottomPadding: {
-    height: 20,
   },
 });

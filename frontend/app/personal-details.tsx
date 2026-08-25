@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { api, accountsApi, cardsApi, Account, Card } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { useAuth } from '../src/context/AuthContext';
+import { getBankTheme } from '../src/context/BankThemes';
 
 const C = {
   white: '#FFFFFF',
@@ -35,7 +36,12 @@ const C = {
 
 export default function PersonalDetailsScreen() {
   const router = useRouter();
-  const { colors: cc } = useCustomization();
+  const { colors: cc, bankThemeId } = useCustomization();
+  const bankTheme = getBankTheme(bankThemeId);
+  // Split e.g. "HSBC UK" -> ["HSBC", "UK"]
+  const bankNameParts = bankTheme.name.split(' ');
+  const bankNameMain = bankNameParts[0];
+  const bankNameSuffix = bankNameParts.slice(1).join(' ');
   const { refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -190,7 +196,7 @@ export default function PersonalDetailsScreen() {
         <View style={s.brandLeft}>
           <View style={[s.brandLogo, { backgroundColor: cc.primary }]} />
           <Text style={s.brandText}>
-            HSBC <Text style={s.brandTextLight}>UK</Text>
+            {bankNameMain} {bankNameSuffix ? <Text style={s.brandTextLight}>{bankNameSuffix}</Text> : null}
           </Text>
         </View>
         <View style={[s.brandLogoBox, { borderColor: cc.primary }]}>

@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCustomization, HSBC_DEFAULTS, LOGO_SIZES } from '../src/context/CustomizationContext';
+import { getBankTheme } from '../src/context/BankThemes';
 import { BANK_THEMES } from '../src/context/BankThemes';
 import { useAuth } from '../src/context/AuthContext';
 import AppLogo from '../src/components/AppLogo';
@@ -137,13 +138,13 @@ export default function CustomizationScreen() {
   const handleRemoveLogo = () => {
     updateLogo({ url: '' });
     setLogoUrl('');
-    Alert.alert('Logo Removed', 'Default HSBC logo restored.');
+    Alert.alert('Logo Removed', `Default ${getBankTheme(bankThemeId).name} logo restored.`);
   };
 
   const handleReset = () => {
-    Alert.alert('Reset to Defaults', 'This will restore all colors and logo to HSBC defaults.', [
+    Alert.alert('Reset to Defaults', 'This will restore all colors and logo to the current bank theme defaults.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Reset', style: 'destructive', onPress: () => { resetToDefaults(); setLogoUrl(''); Alert.alert('Done', 'Settings restored to HSBC defaults'); } },
+      { text: 'Reset', style: 'destructive', onPress: () => { resetToDefaults(); setLogoUrl(''); Alert.alert('Done', 'Settings restored to defaults'); } },
     ]);
   };
 
@@ -163,7 +164,7 @@ export default function CustomizationScreen() {
           <View style={[styles.previewBar, { backgroundColor: colors.header }]}>
             <AppLogo variant="header" />
             {(colors.header === '#FFFFFF' || colors.header === '#F8F4E3') ? null : (
-              <Text style={[styles.previewTitle, { color: headerTextColor }]}>HSBC Mobile Banking</Text>
+              <Text style={[styles.previewTitle, { color: headerTextColor }]}>{getBankTheme(bankThemeId).name} Mobile Banking</Text>
             )}
           </View>
           <View style={styles.previewContent}>
@@ -429,7 +430,7 @@ export default function CustomizationScreen() {
         {isCustomized && (
           <TouchableOpacity style={styles.resetBtn} onPress={handleReset} testID="reset-defaults-btn">
             <Ionicons name="refresh" size={20} color="#DB0011" />
-            <Text style={styles.resetBtnText}>Reset to HSBC Defaults</Text>
+            <Text style={styles.resetBtnText}>Reset to Defaults</Text>
           </TouchableOpacity>
         )}
 
@@ -442,7 +443,7 @@ export default function CustomizationScreen() {
         {/* App version footer */}
         <View style={styles.versionFooter}>
           <AppLogo variant="small" />
-          <Text style={styles.versionText}>HSBC Mobile Banking</Text>
+          <Text style={styles.versionText}>{getBankTheme(bankThemeId).name} Mobile Banking</Text>
           <Text style={styles.versionNumber}>Version {APP_VERSION}</Text>
         </View>
 
