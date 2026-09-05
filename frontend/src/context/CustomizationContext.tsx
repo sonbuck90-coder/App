@@ -20,6 +20,11 @@ export interface CustomizationSettings {
   logo: LogoSettings;
   bankPhone: string;
   bankThemeId: string;
+  /** Per-theme default logo URLs — key is bankThemeId, value is a data URI
+   *  or remote image URL. Set via "Save as default for this theme" in
+   *  Customization. When the user switches theme (applyBankTheme) the
+   *  matching entry is applied automatically. */
+  themeLogos?: Record<string, string>;
 }
 
 const HSBC_DEFAULTS: CustomizationSettings = {
@@ -37,6 +42,7 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   // HSBC UK Personal Banking customer service line
   bankPhone: '03457 404 404',
   bankThemeId: 'hsbc',
+  themeLogos: {},
 };
 
 const LOGO_SIZES = {
@@ -72,6 +78,12 @@ interface CustomizationContextType {
   updateLogo: (logo: Partial<LogoSettings>) => void;
   updateBankPhone: (phone: string) => void;
   applyBankTheme: (themeId: string, colors: CustomColors) => void;
+  /** Save the currently-selected logo URL as the default for the given
+   *  bank theme. When the user later switches to that theme, this logo
+   *  is applied automatically. */
+  setThemeDefaultLogo: (themeId: string, url: string) => void;
+  /** Remove the saved default logo for a specific theme. */
+  clearThemeDefaultLogo: (themeId: string) => void;
   resetToDefaults: () => void;
   isCustomized: boolean;
 }
@@ -145,10 +157,42 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   };
 
   const applyBankTheme = (themeId: string, colorsP: CustomColors) => {
+    // If the user has previously saved a default logo for this theme, load
+    // it — otherwise clear the current logo so a fresh switch doesn't leak
+    // the previous theme's photo.
+    const themeLogos = settings.themeLogos || {};
+    const savedLogo = themeLogos[themeId];
     const updated: CustomizationSettings = {
       ...settings,
       bankThemeId: themeId,
       colors: { ...colorsP },
+      logo: {
+        ...settings.logo,
+        url: savedLogo !== undefined ? savedLogo : '',
+      },
+    };
+    setSettings(updated);
+    saveSettings(updated);
+  };
+
+  const setThemeDefaultLogo = (themeId: string, url: string) => {
+    const themeLogos = { ...(settings.themeLogos || {}), [themeId]: url };
+    const updated: CustomizationSettings = {
+      ...settings,
+      themeLogos,
+      // Also apply immediately so preview reflects the change.
+      logo: { ...settings.logo, url },
+    };
+    setSettings(updated);
+    saveSettings(updated);
+  };
+
+  const clearThemeDefaultLogo = (themeId: string) => {
+    const themeLogos = { ...(settings.themeLogos || {}) };
+    delete themeLogos[themeId];
+    const updated: CustomizationSettings = {
+      ...settings,
+      themeLogos,
     };
     setSettings(updated);
     saveSettings(updated);
@@ -174,6 +218,8 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         updateLogo,
         updateBankPhone,
         applyBankTheme,
+        setThemeDefaultLogo,
+        clearThemeDefaultLogo,
         resetToDefaults,
         isCustomized,
       }}

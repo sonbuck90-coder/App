@@ -58,7 +58,7 @@ const SIZE_OPTIONS: Array<{ label: string; value: 'small' | 'medium' | 'large' |
 
 export default function CustomizationScreen() {
   const router = useRouter();
-  const { settings, colors, headerTextColor, updateColors, updateLogo, updateBankPhone, applyBankTheme, resetToDefaults, isCustomized, bankThemeId } = useCustomization();
+  const { settings, colors, headerTextColor, updateColors, updateLogo, updateBankPhone, applyBankTheme, setThemeDefaultLogo, clearThemeDefaultLogo, resetToDefaults, isCustomized, bankThemeId } = useCustomization();
   const { logout } = useAuth();
   const [logoUrl, setLogoUrl] = useState(settings.logo.url);
   const [bankPhone, setBankPhone] = useState(settings.bankPhone);
@@ -248,6 +248,43 @@ export default function CustomizationScreen() {
                     <Text style={[styles.removeLogoText, { color: colors.primary }]}>Remove & restore default</Text>
                   </TouchableOpacity>
                 </View>
+              </View>
+            ) : null}
+
+            {/* Per-theme default logo controls */}
+            {settings.logo.url ? (
+              <TouchableOpacity
+                style={[styles.themeDefaultBtn, { borderColor: colors.primary }]}
+                onPress={() => {
+                  setThemeDefaultLogo(bankThemeId, settings.logo.url);
+                  Alert.alert(
+                    'Default set',
+                    `This logo is now the default for the ${getBankTheme(bankThemeId).name} theme. It will re-apply automatically whenever you switch to this theme.`,
+                  );
+                }}
+                testID="set-theme-default-logo-btn"
+              >
+                <Ionicons name="bookmark-outline" size={18} color={colors.primary} />
+                <Text style={[styles.themeDefaultBtnText, { color: colors.primary }]}>
+                  Save as default for {getBankTheme(bankThemeId).name}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+            {settings.themeLogos && settings.themeLogos[bankThemeId] ? (
+              <View style={styles.themeDefaultInfo}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.accent} />
+                <Text style={styles.themeDefaultInfoText}>
+                  A default logo is saved for this theme.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    clearThemeDefaultLogo(bankThemeId);
+                    Alert.alert('Cleared', `Default logo removed for ${getBankTheme(bankThemeId).name}.`);
+                  }}
+                  testID="clear-theme-default-logo-btn"
+                >
+                  <Text style={[styles.themeDefaultInfoAction, { color: colors.primary }]}>Clear</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
 
@@ -480,6 +517,42 @@ const styles = StyleSheet.create({
   currentLogoRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, backgroundColor: '#F5F5F5', padding: 12, borderRadius: 8 },
   currentLogoImg: { width: 48, height: 48, borderRadius: 8 },
   currentLogoText: { fontSize: 13, fontWeight: '600', color: '#333333' },
+  themeDefaultBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 10,
+  },
+  themeDefaultBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  themeDefaultInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F2F7F5',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  themeDefaultInfoText: {
+    fontSize: 12,
+    color: '#0B5C56',
+    marginLeft: 6,
+    flex: 1,
+    fontWeight: '600',
+  },
+  themeDefaultInfoAction: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   removeLogoText: { fontSize: 12, fontWeight: '500', marginTop: 4 },
   orDivider: { flexDirection: 'row', alignItems: 'center', marginVertical: 16 },
   orLine: { flex: 1, height: 1, backgroundColor: '#E0E0E0' },
