@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import AppLogo from '../../src/components/AppLogo';
 import HeaderInfoButton from '../../src/components/HeaderInfoButton';
@@ -42,6 +42,7 @@ const COLORS = {
 export default function TransfersScreen() {
   const { colors: customColors, headerTextColor, bankThemeId } = useCustomization();
   const router = useRouter();
+  const params = useLocalSearchParams<{ payee_name?: string; payee_sort?: string; payee_account?: string }>();
   const authGate = useAuthGate();
   const footerTagline = getFooterTagline(bankThemeId);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -115,6 +116,23 @@ export default function TransfersScreen() {
     });
     return () => { unsubscribe(); };
   }, []);
+
+  // Pre-fill the form from route params — used by the Payees quick-action
+  // sheet's "Send money" button so tapping it drops the user straight into
+  // a ready-to-send transfer.
+  useEffect(() => {
+    if (params.payee_name || params.payee_sort || params.payee_account) {
+      if (params.payee_name) setRecipientName(String(params.payee_name));
+      if (params.payee_sort) {
+        const sc = formatSortCode(String(params.payee_sort));
+        setSortCode(sc);
+        const r = lookupBank(sc.replace(/-/g, ''));
+        setBankLookupResult(r);
+      }
+      if (params.payee_account) setRecipientAccount(String(params.payee_account));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params.payee_name, params.payee_sort, params.payee_account]);
 
   const fetchAccounts = async () => {
     try {

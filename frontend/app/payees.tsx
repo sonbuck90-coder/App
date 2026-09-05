@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Modal, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { payeesApi, Payee } from '../src/services/api';
 import { lookupBank, formatSortCode, isValidSortCode } from '../src/services/bank-lookup';
 import BackButton from '../src/components/BackButton';
+import { useCustomization } from '../src/context/CustomizationContext';
 
 const COLORS = { primary: '#DB0011', white: '#FFFFFF', lightGray: '#F5F5F5', gray: '#767676', darkGray: '#333333', black: '#000000', success: '#00847F', background: '#F5F5F5' };
 
 export default function PayeesScreen() {
+  const router = useRouter();
+  const { colors: cc } = useCustomization();
   const [payees, setPayees] = useState<Payee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -17,6 +21,8 @@ export default function PayeesScreen() {
   const [sortCode, setSortCode] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Long-press quick-action sheet
+  const [actionPayee, setActionPayee] = useState<Payee | null>(null);
 
   useEffect(() => { fetchPayees(); }, []);
 
@@ -106,9 +112,17 @@ export default function PayeesScreen() {
           </View>
         ) : (
           payees.map((payee) => (
-            <View key={payee.id} style={styles.payeeCard} testID={`payee-card-${payee.id}`}>
+            <TouchableOpacity
+              key={payee.id}
+              style={styles.payeeCard}
+              onPress={() => setActionPayee(payee)}
+              onLongPress={() => setActionPayee(payee)}
+              delayLongPress={280}
+              activeOpacity={0.75}
+              testID={`payee-card-${payee.id}`}
+            >
               <View style={styles.payeeRow}>
-                <View style={styles.avatar}>
+                <View style={[styles.avatar, { backgroundColor: cc.primary }]}>
                   <Text style={styles.avatarText}>{getInitials(payee.name)}</Text>
                 </View>
                 <View style={styles.payeeDetails}>
@@ -116,20 +130,147 @@ export default function PayeesScreen() {
                   <Text style={styles.payeeSortCode}>{payee.sort_code} {getBankName(payee.sort_code) ? `· ${getBankName(payee.sort_code)}` : ''}</Text>
                   <Text style={styles.payeeAccountNum}>****{payee.account_number.slice(-4)}</Text>
                 </View>
-                <View style={styles.payeeActions}>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => openEditModal(payee)} testID={`edit-payee-${payee.id}`}>
-                    <Ionicons name="create-outline" size={20} color={COLORS.primary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(payee)} testID={`delete-payee-${payee.id}`}>
-                    <Ionicons name="trash-outline" size={20} color={COLORS.primary} />
-                  </TouchableOpacity>
-                </View>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
               </View>
-            </View>
+              <Text style={styles.payeeHint}>Tap or long-press for quick actions</Text>
+            </TouchableOpacity>
           ))
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Quick-action sheet — Send / Receive / Edit / Delete */}
+      <Modal
+        visible={!!actionPayee}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActionPayee(null)}
+      >
+        <TouchableOpacity
+          style={styles.actionOverlay}
+          activeOpacity={1}
+          onPress={() => setActionPayee(null)}
+        >
+          <TouchableOpacity style={styles.actionSheet} activeOpacity={1}>
+            <View style={styles.actionHandle} />
+            <View style={styles.actionHeader}>
+              <View style={[styles.actionAvatar, { backgroundColor: cc.primary }]}>
+                <Text style={styles.actionAvatarText}>
+                  {actionPayee ? getInitials(actionPayee.name) : '?'}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionName}>{actionPayee?.name}</Text>
+                <Text style={styles.actionMeta}>
+                  {actionPayee?.sort_code} · ****{actionPayee?.account_number.slice(-4)}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                if (!actionPayee) return;
+                const p = actionPayee;
+                setActionPayee(null);
+                router.push({
+                  pathname: '/(tabs)/transfers',
+                  params: {
+                    payee_name: p.name,
+                    payee_sort: p.sort_code,
+                    payee_account: p.account_number,
+                  },
+                });
+              }}
+              testID="payee-action-send"
+            >
+              <View style={[styles.actionIcon, { backgroundColor: cc.primary + '18' }]}>
+                <Ionicons name="arrow-up" size={20} color={cc.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionItemLabel}>Send money</Text>
+                <Text style={styles.actionItemSub}>Pre-fill a transfer to this payee</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                if (!actionPayee) return;
+                const p = actionPayee;
+                setActionPayee(null);
+                router.push({
+                  pathname: '/incoming-transfer',
+                  params: {
+                    sender_name: p.name,
+                    sender_sort: p.sort_code,
+                    sender_account: p.account_number,
+                  },
+                });
+              }}
+              testID="payee-action-receive"
+            >
+              <View style={[styles.actionIcon, { backgroundColor: COLORS.success + '18' }]}>
+                <Ionicons name="arrow-down" size={20} color={COLORS.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionItemLabel}>Receive money</Text>
+                <Text style={styles.actionItemSub}>Record incoming payment from this payee</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                if (!actionPayee) return;
+                const p = actionPayee;
+                setActionPayee(null);
+                openEditModal(p);
+              }}
+              testID="payee-action-edit"
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#E7EEF7' }]}>
+                <Ionicons name="create-outline" size={20} color="#1574EE" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionItemLabel}>Edit details</Text>
+                <Text style={styles.actionItemSub}>Update name, sort code or account</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionItem}
+              onPress={() => {
+                if (!actionPayee) return;
+                const p = actionPayee;
+                setActionPayee(null);
+                setTimeout(() => handleDelete(p), 60);
+              }}
+              testID="payee-action-delete"
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#FDECEC' }]}>
+                <Ionicons name="trash-outline" size={20} color="#D9534F" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.actionItemLabel, { color: '#D9534F' }]}>Delete payee</Text>
+                <Text style={styles.actionItemSub}>Remove from your saved list</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={COLORS.gray} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionCancel}
+              onPress={() => setActionPayee(null)}
+              testID="payee-action-cancel"
+            >
+              <Text style={styles.actionCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Add/Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent onRequestClose={() => setShowModal(false)}>
@@ -182,6 +323,72 @@ const styles = StyleSheet.create({
   payeeAccountNum: { fontSize: 13, color: COLORS.gray, marginTop: 1 },
   payeeActions: { flexDirection: 'row' },
   actionBtn: { padding: 8, marginLeft: 4 },
+  payeeHint: { fontSize: 11, color: COLORS.gray, marginTop: 8, marginLeft: 56 },
+
+  // Quick-action sheet
+  actionOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'flex-end',
+  },
+  actionSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
+  },
+  actionHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#D6DAE0',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  actionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingBottom: 14,
+    marginBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
+  },
+  actionAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  actionAvatarText: { color: COLORS.white, fontWeight: '800', fontSize: 17 },
+  actionName: { fontSize: 16, fontWeight: '700', color: COLORS.darkGray },
+  actionMeta: { fontSize: 12, color: COLORS.gray, marginTop: 2 },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  actionItemLabel: { fontSize: 15, fontWeight: '700', color: COLORS.darkGray },
+  actionItemSub: { fontSize: 12, color: COLORS.gray, marginTop: 2 },
+  actionCancel: {
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+  },
+  actionCancelText: { fontSize: 15, fontWeight: '700', color: COLORS.darkGray },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalContent: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
