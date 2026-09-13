@@ -62,6 +62,10 @@ export default function TransfersScreen() {
   const [processingProgress, setProcessingProgress] = useState(0);
   const [showReview, setShowReview] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  /** Payment method — determines wording (Transfer vs Card payment) and the
+   *  transaction-type stored on the ledger. Auto-saving to payees applies
+   *  identically to both. */
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'card'>('bank');
 
   // Confirmation of Payee (CoP) — runs every time the user opens the review.
   const [copStatus, setCopStatus] = useState<'idle' | 'checking' | 'done'>('idle');
@@ -279,9 +283,14 @@ export default function TransfersScreen() {
           from_account_id: selectedAccount.id,
           to_account_number: recipientAccount,
           amount: transferAmount,
-          description: description || `Transfer to ${recipientName || recipientAccount}`,
+          description:
+            description ||
+            (paymentMethod === 'card'
+              ? `Card payment to ${recipientName || recipientAccount}`
+              : `Transfer to ${recipientName || recipientAccount}`),
           recipient_name: recipientName,
           sort_code: sortCode,
+          payment_method: paymentMethod,
         }),
       ]);
 
@@ -347,7 +356,9 @@ export default function TransfersScreen() {
           <TouchableOpacity onPress={() => !isProcessing && setShowReview(false)} disabled={isProcessing} style={styles.reviewBackBtn} testID="review-back-btn">
             <Ionicons name="chevron-back" size={26} color={headerTextColor} />
           </TouchableOpacity>
-          <Text style={[styles.reviewHeaderTitle, { color: headerTextColor }]}>Review payment</Text>
+          <Text style={[styles.reviewHeaderTitle, { color: headerTextColor }]}>
+            {paymentMethod === 'card' ? 'Review card payment' : 'Review payment'}
+          </Text>
           <View style={{ width: 26 }} />
         </View>
 
@@ -549,7 +560,9 @@ export default function TransfersScreen() {
             <View style={styles.rcCheckRing}>
               <Ionicons name="checkmark" size={30} color="#00847F" />
             </View>
-            <Text style={styles.rcTitle}>Transfer complete</Text>
+            <Text style={styles.rcTitle}>
+              {paymentMethod === 'card' ? 'Card payment complete' : 'Transfer complete'}
+            </Text>
             <Text style={styles.rcSubtitle}>Your payment has been sent successfully.</Text>
           </View>
 
@@ -624,7 +637,9 @@ export default function TransfersScreen() {
             <View style={styles.rcCardDivider} />
             <View style={styles.rcCardRow}>
               <Text style={styles.rcCardLabel}>Payment method</Text>
-              <Text style={styles.rcCardVal}>Faster Payment</Text>
+              <Text style={styles.rcCardVal}>
+                {paymentMethod === 'card' ? 'Card payment' : 'Faster Payment'}
+              </Text>
             </View>
           </View>
 
@@ -703,6 +718,58 @@ export default function TransfersScreen() {
             <TouchableOpacity style={styles.transferTypeBtn}>
               <Ionicons name="globe-outline" size={20} color={COLORS.gray} />
               <Text style={styles.transferTypeText}>Overseas</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Payment method segmented control — switches between a bank
+              transfer (default) and a card payment for services/merchants.
+              Both auto-save the recipient as a payee. */}
+          <View style={styles.paymentMethodRow}>
+            <TouchableOpacity
+              style={[
+                styles.paymentMethodBtn,
+                paymentMethod === 'bank' && { backgroundColor: customColors.primary, borderColor: customColors.primary },
+              ]}
+              onPress={() => setPaymentMethod('bank')}
+              testID="pm-bank"
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="swap-vertical"
+                size={18}
+                color={paymentMethod === 'bank' ? '#FFFFFF' : COLORS.darkGray}
+              />
+              <Text
+                style={[
+                  styles.paymentMethodText,
+                  { color: paymentMethod === 'bank' ? '#FFFFFF' : COLORS.darkGray },
+                ]}
+              >
+                Bank transfer
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.paymentMethodBtn,
+                paymentMethod === 'card' && { backgroundColor: customColors.primary, borderColor: customColors.primary },
+              ]}
+              onPress={() => setPaymentMethod('card')}
+              testID="pm-card"
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="card-outline"
+                size={18}
+                color={paymentMethod === 'card' ? '#FFFFFF' : COLORS.darkGray}
+              />
+              <Text
+                style={[
+                  styles.paymentMethodText,
+                  { color: paymentMethod === 'card' ? '#FFFFFF' : COLORS.darkGray },
+                ]}
+              >
+                Pay for services
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -973,6 +1040,29 @@ const styles = StyleSheet.create({
     margin: 16,
     borderRadius: 8,
     padding: 8,
+  },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  paymentMethodBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#E4E7EB',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 4,
+  },
+  paymentMethodText: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 8,
   },
   transferTypeBtn: {
     flex: 1,

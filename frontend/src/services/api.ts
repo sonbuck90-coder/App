@@ -124,6 +124,9 @@ export const transfersApi = {
     description?: string;
     recipient_name?: string;
     sort_code?: string;
+    /** 'bank' (default) → labelled "Transfer".
+     *  'card' → labelled "Card payment" on the ledger and receipt. */
+    payment_method?: 'bank' | 'card';
   }) => api.post<Transaction>('/transfers', data),
 };
 

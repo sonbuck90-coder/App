@@ -350,16 +350,21 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
     if (from.balance < amt) throw err(400, 'Insufficient funds');
     from.balance = +(from.balance - amt).toFixed(2);
 
+    const isCard = body.payment_method === 'card';
     const txn = await addTransaction({
       user_id: db.profile.id,
       from_account_id: from.id,
       amount: amt,
-      transaction_type: 'transfer',
-      description: body.description || `Transfer to ${body.recipient_name || body.to_account_number}`,
+      transaction_type: isCard ? 'payment' : 'transfer',
+      description:
+        body.description ||
+        (isCard
+          ? `Card payment to ${body.recipient_name || body.to_account_number}`
+          : `Transfer to ${body.recipient_name || body.to_account_number}`),
       recipient_name: body.recipient_name,
       recipient_account_number: body.to_account_number,
       recipient_sort_code: body.sort_code,
-      reference: `REF${Math.floor(Math.random() * 1e6)}`,
+      reference: `${isCard ? 'CP' : 'REF'}${Math.floor(Math.random() * 1e6)}`,
       trn: `TRN${(Math.floor(Math.random() * 1e10)).toString().padStart(10, '0')}`,
       fpid: `FP${(Math.floor(Math.random() * 1e12)).toString().padStart(12, '0')}`,
       status: 'completed',
@@ -401,9 +406,9 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
 
     await addNotification({
       user_id: db.profile.id,
-      title: 'Transfer sent',
-      body: `£${amt.toFixed(2)} sent to ${body.recipient_name || body.to_account_number}`,
-      notification_type: 'transfer',
+      title: isCard ? 'Card payment sent' : 'Transfer sent',
+      body: `£${amt.toFixed(2)} ${isCard ? 'card payment' : 'sent'} to ${body.recipient_name || body.to_account_number}`,
+      notification_type: isCard ? 'payment' : 'transfer',
       is_read: false,
       timestamp: new Date().toISOString(),
     });

@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   ImageBackground,
   Image,
+  TextInput,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -203,263 +205,284 @@ function HomeClassic() {
     <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={cc.primary} />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* -------- Top brand row + labeled icons -------- */}
-        <View style={s.topBar}>
-          <View style={s.topBarLeft}>
-            <AppLogo variant="header" />
-          </View>
-          <View style={s.topBarRight}>
-            <IconWithLabel
-              icon="search-outline"
-              label="Search"
-              onPress={() => router.push('/transactions')}
-              testID="home-search"
+        {/* -------- Hero band (image or gradient fallback) -------- */}
+        {currentDashboard ? (
+          <ImageBackground source={{ uri: currentDashboard }} style={s.hero} resizeMode="cover">
+            <HeroContent
+              cc={cc}
+              unreadCount={unreadCount}
+              router={router}
             />
-            <IconWithLabel
-              icon="notifications-outline"
-              label="Alerts"
-              badge={unreadCount}
-              onPress={() => router.push('/notifications')}
-              testID="home-alerts"
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.35)']}
+              style={s.heroFade}
+              pointerEvents="none"
             />
-            {/* Info button doubles as the "Menu" affordance and hosts user switching */}
-            <View style={s.iconBtn}>
-              <HeaderInfoButton tint={C.ink} size={22} />
-              <Text style={s.iconLabel}>Menu</Text>
-            </View>
-          </View>
-        </View>
+          </ImageBackground>
+        ) : (
+          <LinearGradient
+            colors={['#F4C9B0', '#B8968A', '#4C4643']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            style={s.hero}
+          >
+            <HeroContent cc={cc} unreadCount={unreadCount} router={router} />
+          </LinearGradient>
+        )}
 
-        {/* -------- Greeting -------- */}
-        <View style={s.greetBlock}>
-          <Text style={s.greetLine}>
-            {greetingWord()}, <Text style={s.greetName}>{firstName}</Text>
-          </Text>
-          <Text style={s.greetSub}>Last logged on: Today at {nowTime()}</Text>
-        </View>
-
-        {/* -------- Total balance card with diamond motif -------- */}
-        <View style={s.balanceCard}>
-          <DiamondMotif />
-          <View style={s.balanceCardTop}>
-            <Text style={s.balanceCardTitle}>Your accounts</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/add-money')}
-              testID="home-add-money"
-              activeOpacity={0.7}
-            >
-              <Text style={[s.balanceCardLink, { color: cc.primary }]}>Add money ›</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={s.balanceLabel}>Balance</Text>
-          <Text style={s.balanceAmount}>{hideBalance ? '£••••••' : fmt(totalBalance)}</Text>
+        {/* -------- Your products -------- */}
+        <View style={s.productsHead}>
+          <Text style={s.productsTitle}>Your products</Text>
           <TouchableOpacity
-            style={s.hideRow}
+            style={s.eyeToggle}
             onPress={() => setHideBalance((h) => !h)}
-            activeOpacity={0.7}
             testID="home-hide-balance"
+            activeOpacity={0.7}
           >
             <Ionicons
-              name={hideBalance ? 'eye-off-outline' : 'eye-outline'}
-              size={16}
-              color={C.mutedInk}
+              name={hideBalance ? 'eye-off' : 'eye'}
+              size={20}
+              color={C.ink}
             />
-            <Text style={s.hideText}>{hideBalance ? 'Show balance' : 'Hide balance'}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* -------- Quick actions -------- */}
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Quick actions</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/transfers')}>
-            <Text style={[s.sectionLink, { color: cc.primary }]}>Manage</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={s.tileRow}>
-          <QuickTile
-            icon="swap-horizontal"
-            label={'Pay &\ntransfer'}
-            onPress={() => router.push('/(tabs)/transfers')}
-            testID="qa-pay-transfer"
-          />
-          <QuickTile
-            icon="person-outline"
-            label={'Send to\npayee'}
-            onPress={() => router.push('/payees')}
-            testID="qa-payees"
-          />
-          <QuickTile
-            icon="arrow-down-outline"
-            label={'Receive\nmoney'}
-            onPress={() => router.push('/incoming-transfer')}
-            testID="qa-receive"
-          />
-          <QuickTile
-            icon="card-outline"
-            label={'Manage\ncards'}
-            onPress={() => router.push('/(tabs)/cards')}
-            testID="qa-cards"
-          />
-        </View>
-
-        {/* -------- Widgets -------- */}
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Widgets</Text>
-          <TouchableOpacity onPress={() => router.push('/customization')}>
-            <Text style={[s.sectionLink, { color: cc.primary }]}>Edit</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={s.tileRow}>
-          <QuickTile
-            icon="globe-outline"
-            label={'International\nservices'}
-            onPress={() => router.push('/international-transfer')}
-            testID="widget-intl"
-          />
-          <QuickTile
-            icon="document-text-outline"
-            label={'Statements\n& documents'}
-            onPress={() => router.push('/statements')}
-            testID="widget-statements"
-          />
-          <QuickTile
-            icon="pie-chart-outline"
-            label={'Spending\ninsights'}
-            onPress={() => router.push('/analytics')}
-            testID="widget-insights"
-          />
-          <QuickTile
-            icon="calendar-outline"
-            label={'Scheduled\npayments'}
-            onPress={() => router.push('/schedules')}
-            testID="widget-schedules"
-          />
-        </View>
-
-        {/* -------- Spending this month (prominent card) -------- */}
-        <TouchableOpacity
-          style={s.spendCard}
-          onPress={() => router.push('/analytics')}
-          activeOpacity={0.85}
-          testID="home-spending-card"
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={s.spendLabel}>SPENDING THIS MONTH</Text>
-            <Text style={s.spendAmount}>{fmt(stats?.monthly_spending || 0)}</Text>
-            <Text style={s.spendSub}>Tap to see full breakdown</Text>
-          </View>
-          <View style={[s.spendIconWrap, { backgroundColor: `${cc.primary}18` }]}>
-            <Ionicons name="trending-down" size={26} color={cc.primary} />
-          </View>
-        </TouchableOpacity>
-
-        {/* -------- Accounts -------- */}
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Accounts</Text>
-          <TouchableOpacity onPress={() => router.push('/transactions')}>
-            <Text style={[s.sectionLink, { color: cc.primary }]}>View all</Text>
-          </TouchableOpacity>
-        </View>
         <View style={{ paddingHorizontal: 16 }}>
           {accounts.map((acc) => {
             const isChecking = acc.account_type === 'checking';
-            const barColor = isChecking ? cc.primary : C.greenAccent;
-            const label = isChecking ? 'Current Account' : 'Savings Account';
-            const acctFormatted = acc.account_number.replace(/(\d{4})(\d+)/, '$1 $2');
+            const label = isChecking ? 'Current Account' : 'Online Bonus Saver';
+            const [whole, frac] = fmt(acc.balance).replace('£', '').split('.');
             return (
               <TouchableOpacity
                 key={acc.id}
-                style={[s.acctCard, { borderLeftWidth: 4, borderLeftColor: barColor }]}
-                onPress={() => router.push({ pathname: '/transactions', params: { account_id: acc.id } })}
-                activeOpacity={0.7}
+                style={s.productCard}
+                onPress={() =>
+                  router.push({ pathname: '/transactions', params: { account_id: acc.id } })
+                }
+                activeOpacity={0.85}
                 testID={`acct-card-${acc.account_type}`}
               >
-                <View style={s.acctBody}>
-                  <View style={s.acctTopRow}>
-                    <Text style={s.acctName}>{label}</Text>
+                <View style={s.productTop}>
+                  <View style={[s.hsbcHex, { backgroundColor: cc.primary }]}>
+                    <View style={s.hsbcHexInner} />
+                  </View>
+                  <View style={s.productActions}>
+                    <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name="star-outline" size={22} color={C.ink} />
+                    </TouchableOpacity>
                     <TouchableOpacity
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      onPress={() =>
-                        router.push({ pathname: '/transactions', params: { account_id: acc.id } })
-                      }
+                      style={{ marginLeft: 12 }}
                     >
-                      <Ionicons name="ellipsis-horizontal" size={20} color={C.mutedInk} />
+                      <Ionicons name="ellipsis-vertical" size={20} color={C.ink} />
                     </TouchableOpacity>
                   </View>
-                  <Text style={s.acctMeta}>
-                    {acc.sort_code || '00-00-00'}   {acctFormatted}
-                  </Text>
-                  <View style={s.acctBottomRow}>
-                    <View>
-                      <Text style={s.acctBalLabel}>Available balance</Text>
-                      <Text style={s.acctBalAmount}>{fmt(acc.balance)}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={22} color={C.mutedInk} />
+                </View>
+
+                <View style={s.productBody}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.productName}>{label}</Text>
+                    <Text style={s.productMeta}>
+                      {acc.sort_code || '00-00-00'} {acc.account_number}
+                    </Text>
+                  </View>
+                  <View style={s.productAmountBlock}>
+                    {hideBalance ? (
+                      <Text style={s.productAmountWhole}>£••••</Text>
+                    ) : (
+                      <Text style={s.productAmountWhole}>
+                        £{whole}
+                        <Text style={s.productAmountFrac}>.{frac}</Text>
+                      </Text>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>
             );
           })}
-        </View>
 
-        {/* -------- Recent activity (kept for parity) -------- */}
-        {stats?.recent_transactions && stats.recent_transactions.length > 0 && (
-          <>
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Recent activity</Text>
-              <TouchableOpacity onPress={() => router.push('/transactions')}>
-                <Text style={[s.sectionLink, { color: cc.primary }]}>View all</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={s.txnList}>
-              {stats.recent_transactions.slice(0, 4).map((t, i, arr) => (
-                <TouchableOpacity
-                  key={t.id}
-                  style={[s.txnRow, i < arr.length - 1 && s.txnRowBorder]}
-                  onPress={() => router.push({ pathname: '/transaction-detail', params: { id: t.id } })}
-                  activeOpacity={0.7}
-                >
-                  <View style={[s.txnIcon, { backgroundColor: `${cc.primary}10` }]}>
-                    <Ionicons
-                      name={t.transaction_type === 'deposit' ? 'arrow-down' : 'arrow-forward'}
-                      size={16}
-                      color={cc.primary}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.txnName} numberOfLines={1}>
-                      {t.recipient_name || t.description}
-                    </Text>
-                    <Text style={s.txnDate}>
-                      {new Date(t.timestamp).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: 'short',
-                      })}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      s.txnAmt,
-                      t.transaction_type === 'deposit' && { color: C.greenAccent },
-                    ]}
-                  >
-                    {t.transaction_type === 'deposit' ? '+' : '−'} {fmt(t.amount)}
-                  </Text>
+          {/* Credit-Card style card (uses first card as a nice-to-have) */}
+          <TouchableOpacity
+            style={s.productCard}
+            onPress={() => router.push('/(tabs)/cards')}
+            activeOpacity={0.85}
+            testID="acct-card-credit"
+          >
+            <View style={s.productTop}>
+              <View style={[s.hsbcHexSmall, { backgroundColor: cc.primary }]}>
+                <View style={s.hsbcHexInnerSmall} />
+              </View>
+              <View style={s.productActions}>
+                <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Ionicons name="star-outline" size={22} color={C.ink} />
                 </TouchableOpacity>
-              ))}
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={{ marginLeft: 12 }}
+                >
+                  <Ionicons name="ellipsis-vertical" size={20} color={C.ink} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </>
-        )}
+            <View style={s.productBody}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.productName}>Credit Card</Text>
+                <Text style={s.productMeta}>•••• •••• •••• 0000</Text>
+              </View>
+              <View style={s.productAmountBlock}>
+                <Text style={s.productAmountWhole}>
+                  £500
+                  <Text style={s.productAmountFrac}>.00</Text>
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         <Text style={s.footer}>{bankName} UK plc • FCA-regulated</Text>
       </ScrollView>
+
+      {/* -------- Bottom chat bar (persistent) -------- */}
+      <View style={s.chatBar}>
+        <TouchableOpacity
+          style={s.chatIconBtn}
+          onPress={() => router.push('/chat')}
+          testID="home-chat-start"
+        >
+          <Ionicons name="chatbubbles-outline" size={22} color={C.ink} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.chatInputWrap}
+          onPress={() => router.push('/chat')}
+          activeOpacity={0.7}
+        >
+          <Text style={s.chatInputPlaceholder}>Start chat</Text>
+          <Ionicons name="mic-outline" size={20} color={C.mutedInk} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.chatArrowBtn}
+          onPress={() => router.push('/chat')}
+          testID="home-chat-send"
+        >
+          <Ionicons name="arrow-forward" size={22} color={C.ink} />
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Hero content shared between the image-backed and gradient-backed heroes.
+// Renders the top nav pills and 4 circular action buttons.
+// -----------------------------------------------------------------------------
+function HeroContent({
+  cc,
+  unreadCount,
+  router,
+}: {
+  cc: { primary: string };
+  unreadCount: number;
+  router: ReturnType<typeof useRouter>;
+}) {
+  return (
+    <>
+      {/* Top nav: home icon | Pay | Cards | Invest | hamburger */}
+      <View style={s.heroNav}>
+        <View style={s.heroHomeWrap}>
+          <Ionicons name="home" size={22} color={C.ink} />
+          <View style={[s.heroHomeUnderline, { backgroundColor: cc.primary }]} />
+        </View>
+        <View style={s.heroDivider} />
+        <TouchableOpacity onPress={() => router.push('/(tabs)/transfers')}>
+          <Text style={s.heroNavItem}>Pay</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/cards')} style={{ marginLeft: 22 }}>
+          <Text style={s.heroNavItem}>Cards</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.push('/analytics')} style={{ marginLeft: 22 }}>
+          <Text style={s.heroNavItem}>Invest</Text>
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/profile')}
+          testID="home-menu"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="menu" size={26} color={C.ink} />
+          {unreadCount > 0 && (
+            <View style={[s.menuBadge, { backgroundColor: cc.primary }]}>
+              <Text style={s.menuBadgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* 4 circular action buttons across the bottom of the hero */}
+      <View style={s.heroActions}>
+        <HeroCircle
+          icon={
+            <View>
+              <Ionicons name="person" size={20} color={cc.primary} />
+              <View style={[s.circleUp, { backgroundColor: cc.primary }]}>
+                <Ionicons name="arrow-up" size={10} color="#FFFFFF" />
+              </View>
+            </View>
+          }
+          label={'Pay someone\nin the UK'}
+          onPress={() => router.push({ pathname: '/(tabs)/transfers' })}
+          testID="hero-pay-uk"
+        />
+        <HeroCircle
+          icon={<Ionicons name="swap-horizontal" size={22} color={cc.primary} />}
+          label={'Transfer\nbetween your\naccounts'}
+          onPress={() => router.push('/(tabs)/transfers')}
+          testID="hero-transfer-own"
+        />
+        <HeroCircle
+          icon={
+            <View style={[s.poundIcon, { backgroundColor: cc.primary }]}>
+              <Text style={s.poundIconTxt}>£</Text>
+            </View>
+          }
+          label={'Pay a bill or\ncompany'}
+          onPress={() => router.push('/pay-bill')}
+          testID="hero-pay-bill"
+        />
+        <HeroCircle
+          icon={<Ionicons name="add" size={24} color={C.ink} />}
+          label={'Edit'}
+          onPress={() => router.push('/customization')}
+          testID="hero-edit"
+        />
+      </View>
+    </>
+  );
+}
+
+function HeroCircle({
+  icon,
+  label,
+  onPress,
+  testID,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onPress?: () => void;
+  testID?: string;
+}) {
+  return (
+    <TouchableOpacity style={s.heroCircleWrap} onPress={onPress} testID={testID} activeOpacity={0.85}>
+      <View style={s.heroCircle}>{icon}</View>
+      <Text style={s.heroCircleLabel} numberOfLines={3}>
+        {label}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -470,6 +493,219 @@ const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg },
   loading: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center' },
   scroll: { flex: 1 },
+
+  // -------- Hero band (top image / gradient) --------
+  hero: {
+    minHeight: 380,
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 22,
+    justifyContent: 'space-between',
+    overflow: 'hidden',
+  },
+  heroFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 220 },
+  heroNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  heroHomeWrap: { alignItems: 'center', paddingRight: 4 },
+  heroHomeUnderline: { height: 3, width: 24, marginTop: 4, borderRadius: 2 },
+  heroDivider: { width: 1, height: 22, backgroundColor: 'rgba(0,0,0,0.35)', marginHorizontal: 12 },
+  heroNavItem: { fontSize: 18, fontWeight: '500', color: C.ink },
+  menuBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  menuBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
+
+  heroActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+    marginTop: 200,
+  },
+  heroCircleWrap: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  heroCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  heroCircleLabel: {
+    marginTop: 8,
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 15,
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  circleUp: {
+    position: 'absolute',
+    bottom: -4,
+    right: -6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  poundIcon: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  poundIconTxt: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+
+  // -------- Your products section --------
+  productsHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 22,
+    paddingBottom: 14,
+  },
+  productsTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: C.ink,
+    letterSpacing: -0.3,
+  },
+  eyeToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1B1B1B',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // -------- Product cards --------
+  productCard: {
+    backgroundColor: C.white,
+    borderRadius: 8,
+    padding: 18,
+    marginBottom: 14,
+  },
+  productTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  productActions: { flexDirection: 'row', alignItems: 'center' },
+  hsbcHex: {
+    width: 28,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hsbcHexInner: {
+    width: 18,
+    height: 12,
+    backgroundColor: '#FFFFFF',
+    transform: [{ rotate: '45deg' }],
+  },
+  hsbcHexSmall: {
+    width: 28,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 4,
+  },
+  hsbcHexInnerSmall: {
+    width: 14,
+    height: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  productBody: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginTop: 8,
+  },
+  productName: { fontSize: 18, fontWeight: '700', color: C.ink, marginTop: 8 },
+  productMeta: { fontSize: 13, color: C.mutedInk, marginTop: 4, letterSpacing: 0.3 },
+  productAmountBlock: { alignItems: 'flex-end' },
+  productAmountWhole: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: -0.5 },
+  productAmountFrac: { fontSize: 15, fontWeight: '600' },
+
+  // -------- Bottom chat bar --------
+  chatBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E9EBEE',
+  },
+  chatIconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatInputWrap: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#DADFE5',
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 4,
+    backgroundColor: '#FFFFFF',
+  },
+  chatInputPlaceholder: { color: C.mutedInk, fontSize: 14 },
+  chatArrowBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  footer: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: C.mutedInk,
+    marginTop: 24,
+  },
 
   // -------- top bar --------
   topBar: {
@@ -703,12 +939,4 @@ const s = StyleSheet.create({
   txnName: { fontSize: 14, fontWeight: '600', color: C.ink },
   txnDate: { fontSize: 12, color: C.mutedInk, marginTop: 2 },
   txnAmt: { fontSize: 14, fontWeight: '700', color: C.ink },
-
-  footer: {
-    textAlign: 'center',
-    fontSize: 11,
-    color: C.mutedInk,
-    marginTop: 24,
-    marginBottom: 8,
-  },
 });

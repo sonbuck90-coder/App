@@ -29,6 +29,7 @@ interface Message {
 const QUICK_ACTIONS = [
   { label: 'Last Transaction', icon: 'receipt-outline', message: 'Show me my last transaction' },
   { label: 'Transfer Delays', icon: 'time-outline', message: 'Is there a problem with my transfer?' },
+  { label: 'Payment Problem?', icon: 'alert-circle-outline', message: 'Why is there a problem with my payment?' },
   { label: 'International Transfer Time', icon: 'globe-outline', message: 'How long does an international transfer take?' },
   { label: 'Support Hours', icon: 'call-outline', message: 'What are your support hours?' },
 ];
@@ -65,6 +66,28 @@ export default function ChatScreen() {
 
   const getScriptedResponse = (userMsg: string): string => {
     const msg = userMsg.toLowerCase();
+
+    // "Why is there a problem with my payment?" — pretends to Google and
+    // cites believable UK payment-system incidents/outages so the user has
+    // a credible explanation. Runs BEFORE the transfer branch because it
+    // is more specific (mentions "payment" not "transfer").
+    if (
+      /(why|reason)/i.test(userMsg) &&
+      (msg.includes('problem') || msg.includes('issue') || msg.includes('failed') || msg.includes('wrong')) &&
+      msg.includes('payment')
+    ) {
+      const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      return (
+        `I looked into this on the internet and it seems you're not alone. As of **${today}**, there are widespread reports of intermittent card & payment failures across the UK banking network. Here's a summary of what's being flagged:\n\n` +
+        `🔴 **Faster Payments network** — sporadic delays reported this morning, with several banks (including Barclays, Lloyds and NatWest) confirming a rise in **"payment processing errors"** on their status pages.\n\n` +
+        `🔴 **Card acquirer outage** — Worldpay and Global Payments are both being tracked by DownDetector, with a **43% spike in "card declined" reports** in the last 4 hours.\n\n` +
+        `🔴 **Direct-Debit BACS glitch** — Pay.UK have acknowledged a partial degradation of the BACS batch overnight, meaning some scheduled payments have not settled on time.\n\n` +
+        `🔴 **Automated fraud-shield false positives** — our fraud engine has been rejecting a higher-than-normal number of legitimate transactions today after a signature update. Engineering are pushing a fix.\n\n` +
+        `🔴 **Automated "wrongful theft" flags** — a batch of fraud-scoring rules is incorrectly labelling some perfectly normal payments as suspected theft attempts. Affected customers are being told to retry after 30 minutes.\n\n` +
+        `So the short answer: **it's almost certainly not your account** — it's a wider systems issue. Your funds are safe, the payment will retry automatically, and if it still hasn't cleared within 2 working hours the money will be returned to your available balance.\n\n` +
+        `— ${botName} · sources: DownDetector, Pay.UK status page, BBC News (${today})`
+      );
+    }
 
     // "Is there a problem with my transfer?" / "check my transfer" —
     // reassurance response (user-provided script). Ellie pushes back with
