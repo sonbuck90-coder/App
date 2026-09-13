@@ -25,6 +25,10 @@ export interface CustomizationSettings {
    *  Customization. When the user switches theme (applyBankTheme) the
    *  matching entry is applied automatically. */
   themeLogos?: Record<string, string>;
+  /** Per-theme default logo sizes. */
+  themeLogoSizes?: Record<string, LogoSettings['size']>;
+  /** Per-theme dashboard hero image (data URI or URL). */
+  themeDashboards?: Record<string, string>;
 }
 
 const HSBC_DEFAULTS: CustomizationSettings = {
@@ -43,6 +47,8 @@ const HSBC_DEFAULTS: CustomizationSettings = {
   bankPhone: '03457 404 404',
   bankThemeId: 'hsbc',
   themeLogos: {},
+  themeLogoSizes: {},
+  themeDashboards: {},
 };
 
 const LOGO_SIZES = {
@@ -84,6 +90,14 @@ interface CustomizationContextType {
   setThemeDefaultLogo: (themeId: string, url: string) => void;
   /** Remove the saved default logo for a specific theme. */
   clearThemeDefaultLogo: (themeId: string) => void;
+  /** Save the current logo size as the default for a theme. */
+  setThemeDefaultLogoSize: (themeId: string, size: LogoSettings['size']) => void;
+  /** Save a dashboard/hero image for a theme (data URI). */
+  setThemeDashboard: (themeId: string, url: string) => void;
+  /** Remove the saved dashboard image for a theme. */
+  clearThemeDashboard: (themeId: string) => void;
+  /** Current active dashboard image URL for the active theme (or ''). */
+  currentDashboard: string;
   resetToDefaults: () => void;
   isCustomized: boolean;
 }
@@ -157,18 +171,20 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   };
 
   const applyBankTheme = (themeId: string, colorsP: CustomColors) => {
-    // If the user has previously saved a default logo for this theme, load
-    // it — otherwise clear the current logo so a fresh switch doesn't leak
-    // the previous theme's photo.
+    // If the user has previously saved a default logo/size/dashboard for
+    // this theme, load them — otherwise clear so a fresh switch doesn't
+    // leak the previous theme's assets.
     const themeLogos = settings.themeLogos || {};
+    const themeLogoSizes = settings.themeLogoSizes || {};
     const savedLogo = themeLogos[themeId];
+    const savedSize = themeLogoSizes[themeId] as LogoSettings['size'] | undefined;
     const updated: CustomizationSettings = {
       ...settings,
       bankThemeId: themeId,
       colors: { ...colorsP },
       logo: {
-        ...settings.logo,
         url: savedLogo !== undefined ? savedLogo : '',
+        size: savedSize || 'large',
       },
     };
     setSettings(updated);
@@ -180,7 +196,6 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
     const updated: CustomizationSettings = {
       ...settings,
       themeLogos,
-      // Also apply immediately so preview reflects the change.
       logo: { ...settings.logo, url },
     };
     setSettings(updated);
@@ -190,10 +205,33 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
   const clearThemeDefaultLogo = (themeId: string) => {
     const themeLogos = { ...(settings.themeLogos || {}) };
     delete themeLogos[themeId];
+    const updated: CustomizationSettings = { ...settings, themeLogos };
+    setSettings(updated);
+    saveSettings(updated);
+  };
+
+  const setThemeDefaultLogoSize = (themeId: string, size: LogoSettings['size']) => {
+    const themeLogoSizes = { ...(settings.themeLogoSizes || {}), [themeId]: size };
     const updated: CustomizationSettings = {
       ...settings,
-      themeLogos,
+      themeLogoSizes,
+      logo: { ...settings.logo, size },
     };
+    setSettings(updated);
+    saveSettings(updated);
+  };
+
+  const setThemeDashboard = (themeId: string, url: string) => {
+    const themeDashboards = { ...(settings.themeDashboards || {}), [themeId]: url };
+    const updated: CustomizationSettings = { ...settings, themeDashboards };
+    setSettings(updated);
+    saveSettings(updated);
+  };
+
+  const clearThemeDashboard = (themeId: string) => {
+    const themeDashboards = { ...(settings.themeDashboards || {}) };
+    delete themeDashboards[themeId];
+    const updated: CustomizationSettings = { ...settings, themeDashboards };
     setSettings(updated);
     saveSettings(updated);
   };
@@ -220,6 +258,10 @@ export function CustomizationProvider({ children }: { children: ReactNode }) {
         applyBankTheme,
         setThemeDefaultLogo,
         clearThemeDefaultLogo,
+        setThemeDefaultLogoSize,
+        setThemeDashboard,
+        clearThemeDashboard,
+        currentDashboard: (settings.themeDashboards || {})[settings.bankThemeId || 'hsbc'] || '',
         resetToDefaults,
         isCustomized,
       }}

@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  ImageBackground,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,14 +21,18 @@ import { dashboardApi, accountsApi, notificationsApi, Account, DashboardStats } 
 import { getLayoutFor, getBankTheme } from '../../src/context/BankThemes';
 import HomeModern from '../../src/screens/HomeModern';
 import HomeMinimal from '../../src/screens/HomeMinimal';
+import HomeLloyds from '../../src/screens/HomeLloyds';
 
 /**
- * Home layout chooser — picks Classic / Modern / Minimal based on the
- * active bank theme. Each layout is an entirely different visual design.
+ * Home layout chooser — picks Classic / Modern / Minimal / Lloyds based
+ * on the active bank theme. Each layout is an entirely different visual
+ * design.
  */
 export default function Home() {
   const { bankThemeId } = useCustomization();
   const layout = getLayoutFor(bankThemeId);
+  // The Lloyds theme has its own bespoke dashboard.
+  if (bankThemeId === 'lloyds') return <HomeLloyds />;
   if (layout === 'modern') return <HomeModern />;
   if (layout === 'minimal') return <HomeMinimal />;
   return <HomeClassic />;
@@ -64,7 +70,7 @@ const nowTime = () =>
 // -----------------------------------------------------------------------------
 function HomeClassic() {
   const { user, refreshUser } = useAuth();
-  const { colors: cc, bankThemeId } = useCustomization();
+  const { colors: cc, bankThemeId, currentDashboard } = useCustomization();
   const bankName = getBankTheme(bankThemeId).name;
   const router = useRouter();
 
