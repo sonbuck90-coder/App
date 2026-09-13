@@ -156,6 +156,8 @@ export interface Payee {
   name: string;
   sort_code: string;
   account_number: string;
+  bank_name?: string;
+  country_code?: string;
   last_used: string;
 }
 

@@ -365,6 +365,40 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       status: 'completed',
       timestamp: new Date().toISOString(),
     });
+
+    // Auto-save the recipient as a payee (dedup by sort_code + account_number)
+    // so future transfers show them in the "Recent payees" list and the
+    // payees screen. Bank name is resolved via the sort-code lookup so it
+    // renders nicely on cards.
+    if (body.recipient_name && body.to_account_number && body.sort_code) {
+      try {
+        const { lookupBank } = await import('./bank-lookup');
+        const bankShort = lookupBank(body.sort_code)?.bank?.shortName;
+        const existing = db.payees.find(
+          (p) =>
+            p.account_number === body.to_account_number &&
+            (p.sort_code || '').replace(/-/g, '') === body.sort_code.replace(/-/g, ''),
+        );
+        if (existing) {
+          existing.last_used = new Date().toISOString();
+          existing.name = body.recipient_name;
+          if (bankShort) existing.bank_name = bankShort;
+        } else {
+          db.payees.unshift({
+            id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            user_id: db.profile.id,
+            name: body.recipient_name,
+            sort_code: body.sort_code,
+            account_number: body.to_account_number,
+            bank_name: bankShort || undefined,
+            last_used: new Date().toISOString(),
+          });
+        }
+      } catch {
+        /* best-effort save */
+      }
+    }
+
     await addNotification({
       user_id: db.profile.id,
       title: 'Transfer sent',
@@ -426,6 +460,30 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       status: 'completed',
       timestamp: new Date().toISOString(),
     });
+
+    // Auto-save international payee (dedup by iban/account_number)
+    if (body.recipient_name && (body.iban || body.account_number)) {
+      const acct = body.iban || body.account_number;
+      const existing = db.payees.find((p) => p.account_number === acct);
+      if (existing) {
+        existing.last_used = new Date().toISOString();
+        existing.name = body.recipient_name;
+        if (body.bank_name) existing.bank_name = body.bank_name;
+        if (body.country_code) existing.country_code = body.country_code;
+      } else {
+        db.payees.unshift({
+          id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          user_id: db.profile.id,
+          name: body.recipient_name,
+          sort_code: body.country_code || 'INT',
+          account_number: acct,
+          bank_name: body.bank_name || undefined,
+          country_code: body.country_code || undefined,
+          last_used: new Date().toISOString(),
+        });
+      }
+    }
+
     await persist();
     void sendTransactionNotification({
       ...formatHsbcAlert({

@@ -76,6 +76,11 @@ export interface Payee {
   name: string;
   sort_code: string;
   account_number: string;
+  /** Resolved bank name (short) — populated from sort-code lookup at
+   *  save time so we can show it on payee cards and quick-action sheets. */
+  bank_name?: string;
+  /** ISO country code for international payees. */
+  country_code?: string;
   last_used: string;
 }
 

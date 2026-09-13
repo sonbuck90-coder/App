@@ -127,7 +127,11 @@ export default function PayeesScreen() {
                 </View>
                 <View style={styles.payeeDetails}>
                   <Text style={styles.payeeName}>{payee.name}</Text>
-                  <Text style={styles.payeeSortCode}>{payee.sort_code} {getBankName(payee.sort_code) ? `· ${getBankName(payee.sort_code)}` : ''}</Text>
+                  <Text style={styles.payeeSortCode}>
+                    {payee.sort_code}
+                    {payee.bank_name ? ` · ${payee.bank_name}` : (getBankName(payee.sort_code) ? ` · ${getBankName(payee.sort_code)}` : '')}
+                    {payee.country_code && payee.country_code !== 'INT' ? ` · ${payee.country_code}` : ''}
+                  </Text>
                   <Text style={styles.payeeAccountNum}>****{payee.account_number.slice(-4)}</Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={COLORS.gray} />
@@ -164,6 +168,12 @@ export default function PayeesScreen() {
                 <Text style={styles.actionMeta}>
                   {actionPayee?.sort_code} · ****{actionPayee?.account_number.slice(-4)}
                 </Text>
+                {(actionPayee?.bank_name || (actionPayee && getBankName(actionPayee.sort_code))) ? (
+                  <Text style={styles.actionMeta}>
+                    {actionPayee?.bank_name || (actionPayee ? getBankName(actionPayee.sort_code) : '')}
+                    {actionPayee?.country_code && actionPayee.country_code !== 'INT' ? ` · ${actionPayee.country_code}` : ''}
+                  </Text>
+                ) : null}
               </View>
             </View>
 

@@ -27,8 +27,8 @@ interface Message {
 }
 
 const QUICK_ACTIONS = [
-  { label: 'Last Transaction', icon: 'receipt-outline', message: 'Check my last transfer' },
-  { label: 'Transfer Delays', icon: 'time-outline', message: 'How long do transfers take?' },
+  { label: 'Last Transaction', icon: 'receipt-outline', message: 'Show me my last transaction' },
+  { label: 'Transfer Delays', icon: 'time-outline', message: 'Is there a problem with my transfer?' },
   { label: 'International Transfer Time', icon: 'globe-outline', message: 'How long does an international transfer take?' },
   { label: 'Support Hours', icon: 'call-outline', message: 'What are your support hours?' },
 ];
@@ -66,11 +66,17 @@ export default function ChatScreen() {
   const getScriptedResponse = (userMsg: string): string => {
     const msg = userMsg.toLowerCase();
 
-    // "Check my transfer" / "verify my transfer" — reassurance response
-    // (user-provided script) so the bot pushes back with the TRN/FPID and
-    // adds timing based on the recipient bank of the last outgoing transfer.
+    // "Is there a problem with my transfer?" / "check my transfer" —
+    // reassurance response (user-provided script). Ellie pushes back with
+    // TRN/FPID and quotes recipient-bank timings.
+    // NOTE: This branch must run BEFORE the plain "last transaction" branch
+    // so the quick actions can differentiate between the two intents.
+    const isProblemIntent =
+      /(problem|issue|wrong|missing|not receive|not received|didn['’]?t receive|hasn['’]?t (arrived|received)|where is|where's|check|verify|status|confirm|proof)/i.test(
+        userMsg,
+      );
     if (
-      (msg.includes('check') || msg.includes('verify') || msg.includes('status') || msg.includes('confirm') || msg.includes('proof') || msg.includes('where') || msg.includes('when') || msg.includes('arrive')) &&
+      isProblemIntent &&
       (msg.includes('transfer') || (msg.includes('payment') && !msg.includes('receipt')))
     ) {
       // Find the most recent outgoing transaction so we can identify the
