@@ -32,6 +32,9 @@ export interface BankTheme {
     gradientStart: string;
     gradientEnd: string;
   };
+  /** Optional built-in hero image for the Home dashboard. Used when the
+   *  user hasn't chosen their own dashboard photo for this theme. */
+  defaultDashboard?: string;
 }
 
 export const BANK_THEMES: BankTheme[] = [
@@ -44,6 +47,9 @@ export const BANK_THEMES: BankTheme[] = [
     chatbotName: 'Ellie',
     footerTagline: 'HSBC UK | Secure Banking',
     colors: { primary: '#DB0011', accent: '#00847F', header: '#FFFFFF', gradientStart: '#DB0011', gradientEnd: '#8B0000' },
+    // Signature "HSBC — Opening up a world of opportunity" hero photo:
+    // a lone figure on a beach at sunset (user-provided asset).
+    defaultDashboard: 'https://customer-assets-7cd3h4nn.emergentagent.net/job_vault-app-25/artifacts/0kd7ugg1_IMG_0149.jpeg',
   },
   {
     id: 'barclays',

@@ -72,8 +72,15 @@ const nowTime = () =>
 // -----------------------------------------------------------------------------
 function HomeClassic() {
   const { user, refreshUser } = useAuth();
-  const { colors: cc, bankThemeId, currentDashboard } = useCustomization();
-  const bankName = getBankTheme(bankThemeId).name;
+  const { colors: cc, bankThemeId, currentDashboard, settings } = useCustomization();
+  const bankTheme = getBankTheme(bankThemeId);
+  const bankName = bankTheme.name;
+  // Prefer the user's custom dashboard; fall back to the theme-provided one.
+  const heroImage = currentDashboard || bankTheme.defaultDashboard || '';
+  // Small square logo shown on each product card. Uses the user's uploaded
+  // logo (from Customization → Logo) when available, otherwise falls back
+  // to the theme's built-in hexagon.
+  const productLogo = settings.logo?.url || '';
   const router = useRouter();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -212,17 +219,28 @@ function HomeClassic() {
         showsVerticalScrollIndicator={false}
       >
         {/* -------- Hero band (image or gradient fallback) -------- */}
-        {currentDashboard ? (
-          <ImageBackground source={{ uri: currentDashboard }} style={s.hero} resizeMode="cover">
+        {heroImage ? (
+          <ImageBackground source={{ uri: heroImage }} style={s.hero} resizeMode="cover">
+            {/* Top scrim so nav pills stay legible over bright skies */}
+            <LinearGradient
+              colors={['rgba(255,255,255,0.85)', 'rgba(255,255,255,0.15)', 'transparent']}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 0.35 }}
+              style={s.heroTopScrim}
+              pointerEvents="none"
+            />
+            {/* Bottom scrim so circle labels stay legible over water */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.55)']}
+              start={{ x: 0.5, y: 0.4 }}
+              end={{ x: 0.5, y: 1 }}
+              style={s.heroBottomScrim}
+              pointerEvents="none"
+            />
             <HeroContent
               cc={cc}
               unreadCount={unreadCount}
               router={router}
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.35)']}
-              style={s.heroFade}
-              pointerEvents="none"
             />
           </ImageBackground>
         ) : (
@@ -269,18 +287,22 @@ function HomeClassic() {
                 testID={`acct-card-${acc.account_type}`}
               >
                 <View style={s.productTop}>
-                  <View style={[s.hsbcHex, { backgroundColor: cc.primary }]}>
-                    <View style={s.hsbcHexInner} />
-                  </View>
+                  {productLogo ? (
+                    <Image source={{ uri: productLogo }} style={s.productLogoImg} resizeMode="cover" />
+                  ) : (
+                    <View style={[s.productLogoHex, { backgroundColor: cc.primary }]}>
+                      <View style={s.productLogoHexInner} />
+                    </View>
+                  )}
                   <View style={s.productActions}>
                     <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name="star-outline" size={22} color={C.ink} />
+                      <Ionicons name="star-outline" size={20} color={C.ink} />
                     </TouchableOpacity>
                     <TouchableOpacity
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       style={{ marginLeft: 12 }}
                     >
-                      <Ionicons name="ellipsis-vertical" size={20} color={C.ink} />
+                      <Ionicons name="ellipsis-vertical" size={18} color={C.ink} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -315,18 +337,22 @@ function HomeClassic() {
             testID="acct-card-credit"
           >
             <View style={s.productTop}>
-              <View style={[s.hsbcHexSmall, { backgroundColor: cc.primary }]}>
-                <View style={s.hsbcHexInnerSmall} />
-              </View>
+              {productLogo ? (
+                <Image source={{ uri: productLogo }} style={s.productLogoImg} resizeMode="cover" />
+              ) : (
+                <View style={[s.productLogoHex, { backgroundColor: cc.primary }]}>
+                  <View style={s.productLogoHexInner} />
+                </View>
+              )}
               <View style={s.productActions}>
                 <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Ionicons name="star-outline" size={22} color={C.ink} />
+                  <Ionicons name="star-outline" size={20} color={C.ink} />
                 </TouchableOpacity>
                 <TouchableOpacity
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={{ marginLeft: 12 }}
                 >
-                  <Ionicons name="ellipsis-vertical" size={20} color={C.ink} />
+                  <Ionicons name="ellipsis-vertical" size={18} color={C.ink} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -496,13 +522,15 @@ const s = StyleSheet.create({
 
   // -------- Hero band (top image / gradient) --------
   hero: {
-    minHeight: 380,
+    minHeight: 400,
     paddingHorizontal: 18,
     paddingTop: 10,
-    paddingBottom: 22,
+    paddingBottom: 26,
     justifyContent: 'space-between',
     overflow: 'hidden',
   },
+  heroTopScrim: { position: 'absolute', left: 0, right: 0, top: 0, height: 130 },
+  heroBottomScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 260 },
   heroFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 220 },
   heroNav: {
     flexDirection: 'row',
@@ -622,6 +650,23 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   productActions: { flexDirection: 'row', alignItems: 'center' },
+  productLogoImg: {
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+  },
+  productLogoHex: {
+    width: 28,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 3,
+  },
+  productLogoHexInner: {
+    width: 14,
+    height: 10,
+    backgroundColor: '#FFFFFF',
+  },
   hsbcHex: {
     width: 28,
     height: 20,
