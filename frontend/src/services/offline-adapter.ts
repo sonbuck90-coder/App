@@ -359,7 +359,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
       description:
         body.description ||
         (isCard
-          ? `Card payment to ${body.recipient_name || body.to_account_number}`
+          ? `Payment to ${body.recipient_name || 'merchant'}`
           : `Transfer to ${body.recipient_name || body.to_account_number}`),
       recipient_name: body.recipient_name,
       recipient_account_number: body.to_account_number,
@@ -388,6 +388,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
           existing.last_used = new Date().toISOString();
           existing.name = body.recipient_name;
           if (bankShort) existing.bank_name = bankShort;
+          if (typeof body.is_business === 'boolean') existing.is_business = body.is_business;
         } else {
           db.payees.unshift({
             id: `pay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -396,6 +397,7 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
             sort_code: body.sort_code,
             account_number: body.to_account_number,
             bank_name: bankShort || undefined,
+            is_business: !!body.is_business,
             last_used: new Date().toISOString(),
           });
         }
@@ -406,8 +408,8 @@ async function handle(ctx: Ctx): Promise<AxiosResponse> {
 
     await addNotification({
       user_id: db.profile.id,
-      title: isCard ? 'Card payment sent' : 'Transfer sent',
-      body: `£${amt.toFixed(2)} ${isCard ? 'card payment' : 'sent'} to ${body.recipient_name || body.to_account_number}`,
+      title: isCard ? 'Payment completed' : 'Transfer sent',
+      body: `£${amt.toFixed(2)} ${isCard ? 'paid' : 'sent'} to ${body.recipient_name || body.to_account_number}`,
       notification_type: isCard ? 'payment' : 'transfer',
       is_read: false,
       timestamp: new Date().toISOString(),

@@ -78,9 +78,11 @@ function HomeClassic() {
   // Prefer the user's custom dashboard; fall back to the theme-provided one.
   const heroImage = currentDashboard || bankTheme.defaultDashboard || '';
   // Small square logo shown on each product card. Uses the user's uploaded
-  // logo (from Customization → Logo) when available, otherwise falls back
-  // to the theme's built-in hexagon.
+  // logo (from Customization → Logo) when available, otherwise a themed
+  // badge with the bank's initials so it always feels branded.
   const productLogo = settings.logo?.url || '';
+  const productInitials =
+    bankTheme.id === 'hsbc' ? 'HSBC' : bankTheme.initials || bankName[0];
   const router = useRouter();
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -290,8 +292,8 @@ function HomeClassic() {
                   {productLogo ? (
                     <Image source={{ uri: productLogo }} style={s.productLogoImg} resizeMode="cover" />
                   ) : (
-                    <View style={[s.productLogoHex, { backgroundColor: cc.primary }]}>
-                      <View style={s.productLogoHexInner} />
+                    <View style={[s.productLogoBadge, { backgroundColor: cc.primary }]}>
+                      <Text style={s.productLogoBadgeText}>{productInitials}</Text>
                     </View>
                   )}
                   <View style={s.productActions}>
@@ -340,8 +342,8 @@ function HomeClassic() {
               {productLogo ? (
                 <Image source={{ uri: productLogo }} style={s.productLogoImg} resizeMode="cover" />
               ) : (
-                <View style={[s.productLogoHex, { backgroundColor: cc.primary }]}>
-                  <View style={s.productLogoHexInner} />
+                <View style={[s.productLogoBadge, { backgroundColor: cc.primary }]}>
+                  <Text style={s.productLogoBadgeText}>{productInitials}</Text>
                 </View>
               )}
               <View style={s.productActions}>
@@ -654,6 +656,20 @@ const s = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 4,
+  },
+  productLogoBadge: {
+    minWidth: 40,
+    height: 24,
+    borderRadius: 3,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productLogoBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   productLogoHex: {
     width: 28,

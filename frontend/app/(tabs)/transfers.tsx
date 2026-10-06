@@ -66,6 +66,9 @@ export default function TransfersScreen() {
    *  transaction-type stored on the ledger. Auto-saving to payees applies
    *  identically to both. */
   const [paymentMethod, setPaymentMethod] = useState<'bank' | 'card'>('bank');
+  /** Send-to-business toggle. Tags the auto-saved payee with a business
+   *  flag so it appears with a briefcase icon on the payees screen. */
+  const [isBusinessAccount, setIsBusinessAccount] = useState(false);
 
   // Confirmation of Payee (CoP) — runs every time the user opens the review.
   const [copStatus, setCopStatus] = useState<'idle' | 'checking' | 'done'>('idle');
@@ -225,13 +228,18 @@ export default function TransfersScreen() {
       return;
     }
     if (!recipientName.trim()) {
-      Alert.alert('Error', 'Please enter recipient name');
+      Alert.alert('Error', paymentMethod === 'card' ? 'Please enter the merchant name' : 'Please enter recipient name');
       return;
     }
-    if (!validateSortCode()) return;
-    if (!recipientAccount) {
-      Alert.alert('Error', 'Please enter recipient account number');
-      return;
+    // Bank transfers require a full sort code + account number pair. Card
+    // payments (pay-for-services) skip these because they route through
+    // the card acquirer, not Faster Payments.
+    if (paymentMethod === 'bank') {
+      if (!validateSortCode()) return;
+      if (!recipientAccount) {
+        Alert.alert('Error', 'Please enter recipient account number');
+        return;
+      }
     }
     if (!amount || parseFloat(amount) <= 0) {
       Alert.alert('Error', 'Please enter a valid amount');
@@ -281,16 +289,17 @@ export default function TransfersScreen() {
         new Promise((resolve) => setTimeout(resolve, 3000)),
         transfersApi.create({
           from_account_id: selectedAccount.id,
-          to_account_number: recipientAccount,
+          to_account_number: paymentMethod === 'card' ? 'CARDPAY' : recipientAccount,
           amount: transferAmount,
           description:
             description ||
             (paymentMethod === 'card'
-              ? `Card payment to ${recipientName || recipientAccount}`
+              ? `Payment to ${recipientName || 'merchant'}`
               : `Transfer to ${recipientName || recipientAccount}`),
           recipient_name: recipientName,
-          sort_code: sortCode,
+          sort_code: paymentMethod === 'card' ? '00-00-00' : sortCode,
           payment_method: paymentMethod,
+          is_business: isBusinessAccount,
         }),
       ]);
 
@@ -561,7 +570,7 @@ export default function TransfersScreen() {
               <Ionicons name="checkmark" size={30} color="#00847F" />
             </View>
             <Text style={styles.rcTitle}>
-              {paymentMethod === 'card' ? 'Card payment complete' : 'Transfer complete'}
+              {paymentMethod === 'card' ? 'Payment completed' : 'Transfer complete'}
             </Text>
             <Text style={styles.rcSubtitle}>Your payment has been sent successfully.</Text>
           </View>
@@ -881,77 +890,103 @@ export default function TransfersScreen() {
 
           {/* Recipient Details */}
           <View style={styles.section}>
-            <Text style={styles.sectionLabel}>To</Text>
+            <Text style={styles.sectionLabel}>{paymentMethod === 'card' ? 'Pay for services' : 'To'}</Text>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Recipient Name</Text>
+              <Text style={styles.inputLabel}>
+                {paymentMethod === 'card' ? 'Merchant / Business name' : 'Recipient Name'}
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Enter recipient name"
+                placeholder={paymentMethod === 'card' ? 'e.g. Netflix, Amazon, Corner Café' : 'Enter recipient name'}
                 placeholderTextColor={COLORS.gray}
                 value={recipientName}
                 onChangeText={setRecipientName}
                 testID="recipient-name-input"
               />
             </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Sort Code</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  bankLookupResult?.found && styles.inputSuccess,
-                  sortCodeError ? styles.inputError : (bankLookupResult && !bankLookupResult.found && isValidSortCode(sortCode) && styles.inputWarning),
-                ]}
-                placeholder="XX-XX-XX"
-                placeholderTextColor={COLORS.gray}
-                value={sortCode}
-                onChangeText={handleSortCodeChange}
-                keyboardType="numeric"
-                maxLength={8}
-                testID="sort-code-input"
-              />
-              {/* Sort code validation error */}
-              {sortCodeError ? (
-                <View style={styles.sortCodeErrorContainer}>
-                  <Ionicons name="close-circle" size={16} color={customColors.primary} />
-                  <Text style={styles.sortCodeErrorText}>{sortCodeError}</Text>
-                </View>
-              ) : null}
-              {/* Bank Name Lookup Result */}
-              {!sortCodeError && bankLookupResult && (
-                <View style={styles.bankLookupContainer}>
-                  {bankLookupResult.found && bankLookupResult.bank ? (
-                    <View style={styles.bankFound}>
-                      <View style={styles.bankIconContainer}>
-                        <Ionicons name="business" size={16} color={COLORS.success} />
-                      </View>
-                      <View style={styles.bankInfoContainer}>
-                        <Text style={styles.bankName}>{bankLookupResult.bank.name}</Text>
-                        <Text style={styles.bankShortName}>{bankLookupResult.bank.shortName}</Text>
-                      </View>
-                      <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
-                    </View>
-                  ) : bankLookupResult.error && isValidSortCode(sortCode) ? (
-                    <View style={styles.bankNotFound}>
-                      <Ionicons name="alert-circle" size={18} color={COLORS.warning} />
-                      <Text style={styles.bankNotFoundText}>{bankLookupResult.error}</Text>
+            {/* Business-account toggle (both modes) — payee is auto-flagged
+                as a business account so it appears with a briefcase icon. */}
+            <TouchableOpacity
+              style={styles.businessToggleRow}
+              onPress={() => setIsBusinessAccount((v) => !v)}
+              activeOpacity={0.75}
+              testID="business-toggle"
+            >
+              <View style={[styles.businessCheckbox, isBusinessAccount && { backgroundColor: customColors.primary, borderColor: customColors.primary }]}>
+                {isBusinessAccount && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.businessToggleLabel}>Send to a business account</Text>
+                <Text style={styles.businessToggleSub}>Tag this recipient as a business — helps with tax and expense reporting</Text>
+              </View>
+              <Ionicons name="briefcase-outline" size={20} color={isBusinessAccount ? customColors.primary : COLORS.gray} />
+            </TouchableOpacity>
+
+            {/* Sort code + account number only apply to bank transfers.
+                Card payments (Pay for services) don't need them. */}
+            {paymentMethod === 'bank' && (
+              <>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Sort Code</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      bankLookupResult?.found && styles.inputSuccess,
+                      sortCodeError ? styles.inputError : (bankLookupResult && !bankLookupResult.found && isValidSortCode(sortCode) && styles.inputWarning),
+                    ]}
+                    placeholder="XX-XX-XX"
+                    placeholderTextColor={COLORS.gray}
+                    value={sortCode}
+                    onChangeText={handleSortCodeChange}
+                    keyboardType="numeric"
+                    maxLength={8}
+                    testID="sort-code-input"
+                  />
+                  {/* Sort code validation error */}
+                  {sortCodeError ? (
+                    <View style={styles.sortCodeErrorContainer}>
+                      <Ionicons name="close-circle" size={16} color={customColors.primary} />
+                      <Text style={styles.sortCodeErrorText}>{sortCodeError}</Text>
                     </View>
                   ) : null}
+                  {/* Bank Name Lookup Result */}
+                  {!sortCodeError && bankLookupResult && (
+                    <View style={styles.bankLookupContainer}>
+                      {bankLookupResult.found && bankLookupResult.bank ? (
+                        <View style={styles.bankFound}>
+                          <View style={styles.bankIconContainer}>
+                            <Ionicons name="business" size={16} color={COLORS.success} />
+                          </View>
+                          <View style={styles.bankInfoContainer}>
+                            <Text style={styles.bankName}>{bankLookupResult.bank.name}</Text>
+                            <Text style={styles.bankShortName}>{bankLookupResult.bank.shortName}</Text>
+                          </View>
+                          <Ionicons name="checkmark-circle" size={20} color={COLORS.success} />
+                        </View>
+                      ) : bankLookupResult.error && isValidSortCode(sortCode) ? (
+                        <View style={styles.bankNotFound}>
+                          <Ionicons name="alert-circle" size={18} color={COLORS.warning} />
+                          <Text style={styles.bankNotFoundText}>{bankLookupResult.error}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Account Number</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter 8-digit account number"
-                placeholderTextColor={COLORS.gray}
-                value={recipientAccount}
-                onChangeText={(t) => setRecipientAccount(t.replace(/\D/g, '').slice(0, 8))}
-                keyboardType="numeric"
-                maxLength={8}
-                testID="account-number-input"
-              />
-            </View>
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Account Number</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter 8-digit account number"
+                    placeholderTextColor={COLORS.gray}
+                    value={recipientAccount}
+                    onChangeText={(t) => setRecipientAccount(t.replace(/\D/g, '').slice(0, 8))}
+                    keyboardType="numeric"
+                    maxLength={8}
+                    testID="account-number-input"
+                  />
+                </View>
+              </>
+            )}
           </View>
 
           {/* Amount */}

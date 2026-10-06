@@ -24,6 +24,8 @@ import { useRouter } from 'expo-router';
 import { api, accountsApi, Account } from '../src/services/api';
 import { useCustomization } from '../src/context/CustomizationContext';
 import { lookupBank, formatSortCode, isValidSortCode } from '../src/services/bank-lookup';
+import { getBankTheme } from '../src/context/BankThemes';
+import * as Clipboard from 'expo-clipboard';
 import BackButton from '../src/components/BackButton';
 
 const fmt = (v: number) =>
@@ -31,7 +33,70 @@ const fmt = (v: number) =>
 
 export default function IncomingTransferScreen() {
   const router = useRouter();
-  const { colors: cc, headerTextColor } = useCustomization();
+  const { colors: cc, headerTextColor, bankThemeId } = useCustomization();
+  const bankTheme = getBankTheme(bankThemeId);
+
+  /**
+   * Compute an IBAN from a UK sort code + account number.
+   * Format: GB {2 check digits} {4-char bank code} {sort code} {account number}
+   * We use a compact mod-97 check-digit implementation.
+   */
+  const computeIban = (sortCode: string, accountNumber: string, bankCode: string) => {
+    if (!sortCode || !accountNumber) return '';
+    const sc = sortCode.replace(/-/g, '').padEnd(6, '0');
+    const acct = accountNumber.padStart(8, '0');
+    const bban = `${bankCode}${sc}${acct}`;
+    // Move country + "00" to end, convert letters (A=10..Z=35), mod 97
+    const rearranged = `${bban}GB00`;
+    const numeric = rearranged
+      .split('')
+      .map((ch) => (/[A-Z]/.test(ch) ? String(ch.charCodeAt(0) - 55) : ch))
+      .join('');
+    // mod-97 on a huge number, done in chunks
+    let remainder = 0;
+    for (const ch of numeric) {
+      remainder = (remainder * 10 + parseInt(ch, 10)) % 97;
+    }
+    const check = 98 - remainder;
+    const checkStr = String(check).padStart(2, '0');
+    return `GB${checkStr} ${bankCode} ${sc.match(/.{1,4}/g)?.join(' ')} ${acct.match(/.{1,4}/g)?.join(' ')}`.trim();
+  };
+
+  /** SWIFT/BIC codes per UK bank theme (used on incoming international
+   *  transfer instructions). */
+  const swiftByTheme: Record<string, string> = {
+    hsbc: 'HBUKGB4B',
+    barclays: 'BARCGB22',
+    lloyds: 'LOYDGB2L',
+    natwest: 'NWBKGB2L',
+    santander: 'ABBYGB2L',
+    halifax: 'HLFXGB21',
+    metro: 'MYMBGB2L',
+    starling: 'SRLGGB3L',
+    monzo: 'MONZGB2L',
+    revolut: 'REVOGB21',
+    firstdirect: 'MIDLGB22',
+    nationwide: 'NAIAGB21',
+    tsb: 'TSBSGB2A',
+  };
+  /** 4-char bank code used in IBAN construction. */
+  const bankCodeByTheme: Record<string, string> = {
+    hsbc: 'HBUK',
+    barclays: 'BARC',
+    lloyds: 'LOYD',
+    natwest: 'NWBK',
+    santander: 'ABBY',
+    halifax: 'HLFX',
+    metro: 'MYMB',
+    starling: 'SRLG',
+    monzo: 'MONZ',
+    revolut: 'REVO',
+    firstdirect: 'MIDL',
+    nationwide: 'NAIA',
+    tsb: 'TSBS',
+  };
+  const themeSwift = swiftByTheme[bankThemeId] || 'HBUKGB4B';
+  const themeBankCode = bankCodeByTheme[bankThemeId] || 'HBUK';
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [acct, setAcct] = useState<Account | null>(null);
@@ -224,6 +289,57 @@ export default function IncomingTransferScreen() {
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
           <Text style={s.lead}>Record a Faster Payment coming into your account. Enter the sender&apos;s details just like they appear on their banking app.</Text>
+
+          {/* International details — IBAN + SWIFT for the selected account,
+              so senders overseas can pay into it via SWIFT. */}
+          {acct ? (
+            <View style={[s.intlCard, { borderColor: cc.primary + '33' }]}>
+              <View style={s.intlHead}>
+                <Ionicons name="globe-outline" size={18} color={cc.primary} />
+                <Text style={[s.intlTitle, { color: cc.primary }]}>
+                  Your international details ({bankTheme.name})
+                </Text>
+              </View>
+              <Text style={s.intlSub}>Share these with anyone paying you from overseas.</Text>
+
+              <View style={s.intlRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.intlLbl}>IBAN</Text>
+                  <Text style={s.intlValue} selectable>
+                    {computeIban(acct.sort_code, acct.account_number, themeBankCode)}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={async () => {
+                    const iban = computeIban(acct.sort_code, acct.account_number, themeBankCode).replace(/ /g, '');
+                    await Clipboard.setStringAsync(iban);
+                    Alert.alert('IBAN copied', iban);
+                  }}
+                  testID="copy-iban"
+                >
+                  <Ionicons name="copy-outline" size={18} color={cc.primary} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={s.intlRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.intlLbl}>SWIFT / BIC</Text>
+                  <Text style={s.intlValue} selectable>{themeSwift}</Text>
+                </View>
+                <TouchableOpacity
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(themeSwift);
+                    Alert.alert('SWIFT copied', themeSwift);
+                  }}
+                  testID="copy-swift"
+                >
+                  <Ionicons name="copy-outline" size={18} color={cc.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
 
           {/* Receive into */}
           <Text style={s.fieldLabel}>Receive into</Text>

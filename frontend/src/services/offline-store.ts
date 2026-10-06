@@ -81,6 +81,8 @@ export interface Payee {
   bank_name?: string;
   /** ISO country code for international payees. */
   country_code?: string;
+  /** Recipient is a business (vs individual). */
+  is_business?: boolean;
   last_used: string;
 }
 

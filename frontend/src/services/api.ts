@@ -127,6 +127,8 @@ export const transfersApi = {
     /** 'bank' (default) → labelled "Transfer".
      *  'card' → labelled "Card payment" on the ledger and receipt. */
     payment_method?: 'bank' | 'card';
+    /** Tag the auto-saved payee as a business account. */
+    is_business?: boolean;
   }) => api.post<Transaction>('/transfers', data),
 };
 
@@ -161,6 +163,9 @@ export interface Payee {
   account_number: string;
   bank_name?: string;
   country_code?: string;
+  /** Recipient is a business (vs an individual). Shown with a briefcase
+   *  icon on the payees screen. */
+  is_business?: boolean;
   last_used: string;
 }
 
